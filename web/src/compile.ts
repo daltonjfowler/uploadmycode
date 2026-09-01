@@ -11,16 +11,24 @@
  * Everything else — a dropped connection, an HTML error page, a shape we do not
  * recognise — becomes one "service" outcome with a sentence a student can read.
  *
- * Since T5 every compile carries the class phrase in an `x-class-phrase`
- * header. A 403 means the phrase is missing, wrong, or has expired; the message
- * the Worker sends is the one shown, word for word, because it is the sentence
- * that tells a student to go and ask the teacher.
+ * Every compile carries two headers:
  *
- * Two different problems arrive as HTTP 429, so they are told apart by the
- * Worker's `x-lockout` header rather than by reading the sentence: too many
- * compiles in a minute (wait, then click Compile), and too many wrong phrases
- * from this network (a lockout, and the phrase is what has to be fixed).
+ *   x-class-phrase  today's class phrase. A 403 means it is missing, wrong or
+ *                   expired, and the Worker's sentence is shown word for word
+ *                   because it is what tells a student to ask the teacher. A
+ *                   wrong phrase is only ever a 403 — never a lockout, never a
+ *                   delay — because the whole school shares one public address
+ *                   and one student must not be able to shut the room down.
+ *   x-client-id     this browser's id from storage.ts, which is how the Worker
+ *                   gives every Chromebook its own six compiles a minute
+ *                   instead of six for the school.
+ *
+ * An HTTP 429 is therefore always about pace, never about the phrase: either
+ * this browser has compiled six times in a minute or the whole site is at its
+ * ceiling. Both say so in a sentence and both mean "wait, then click Compile".
  */
+
+import { loadClientId } from "./storage.ts";
 
 export type CompileOutcome =
 	| { kind: "success"; hex: string }
@@ -28,8 +36,6 @@ export type CompileOutcome =
 	| { kind: "busy"; message: string }
 	/** HTTP 403. The page must ask for the phrase again. */
 	| { kind: "phrase-required"; message: string }
-	/** HTTP 429 after too many wrong phrases from this network. */
-	| { kind: "phrase-locked"; message: string }
 	| { kind: "service-error"; message: string };
 
 /** Same path in dev (Vite proxies it to the local server) and in production. */
@@ -40,7 +46,11 @@ export async function requestCompile(code: string, phrase: string): Promise<Comp
 	try {
 		response = await fetch(COMPILE_URL, {
 			method: "POST",
-			headers: { "content-type": "application/json", "x-class-phrase": phrase },
+			headers: {
+				"content-type": "application/json",
+				"x-class-phrase": phrase,
+				"x-client-id": loadClientId(),
+			},
 			body: JSON.stringify({ code }),
 		});
 	} catch {
@@ -73,9 +83,6 @@ export async function requestCompile(code: string, phrase: string): Promise<Comp
 	// as it was written: 403 phrase, 413 too big, 429 too fast, 503 over capacity.
 	if (typeof reply.error === "string") {
 		if (response.status === 403) return { kind: "phrase-required", message: reply.error };
-		if (response.headers.get("x-lockout") === "class-phrase") {
-			return { kind: "phrase-locked", message: reply.error };
-		}
 		return response.status === 503
 			? { kind: "busy", message: reply.error }
 			: { kind: "service-error", message: reply.error };

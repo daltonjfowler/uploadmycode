@@ -35,7 +35,8 @@ and a Chromebook that goes back in the cart carries nothing into tomorrow.
 |---|---|
 | No class phrase is active. Ask your teacher. | Nothing is set, or it expired. Set one. |
 | Wrong class phrase. Ask your teacher for today's phrase. | Typo, or yesterday's phrase in a tab that was never closed. Retype it. |
-| That is a lot of compiles in one minute. Wait N seconds… | Rate limit. Six a minute per IP. Wait. |
+| That is a lot of compiles in one minute. Wait N seconds… | That Chromebook has compiled six times in a minute. Wait. |
+| The compiler is very busy right now. Wait a minute… | The whole site is at its ceiling of 120 compiles a minute. Rare; wait. |
 | That sketch is too big to compile. The limit is 100 KB. | They pasted something enormous. |
 | The compiler is busy or starting up. | Cold start, or two compiles landed at once. Wait and retry. |
 | uploadmycode only works from school. | The optional IP lock is on and they are off-site (section 6). |
@@ -185,18 +186,21 @@ is refusing everyone and the Worker log says so.
 
 ## 4. What actually guards a compile
 
-`POST /api/compile` runs six checks, in this order:
+`POST /api/compile` runs five checks before it will hand anything to the container. The order is
+the design, and it lives in one file, `src/compile-gate.ts`:
 
 1. **Size.** Over 100 KB → 413. Answered from `Content-Length` before the body is read where
    possible, and re-checked against the real byte count after, so a chunked upload cannot slip past.
 2. **School IP lock.** Off unless `ALLOWED_CIDRS` is set (section 6).
-3. **Phrase lockout.** Is this address already serving a wrong-phrase lockout? → 429. Checked
-   before the KV read, so a locked address costs nothing (section 4a).
-4. **Class phrase.** Read from KV, compared in constant time after both sides are normalized.
-   Missing or expired → 403 "No class phrase is active"; wrong → 403 "Wrong class phrase".
-5. **Rate limit.** Six compiles a minute per IP, counted in the container's Durable Object, with a
-   `Retry-After` header on the 429.
-6. **Compile.** Only now is the container touched.
+3. **Class phrase.** Read from KV, compared in constant time after both sides are normalized.
+   Missing or expired → 403 "No class phrase is active"; wrong → 403 "Wrong class phrase". A wrong
+   phrase is *only ever* a 403: never counted, never delayed, never a lockout (section 4a).
+4. **Per-client rate limit.** Six compiles a minute for the `x-client-id` the browser sends,
+   counted in the container's Durable Object, with a `Retry-After` header on the 429. It runs
+   after the phrase check on purpose, so wrong guesses can never spend anybody's compiles.
+5. **Global ceiling.** 120 compile requests a minute across everyone → 429. The bill guard.
+
+Only after all five is the container touched.
 
 A phrase is valid only while `Date.now() < expiresAt`. KV's own `expirationTtl` is set as well, but
 a KV read can be served from a per-location cache for up to 60 seconds, so the Worker never trusts
@@ -209,51 +213,91 @@ rejection, so guessing is slow and the reply time says nothing about how close a
 
 ## 4a. Abuse protection
 
-The phrase and the key are short enough to guess if guessing is free, so it is not free. Everything
-below is counted in the compile container's Durable Object — the single instance every request
-already passes through — which makes the counts site-wide rather than per Worker isolate. Nothing
-is written to storage: if that object is ever evicted the counts reset, which is the same trade the
-compile rate limit makes.
+**Read this first: the whole school leaves Cloudflare through ONE public IP address.** Every
+Chromebook in the building shares it. So anything this Worker counts "per IP" is really counted per
+*school*, and any penalty it hands out per IP is handed to the whole class at once. That single
+fact decides every number below.
+
+There used to be per-IP lockouts here: ten wrong phrases in ten minutes locked that address out of
+compiling, five wrong teacher keys locked it out of `/teacher.html`. On paper they slowed a
+guesser down. In a classroom they handed one bored student a switch that turns off compiling for
+thirty classmates — or locks the teacher out of his own phrase page — in about fifteen clicks. They
+are gone. Do not put them back.
+
+Very little was bought by them anyway:
+
+- **A wrong answer is already cheap to refuse.** A wrong phrase costs one KV read (usually served
+  from a cache) and two hashes. A wrong teacher key costs two hashes and the fixed 300 ms pause.
+  The container never starts either way, so no wrong guess costs compute.
+- **The teacher key is 192 bits of randomness.** What stops a brute force is the length of the key,
+  not a counter. There is no number of guesses per hour that matters at that size.
+- **The phrase is not a password.** It is three words, it is written on the board, and it expires
+  within hours. It keeps the rest of the internet off the compiler; it was never meant to hold
+  against somebody sitting in the room.
+
+### What is actually enforced
 
 | Guard | Limit | Then | Message |
 |---|---|---|---|
-| Wrong teacher key, per IP | 5 in 15 minutes | 429 for 15 minutes from the fifth | "Too many wrong keys from this network. Try again in N minutes." |
-| Wrong teacher key, everywhere | more than 100 in 15 minutes | 429 for 15 minutes — **but a correct key still gets in** | "Too many wrong keys from everywhere right now. Try again in N minutes. The right key still works." |
-| Wrong class phrase, per IP | 10 in 10 minutes | 429 for 10 minutes from the tenth | "Too many wrong phrases. Wait N minutes, then ask your teacher for today's phrase." |
-| Compiles, per IP | 6 per minute | 429 until the window slides | "That is a lot of compiles in one minute…" |
+| Wrong class phrase | none | 403, every time, straight away | "Wrong class phrase. Ask your teacher for today's phrase." |
+| Wrong teacher key | none, per person | 403 after a fixed 300 ms | "Wrong teacher key." |
+| Wrong teacher keys, everywhere | more than 100 in 15 minutes | wrong keys get 429 for 15 minutes — **a correct key still gets in** | "Too many wrong keys from everywhere right now. Try again in N minutes. The right key still works." |
+| Compiles, per client id | 6 per minute | 429 until the window slides | "That is a lot of compiles in one minute. Wait N seconds…" |
+| Compile requests, everyone | 120 per minute | 429 until the window slides | "The compiler is very busy right now. Wait a minute and try again." |
 
-Every 429 carries a `Retry-After` header in seconds. The phrase lockout also sends
-`x-lockout: class-phrase`, which is how the editor tells it apart from the ordinary compile rate
-limit and shows it next to the phrase field rather than in the output panel.
+Every 429 carries `Retry-After` in seconds. There is no `x-lockout` header any more: a 429 from
+`/api/compile` is now always about pace, never about the phrase, so the editor no longer has to
+tell two kinds of 429 apart.
 
-Details worth knowing before you change any of it:
+**The per-client limit.** The editor mints one random id the first time it is used
+(`crypto.randomUUID()`), keeps it in `localStorage` under `uno-ide.v1.client-id`, and sends it
+as `x-client-id` on every compile. Six a minute is then six a minute *per Chromebook* instead of
+six for the whole school, which is what the old per-IP limit really meant.
 
-- **A correct answer clears that address.** A class that fumbled the phrase all morning is not one
-  typo away from a lockout all afternoon, and a good teacher key wipes that machine's slate.
-- **Setting a phrase unlocks the room.** A whole school usually leaves Cloudflare through one
-  address, so the class shares one bucket of ten wrong phrases — and a phrase expiring mid-period
-  is exactly when thirty open tabs all send a stale one at once. Setting a new phrase from
-  `/teacher.html` therefore forgives every wrong-phrase lockout everywhere. **If a class is ever
-  locked out, set the phrase again; that is the fix.** It does not touch teacher-key lockouts.
-- **A student with no phrase yet is not a guesser.** A compile with no `x-class-phrase` header at
-  all is refused but never counted; only a wrong, non-empty phrase costs a strike. The first
-  compile of the day therefore never eats one.
-- **The wide teacher guard cannot lock you out.** The key is compared *first*, and the all-IP guard
-  is consulted only after a key turns out to be wrong. That ordering is deliberate: if the guard
-  ran before the compare, anyone could lock the teacher out of his own class for the price of a
-  hundred junk requests. Your own per-IP lock still applies — five wrong keys from your own laptop
-  is still fifteen minutes — so if you are locked out and the phrase must change now, set it from
-  the terminal instead: `npx wrangler kv key put --binding CLASS_KV phrase ... --remote`, or wait.
-- **The lock does not grow while you push on it.** Refused requests are not counted, so retrying
-  during a lockout never extends it. The wait shown is the real one.
-- **The limits live in one place**, `src/lockout.ts` (`LOCKOUT_POLICIES`), with unit tests in
-  `test/lockout.test.mjs`. Change the numbers there and the tests will tell you what you broke.
+The id is not a credential and is not treated as one. Anyone can mint a fresh one for every request
+and walk straight past the per-client limit — that is fine and expected. It is a fuse against a
+stuck loop or a page left hammering Ctrl-Enter, not a lock. **The phrase is the lock**, and the
+ceiling below is what keeps somebody who does that from mattering to the bill. A request with no
+id, or with an id that is not `^[A-Za-z0-9-]{8,64}$`, drops into a shared per-IP "anonymous"
+bucket with the same six a minute. That is where `curl` lands. No student ever does.
+
+**The global ceiling.** One number, `GLOBAL_COMPILE_MAX_PER_MINUTE` in `src/ratelimit.ts`, set
+to 120 a minute and counted after the phrase check. It protects the bill, not the door: it is there
+so a runaway script, a bug in the page, or a phrase that leaked cannot quietly run up container
+time overnight. Know the headroom before you rely on it — thirty students compiling twice a minute
+is 60, and thirty students compiling four times a minute is exactly 120. A class in a debugging
+frenzy is the one plausible way to meet it. **If that happens, raise the number.** It is not a
+security boundary and treating it as one will only annoy a class.
+
+**The teacher-key guard cannot lock you out.** The key is compared *first*, and the wide guard is
+consulted only once a key has already turned out to be wrong. A correct key therefore gets in
+however much junk anybody else is sending. That ordering is the whole safety argument, and
+`test/teacher-guard.test.mjs` pins it by asserting the guard class has no method a correct key can
+reach.
+
+**If a class cannot compile, the phrase is the only thing that can be wrong.** Set it again from
+`/teacher.html`. Nothing else can put the room in a bad state: there is no lockout to wait out and
+no counter that needs forgiving.
+
+All of it is counted in the compile container's Durable Object — the single instance every request
+already passes through — which makes the counts site-wide rather than per Worker isolate. Nothing
+is written to storage: if that object is ever evicted the counts reset, which is an acceptable
+trade for a fuse.
+
+The numbers live in two files, with tests beside each:
+
+| What | Where | Tests |
+|---|---|---|
+| 6 compiles/minute/client, 120/minute total, the client-id shape | `src/ratelimit.ts` | `test/ratelimit.test.mjs` |
+| more than 100 wrong teacher keys / 15 minutes | `src/teacher-guard.ts` | `test/teacher-guard.test.mjs` |
+| the order of the five checks | `src/compile-gate.ts` | `test/compile-gate.test.mjs` |
 
 ### Optional: a Cloudflare Rate Limiting rule on `/api/teacher/*`
 
-Not configured, and not needed — the lockouts above already run before any KV read. Add it only if
-the teacher page ever draws real traffic, because a zone rule refuses at Cloudflare's edge and the
-Worker never runs at all, which is cheaper still. Dashboard steps, if that day comes:
+Not configured, and not needed: a wrong key is refused for two hashes and a 300 ms pause, with no
+KV read and no container. Add it only if the teacher page ever draws real traffic, because a zone
+rule refuses at Cloudflare's edge and the Worker never runs at all, which is cheaper still.
+Dashboard steps, if that day comes:
 
 1. <https://dash.cloudflare.com> → the `uploadmycode.com` zone → **Security** → **WAF** → **Rate
    limiting rules** → **Create rule**.
@@ -263,10 +307,11 @@ Worker never runs at all, which is cheaper still. Dashboard steps, if that day c
 4. Period **10 seconds**, requests **20**, duration **60 seconds**, action **Block**.
 5. Deploy.
 
-Keep the numbers loose. The teacher page fires one GET on load and one request per button press,
-so twenty in ten seconds is far above real use and far below a script. A blocked request gets
-Cloudflare's own 429 page, not this site's JSON, so do not tighten it to where a real person can
-hit it.
+Remember what section 4a says about one address: this rule is per IP, so at school it is per
+*school*, and it is per school for students as well as for a script. Keep the numbers loose: the
+teacher page fires one GET on load and one request per button press, so twenty in ten seconds is
+far above real use and far below a script. A blocked request gets Cloudflare's own 429 page, not
+this site's JSON, so do not tighten it to where a real person can hit it.
 
 ---
 
@@ -372,8 +417,9 @@ The guardrails, all already in place:
 | Sleeps when idle | `src/worker.ts` `sleepAfter` | 10 minutes |
 | Compile timeout | `container/server.js` | 30 s |
 | Request size cap | `src/worker.ts` | 100 KB |
-| Rate limit | `src/ratelimit.ts` | 6 per minute per IP |
-| Failure lockouts | `src/lockout.ts` | 5 wrong keys / 15 min, 10 wrong phrases / 10 min (section 4a) |
+| Rate limit, per client | `src/ratelimit.ts` | 6 per minute per `x-client-id` (section 4a) |
+| Global ceiling | `src/ratelimit.ts` | 120 compile requests per minute, everyone together |
+| Wrong-key guard | `src/teacher-guard.ts` | more than 100 wrong teacher keys / 15 min (section 4a) |
 | Class phrase | KV + `src/worker.ts` | required on every compile |
 
 Memory and disk are billed while the instance is **awake**, CPU only while it is **working**. That

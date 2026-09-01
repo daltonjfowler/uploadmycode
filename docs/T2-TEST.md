@@ -52,7 +52,7 @@ Open **http://localhost:5173/** in Chrome. Use a normal (not Incognito) window: 
 `localStorage` to survive a reload.
 
 > Starting clean: if you have used the page before, open DevTools (F12) → Application → Local
-> Storage → `http://localhost:5173` → delete the three `uno-ide.v1.*` keys, then reload. Steps 1
+> Storage → `http://localhost:5173` → delete every `uno-ide.v1.*` key, then reload. Steps 1
 > and 2 below assume a first visit.
 
 > **About the class phrase (added in T5).** In production `/api/compile` goes through the Worker,

@@ -31,6 +31,7 @@ const CURRENT_KEY = "uno-ide.v1.current";
 const AUTOCOMPLETE_KEY = "uno-ide.v1.autocomplete";
 const MONITOR_OPEN_KEY = "uno-ide.v1.monitor-open";
 const MONITOR_BAUD_KEY = "uno-ide.v1.monitor-baud";
+const CLIENT_ID_KEY = "uno-ide.v1.client-id";
 
 /** Name given to the sketch created on a first visit. */
 export const DEFAULT_SKETCH_NAME = "sketch";
@@ -137,6 +138,53 @@ export function loadMonitorBaud(): number | null {
 
 export function saveMonitorBaud(baudRate: number): void {
 	writeKey(MONITOR_BAUD_KEY, String(baudRate));
+}
+
+/**
+ * This browser's compile budget, as a name the server can count against.
+ *
+ * The Worker allows six compiles a minute per client id. It cannot count them
+ * per IP: the whole school leaves through one public address, so thirty
+ * students would be sharing six compiles a minute and one runaway tab would
+ * starve the room. So each Chromebook mints one random id and keeps it.
+ *
+ * It is not a secret and it is not a login — it names a bucket, nothing more.
+ * The class phrase is what decides whether a compile is allowed at all.
+ *
+ * localStorage, not sessionStorage: a student who reloads or opens a second tab
+ * should keep the same budget rather than quietly getting a fresh one. If
+ * storage is blocked the id lives for this page load only, which still gives
+ * that machine its own six a minute for the lesson.
+ */
+let clientId: string | null = null;
+
+export function loadClientId(): string {
+	if (clientId !== null) return clientId;
+
+	const stored = readKey(CLIENT_ID_KEY);
+	// Re-check the shape: the Worker refuses anything else and drops the request
+	// into the shared per-IP bucket, which is the thing to avoid.
+	if (stored !== null && /^[A-Za-z0-9-]{8,64}$/.test(stored)) {
+		clientId = stored;
+		return clientId;
+	}
+
+	clientId = newClientId();
+	writeKey(CLIENT_ID_KEY, clientId);
+	return clientId;
+}
+
+function newClientId(): string {
+	try {
+		return crypto.randomUUID();
+	} catch {
+		// randomUUID needs a secure context, which a plain-http dev server is
+		// not. Thirty-two hex characters do the same job: this is a bucket name,
+		// not a secret, and getRandomValues works everywhere.
+		const bytes = new Uint8Array(16);
+		crypto.getRandomValues(bytes);
+		return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+	}
 }
 
 /**

@@ -284,11 +284,18 @@
 					return picked.join("-");
 				}
 
-				/** The Worker's own 429 sentence, verbatim, minutes and all. */
-				function lockoutText(body) {
+				/**
+				 * The Worker's own 429 sentence, verbatim, minutes and all.
+				 *
+				 * There is only one thing that answers 429 here: the site-wide
+				 * guard that arms after a hundred WRONG keys from anywhere. A
+				 * correct key is never refused by it, so seeing this means the
+				 * key in the box is wrong, not that you are locked out.
+				 */
+				function busyText(body) {
 					return body && body.error
 						? body.error
-						: "Too many tries from this network. Wait 15 minutes.";
+						: "Too many wrong keys from everywhere right now. Try again in 15 minutes. The right key still works.";
 				}
 
 				function say(text, tone) {
@@ -392,10 +399,10 @@
 						return;
 					}
 					if (result.status === 429) {
-						// Locked out after too many wrong keys. The Worker's
-						// sentence carries the wait in minutes, so show it word
-						// for word rather than inventing a shorter one.
-						say(lockoutText(result.body), "error");
+						// Wrong key, while the site-wide wrong-key guard is armed.
+						// The Worker's sentence carries the wait in minutes, so
+						// show it word for word rather than inventing a shorter one.
+						say(busyText(result.body), "error");
 						return;
 					}
 					var detail = result.body && result.body.error ? result.body.error : "Something went wrong.";
@@ -468,7 +475,7 @@
 					call("GET", null).then(function (result) {
 						if (result.status === 200) show(result.body);
 						else if (result.status === 403) say("The saved teacher key was refused.", "error");
-						else if (result.status === 429) say(lockoutText(result.body), "error");
+						else if (result.status === 429) say(busyText(result.body), "error");
 					});
 				}
 			})();
