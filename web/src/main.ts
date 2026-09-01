@@ -21,6 +21,7 @@ import {
 	type SerialPortLike,
 } from "./flash/serial.ts";
 import { FlashError, PAGE_SIZE, uploadImage } from "./flash/stk500v1.ts";
+import { clearPhrase, loadPhrase, savePhrase } from "./phrase.ts";
 import {
 	BAUD_RATES,
 	DEFAULT_BAUD_RATE,
@@ -72,6 +73,8 @@ const uploadProgress = el<HTMLDivElement>("upload-progress");
 const uploadBar = el<HTMLProgressElement>("upload-bar");
 const uploadCount = el<HTMLSpanElement>("upload-count");
 const serialHelp = el<HTMLAnchorElement>("serial-help");
+const phraseForm = el<HTMLFormElement>("phrase-form");
+const phraseInput = el<HTMLInputElement>("phrase-input");
 
 // ------------------------------------------------------------- sketch library
 
@@ -175,10 +178,58 @@ function clearErrorRows(): void {
 	errorList.replaceChildren();
 }
 
+// --------------------------------------------------------------- class phrase
+
+/**
+ * Ask for today's phrase, in the page rather than in a browser dialog.
+ *
+ * The message is whatever the Worker said, word for word: "No class phrase is
+ * active" and "Wrong class phrase" send a student to two different places, and
+ * paraphrasing them here would lose that.
+ */
+function askForPhrase(message: string): void {
+	phraseForm.hidden = false;
+	phraseInput.value = "";
+	setStatus("error", "Phrase needed");
+	showOutput(message, "error");
+	phraseInput.focus();
+}
+
+function hidePhraseForm(): void {
+	phraseForm.hidden = true;
+	phraseInput.value = "";
+}
+
+phraseForm.addEventListener("submit", (event) => {
+	event.preventDefault();
+	const typed = phraseInput.value.trim();
+	if (typed === "") return;
+	// The Worker does the real normalizing; this only has to carry the text.
+	savePhrase(typed);
+	hidePhraseForm();
+	void compileSketch();
+});
+
 // ------------------------------------------------------------------- compiling
 
 async function compileSketch(): Promise<void> {
 	if (compiling) return;
+
+	// First compile of the tab: the phrase is asked for before anything is sent,
+	// so a class with no phrase set never wakes the container at all.
+	let phrase = loadPhrase();
+	// Clicking Compile with the field open and filled in means the same thing as
+	// pressing Start, and must not throw away what was typed.
+	if (phrase === "" && !phraseForm.hidden && phraseInput.value.trim() !== "") {
+		phrase = phraseInput.value.trim();
+		savePhrase(phrase);
+		hidePhraseForm();
+	}
+	if (phrase === "") {
+		askForPhrase("Type today's class phrase to compile. Your teacher has it on the board.");
+		return;
+	}
+
 	compiling = true;
 	compileButton.disabled = true;
 
@@ -192,7 +243,7 @@ async function compileSketch(): Promise<void> {
 	showOutput("Compiling on the server. The first compile after a quiet spell can take 15 seconds.", "plain");
 
 	try {
-		const outcome = await requestCompile(code);
+		const outcome = await requestCompile(code, phrase);
 
 		if (outcome.kind === "success") {
 			setCompiledHex(outcome.hex, code);
@@ -203,6 +254,14 @@ async function compileSketch(): Promise<void> {
 				`Compiled with no errors.\nProgram size: ${bytes} bytes of ${UNO_FLASH_BYTES} (${percent}%).`,
 				"success",
 			);
+			return;
+		}
+
+		if (outcome.kind === "phrase-required") {
+			// Missing, wrong, or expired. Whichever it was, this tab's copy is no
+			// good, so drop it and ask again with the Worker's own sentence.
+			clearPhrase();
+			askForPhrase(outcome.message);
 			return;
 		}
 

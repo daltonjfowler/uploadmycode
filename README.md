@@ -13,12 +13,26 @@ hex onto an Arduino Uno over USB with the Web Serial API. No installs on student
 **Start here:** [PLAN.md](PLAN.md) — architecture, locked decisions, and the T0–T5 task list for
 worker sessions. One task per session, in order, gate must pass before stopping.
 
+**Running it:** [docs/DEPLOY.md](docs/DEPLOY.md) — fresh-machine deploy, the teacher key, the daily
+routine, adding a library, the IP lock, and keeping the bill small.
+
+## Daily routine
+
+Nobody can compile without today's class phrase, so the day starts by setting one. Open
+<https://uploadmycode.com/teacher.html>, press **Generate**, pick how long it lasts (1 period, half
+day, or full day), press **Set phrase**, and project the page or write the phrase on the board.
+Then open the editor and click **Compile** once — that wakes the container so the first student pays
+a warm compile instead of a 15-second cold start. Students type the phrase once per tab; it lives in
+`sessionStorage` and is gone when the tab closes. Press **End now** to shut it off early; otherwise
+it expires on its own. Full version, including what each refusal message means:
+[docs/DEPLOY.md](docs/DEPLOY.md).
+
 ## Commands
 
 ```sh
 npm install
 npm run typecheck   # tsc --noEmit for the Worker and for web/
-npm test            # node --test web/test/*.test.mjs
+npm test            # node --test over test/ (Worker logic) and web/test/ (frontend)
 npm run dev:web     # Vite dev server for the editor (proxies /api/compile to localhost:8080)
 npm run build       # vite build web -> public/
 npm run types       # regenerate worker-configuration.d.ts after editing wrangler.jsonc
@@ -58,8 +72,9 @@ arduino-cli lib install LiquidCrystal@1.0.7
 node container/server.js
 ```
 
-## Manual test docs
+## Docs
 
+- [docs/DEPLOY.md](docs/DEPLOY.md) — deploying, the teacher key, the daily phrase routine, adding a library, `ALLOWED_CIDRS`, cost caps and billing alerts.
 - [docs/T2-TEST.md](docs/T2-TEST.md) — editor click-through (compile, error highlight, autosave, autocomplete toggle).
 - [docs/T3-TEST.md](docs/T3-TEST.md) — flashing a real Uno from Chrome (hardware gate, Dalton runs it); reset-polarity troubleshooting.
 - [docs/T4-TEST.md](docs/T4-TEST.md) — serial monitor with a real Uno, including Upload while connected (hardware gate, Dalton runs it).

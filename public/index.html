@@ -6,8 +6,8 @@
 		<meta name="robots" content="noindex" />
 		<meta name="color-scheme" content="light dark" />
 		<title>uploadmycode</title>
-		<script type="module" crossorigin src="/assets/index-DFELvwXc.js"></script>
-		<link rel="stylesheet" crossorigin href="/assets/index-CFr_XJuA.css">
+		<script type="module" crossorigin src="/assets/index-BdkvVsQA.js"></script>
+		<link rel="stylesheet" crossorigin href="/assets/index-Bp9AIrQt.css">
 	</head>
 	<body>
 		<div class="app">
@@ -61,6 +61,20 @@
 					<span class="grow"></span>
 					<button id="clear-output" type="button" class="link">Clear</button>
 				</div>
+				<form id="phrase-form" class="phrase-form" hidden>
+					<label class="field" for="phrase-input"><span>Class phrase</span></label>
+					<input
+						id="phrase-input"
+						type="text"
+						autocomplete="off"
+						autocapitalize="none"
+						spellcheck="false"
+						placeholder="today's class phrase"
+						aria-label="Today's class phrase"
+					/>
+					<button id="phrase-submit" class="primary" type="submit">Start</button>
+				</form>
+
 				<div id="upload-progress" class="progress" hidden>
 					<progress id="upload-bar" max="1" value="0"></progress>
 					<span id="upload-count" class="progress-count"></span>
@@ -124,6 +138,8 @@
 
 			<footer class="footer">
 				<span>Arduino Uno only. Internal district tool.</span>
+				<span class="grow"></span>
+				<a href="/teacher.html">Teacher</a>
 				<a href="https://daltonjfowler.com" target="_blank" rel="noopener"
 					>Made by Dalton Fowler</a
 				>

@@ -55,6 +55,14 @@ Open **http://localhost:5173/** in Chrome. Use a normal (not Incognito) window: 
 > Storage → `http://localhost:5173` → delete the three `uno-ide.v1.*` keys, then reload. Steps 1
 > and 2 below assume a first visit.
 
+> **About the class phrase (added in T5).** In production `/api/compile` goes through the Worker,
+> which refuses any compile that does not carry today's class phrase. The first Compile of a tab
+> therefore shows a **Class phrase** field in the Output panel and sends nothing until it is filled
+> in; the phrase is kept in `sessionStorage` for that tab only. The dev server proxies straight to
+> the compile server and never touches the Worker, so **no phrase is asked for in the steps below**.
+> To exercise the phrase itself, set one at `/teacher.html` on the live site and run A2 and A3
+> against <https://uploadmycode.com>. See [DEPLOY.md](DEPLOY.md).
+
 ---
 
 ## Part A — the gate (these three are the T2 gate)
@@ -92,10 +100,11 @@ If A3, A5+A6, and A9 all pass, the T2 gate is green.
 | B11 | Click **New**, accept the name, then paste the **Servo Sweep** sketch from the bottom of this file and Compile. | Green `Compiled`, `Program size: 2128 bytes of 32256 (7%).` This is the one step that proves the container's Servo library is reachable — nothing else in the test uses `#include`. | |
 | B12 | Stop the compile server (Ctrl-C in terminal 1) and click **Compile**. | Status reads `Failed` and the output says `Could not reach the compiler. Check the Wi-Fi and try again.` — not a blank page or a stack trace. Restart the server afterwards. | |
 | B13 | Switch ChromeOS/Windows to dark mode (Settings → Appearance), with the page open. | The whole page — toolbar, editor, gutter, output panel, footer — flips to a dark palette and stays readable. Switch back to light and it flips back. No reload needed. | |
-| B14 | Look at the footer. | It reads "Arduino Uno only. Internal district tool." on the left and a **Made by Dalton Fowler** link on the right. Clicking it opens `https://daltonjfowler.com` in a **new tab**, leaving the editor open. | |
+| B14 | Look at the footer. | It reads "Arduino Uno only. Internal district tool." on the left, then a **Teacher** link and a **Made by Dalton Fowler** link on the right. Clicking Made by Dalton Fowler opens `https://daltonjfowler.com` in a **new tab**, leaving the editor open. Teacher goes to `/teacher.html`, which the dev server does serve; its buttons will not work locally, though, because the dev server only proxies `/api/compile` and not the teacher API. Use the live site for the teacher page. | |
 | B15 | Narrow the window to about half the screen. | The toolbar wraps onto two rows. Nothing is cut off and the page never scrolls sideways. | |
 | B16 | Press **Ctrl+Enter**. | Same as clicking Compile. | |
 | B17 | Open `http://localhost:5173/serial-test.html`. | The old Web Serial diagnostic page, moved here from the T0 placeholder. The bordered box says whether Web Serial is available, and the **Test Web Serial (pick a port)** button still opens Chrome's port chooser and prints `usbVendorId` / `usbProductId`. This is the page `docs/CHROMEBOOK-CHECKLIST.md` now sends the district to. | |
+| B18 | **Live site only.** Set a phrase at <https://uploadmycode.com/teacher.html>, then open <https://uploadmycode.com/> in a fresh tab and click **Compile**. | Nothing is sent. A **Class phrase** field appears in the Output panel, the status pill reads `Phrase needed`, and the output says `Type today's class phrase to compile.` Type the phrase, press **Start**, and it compiles green. Reload the tab: it compiles without asking again. Close the tab, open a new one: it asks again. Press **End now** on the teacher page and compile: `No class phrase is active. Ask your teacher.` | |
 
 ### Checking the hex is kept for the Upload button
 

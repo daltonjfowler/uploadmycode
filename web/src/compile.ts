@@ -6,27 +6,34 @@
  *
  *   { ok: true,  hex }     compiled
  *   { ok: false, stderr }  the sketch is wrong (still HTTP 200)
- *   { ok: false, error }   the service is wrong: busy, cold, or down (HTTP 503)
+ *   { ok: false, error }   the compiler never ran, and `error` says why
  *
  * Everything else — a dropped connection, an HTML error page, a shape we do not
  * recognise — becomes one "service" outcome with a sentence a student can read.
+ *
+ * Since T5 every compile carries the class phrase in an `x-class-phrase`
+ * header. A 403 means the phrase is missing, wrong, or has expired; the message
+ * the Worker sends is the one shown, word for word, because it is the sentence
+ * that tells a student to go and ask the teacher.
  */
 
 export type CompileOutcome =
 	| { kind: "success"; hex: string }
 	| { kind: "compile-error"; stderr: string }
 	| { kind: "busy"; message: string }
+	/** HTTP 403. The page must ask for the phrase again. */
+	| { kind: "phrase-required"; message: string }
 	| { kind: "service-error"; message: string };
 
 /** Same path in dev (Vite proxies it to the local server) and in production. */
 const COMPILE_URL = "/api/compile";
 
-export async function requestCompile(code: string): Promise<CompileOutcome> {
+export async function requestCompile(code: string, phrase: string): Promise<CompileOutcome> {
 	let response: Response;
 	try {
 		response = await fetch(COMPILE_URL, {
 			method: "POST",
-			headers: { "content-type": "application/json" },
+			headers: { "content-type": "application/json", "x-class-phrase": phrase },
 			body: JSON.stringify({ code }),
 		});
 	} catch {
@@ -55,8 +62,10 @@ export async function requestCompile(code: string): Promise<CompileOutcome> {
 	if (typeof reply.stderr === "string") {
 		return { kind: "compile-error", stderr: reply.stderr };
 	}
-	// error means the compiler never ran. 503 is the "over capacity" case.
+	// error means the compiler never ran. The Worker's sentence is always shown
+	// as it was written: 403 phrase, 413 too big, 429 too fast, 503 over capacity.
 	if (typeof reply.error === "string") {
+		if (response.status === 403) return { kind: "phrase-required", message: reply.error };
 		return response.status === 503
 			? { kind: "busy", message: reply.error }
 			: { kind: "service-error", message: reply.error };

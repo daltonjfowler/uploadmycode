@@ -12,6 +12,9 @@
     "noFallthroughCasesInSwitch": true,
 
     "isolatedModules": true,
+    // Relative imports name the .ts file, the same way web/ does, so Node can run
+    // test/*.test.mjs against these sources with nothing built first.
+    "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "noEmit": true

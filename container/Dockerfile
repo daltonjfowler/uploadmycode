@@ -69,6 +69,23 @@ RUN arduino-cli core update-index \
 	&& arduino-cli core list \
 	&& arduino-cli lib list
 
+# --- the user the server runs as (T5) ---------------------------------------
+# Everything above needs root to install into /usr/local and /opt. Nothing below
+# does. The compile server takes untrusted text from students and hands it to
+# avr-gcc, so it spends its whole life as an ordinary user that owns only the
+# arduino toolchain directories and /app.
+#
+# The warm-up compile below runs as this user on purpose: it fills
+# ARDUINO_BUILD_CACHE_PATH with files the runtime user already owns, so the
+# first real compile reuses the cache instead of rebuilding the core.
+RUN useradd --create-home --home-dir /home/uploader --shell /usr/sbin/nologin --uid 10001 uploader \
+	&& mkdir -p /opt/arduino/cache /app \
+	&& chown -R uploader:uploader /opt/arduino /app
+
+# Explicit rather than inherited, so arduino-cli never writes to / by accident.
+ENV HOME=/home/uploader
+USER uploader
+
 # --- warm-up compile --------------------------------------------------------
 # Compiling the AVR core is the slow half of a first compile. Doing it here bakes
 # the result into the image, so the first student after a container cold start
@@ -83,8 +100,9 @@ RUN mkdir -p /tmp/warmup/sketch \
 # --- the server -------------------------------------------------------------
 WORKDIR /app
 # package.json only marks server.js as an ES module. It has no dependencies, so
-# there is no npm install step.
-COPY package.json server.js /app/
+# there is no npm install step. Copied last so editing server.js does not
+# invalidate the toolchain or warm-up layers above.
+COPY --chown=uploader:uploader package.json server.js /app/
 
 ENV PORT=8080
 EXPOSE 8080

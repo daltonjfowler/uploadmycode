@@ -273,6 +273,31 @@ button.link {
 	white-space: nowrap;
 }
 
+/* The class phrase. Hidden until the page needs it, which is the first compile
+   of a session and any time the Worker turns one down. Deliberately an inline
+   field and not window.prompt: a browser prompt cannot be read from the back of
+   the room, and it blocks the tab. */
+.phrase-form {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.4rem 0.5rem;
+	padding: 0 0.75rem 0.5rem;
+}
+
+.phrase-form input[type="text"] {
+	flex: 1 1 14rem;
+	max-width: 22rem;
+	min-width: 0;
+	font: inherit;
+	font-size: 0.95rem;
+	color: var(--fg);
+	background: var(--bg);
+	border: 1px solid var(--accent);
+	border-radius: 5px;
+	padding: 0.3rem 0.5rem;
+}
+
 .error-list {
 	display: flex;
 	flex-direction: column;

@@ -37,6 +37,15 @@
     { "binding": "CLASS_KV", "id": "1826452392d7425b96e48aa005f9be77" }
   ],
 
+  "vars": {
+    // Optional in-person lock (T5). Empty = off, and the site works from anywhere as long as
+    // the class phrase is right. Set it to a comma-separated list of the school's public
+    // egress ranges (IPv4 and/or IPv6, e.g. "203.0.113.0/24,2001:db8:1234::/48") and every
+    // compile from another address is refused. How to get the ranges: docs/DEPLOY.md.
+    // A var, not a secret: it is not sensitive and it belongs in version control.
+    "ALLOWED_CIDRS": ""
+  },
+
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
