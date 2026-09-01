@@ -12,6 +12,13 @@
   // Deploy to <name>.<subdomain>.workers.dev. No custom domain yet.
   "workers_dev": true,
 
+  // Custom domain, registered at Cloudflare Registrar on this account (2026-09-01).
+  // This is the final origin for docs/CHROMEBOOK-CHECKLIST.md. workers.dev stays on as a fallback.
+  "routes": [
+    { "pattern": "uploadmycode.com", "custom_domain": true },
+    { "pattern": "www.uploadmycode.com", "custom_domain": true }
+  ],
+
   "assets": {
     // The frontend. T0 ships a placeholder here; T2 builds Vite output into it.
     "directory": "./public/",
@@ -23,6 +30,12 @@
     // No SPA rewrite and no custom 404 page. A missing file is a plain 404.
     "not_found_handling": "none"
   },
+
+  // Rolling class phrase lives here (T5). Key "phrase", written with an expirationTtl by the
+  // teacher endpoint; read on every compile.
+  "kv_namespaces": [
+    { "binding": "CLASS_KV", "id": "1826452392d7425b96e48aa005f9be77" }
+  ],
 
   "observability": {
     "enabled": true,

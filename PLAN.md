@@ -18,7 +18,7 @@ This file is the single source of truth for the worker team. Read it fully befor
 | Compile | `arduino-cli` (pinned version) inside a Cloudflare Container. Never in the browser, never WASM. |
 | Upload | Web Serial API + STK500v1 (Optiboot bootloader, 115200 baud). Vendored minimal flasher, no heavyweight flashing dependency. |
 | Frontend | Vite + vanilla TypeScript + CodeMirror 6. No React, no UI framework. Chromebooks are slow; keep the bundle small. |
-| Auth | One shared class code, checked by the Worker, stored as a wrangler secret. No student accounts, no PII stored. |
+| Auth | Rolling class phrase: teacher sets today's phrase (with an expiry) from a `/teacher` page guarded by a `TEACHER_KEY` secret; the Worker checks it on every compile from KV. Students enter it once per tab (`sessionStorage`). Optional school-IP allowlist. No student accounts, no PII stored. Spec in T5. |
 | Sketch storage | Browser `localStorage` + download/upload of `.ino` files. No server-side storage in MVP. |
 | Libraries | Fixed allowlist baked into the container image. Adding a library = edit Dockerfile, redeploy. Start: `Servo`, `LiquidCrystal`. |
 | Cost caps | `max_instances: 1` (raise to 2 only if a real class saturates it), `instance_type: "basic"`, request body cap 100 KB, rate limit per IP, compile timeout 30 s. |
@@ -50,21 +50,22 @@ Chromebook browser                         Cloudflare
 - Wrangler config: `containers: [{ class_name, image: "./Dockerfile", instance_type, max_instances }]` + a `durable_objects` binding with the same `class_name` + a `migrations` entry using `new_sqlite_classes`. `max_instances` counts actively RUNNING instances and requests beyond it error — surface that to students as "compiler busy, try again in a few seconds".
 - Container image must build for `linux/amd64`.
 
-## Machine + account status (checked 2026-08-31, by the lead)
+## Machine + account status (updated 2026-09-01, by the lead)
 
 - Windows 11, PowerShell. Node v24.19.0, npm 11.17.0.
-- wrangler 4.127.1 authenticated (OAuth, daltonjfowler@gmail.com, account `8a77f2d8ecd25793e3a979cef8ac2646`). Token includes `containers (write)`. Use `npx wrangler`.
-- **Docker is NOT installed.** `wrangler deploy` cannot build the container image locally, and `wrangler dev` cannot run the container. Consequences:
-  - T0 (assets + Worker only, no container) deploys normally.
-  - T1's primary gate is LOCAL: download the pinned `arduino-cli` Windows binary into `tools/` (gitignored), run `node container/server.js` directly with `tools/` on PATH, and prove the compile pipeline end to end. Then ATTEMPT `wrangler deploy`; when it fails (no Docker, and possibly Workers Paid not yet enabled), record the exact error in `docs/BLOCKERS.md` and move on. Do not install Docker Desktop — that is Dalton's call.
-  - T2–T4 gates run against the local server (`vite dev` + local `container/server.js`), which exercises the identical code paths.
-- Whether the account has the Workers Paid plan is unknown; a billing error on container deploy goes in `docs/BLOCKERS.md`, not into a retry loop.
+- wrangler 4.127.1 authenticated (OAuth, daltonjfowler@gmail.com, account `8a77f2d8ecd25793e3a979cef8ac2646`). Use `npx wrangler`.
+- **Workers Paid is active** on the account (confirmed by Dalton and by a clean container deploy).
+- **Docker Desktop 4.88.1 works** (WSL2 backend, engine 29.7.2). `docker` is on PATH in fresh shells. If the engine is down, start `C:UsersMo CharaAppDataLocalProgramsDockerDesktopDocker Desktop.exe` and wait ~10 s.
+- **Container is deployed and live.** `POST https://uno-web-ide.daltonjfowler.workers.dev/api/compile` compiles Blink: cold start ~16 s, warm ~0.8 s. Measured 2026-09-01 by the lead. Blocker B1 is cleared.
+- `npx wrangler deploy` is allowed for T3–T5 workers; it rebuilds the image (cached layers, ~1 min when the Dockerfile is unchanged) and re-uploads assets. Build `public/` from `web/` before deploying.
+- Domain `uploadmycode.com` is registered at Cloudflare Registrar on this account (2026-09-01). The lead attaches it as a custom domain; it becomes the final origin for the Chromebook checklist.
+- Local gates still run against `node container/server.js` + `tools/` arduino-cli (README recipe) when a full deploy is not needed.
 
 ## Risk spikes — resolve before or during T0
 
 1. **District Chrome policy may block Web Serial.** Managed Chromebooks can have `DefaultSerialGuardSetting` set to block. This is the go/no-go risk for the whole project. Dalton asks district IT to allow serial for the site origin (or leave the default ask-per-use prompt) and tests on a REAL managed student Chromebook with a REAL Uno before T2 begins. T0 ships `docs/CHROMEBOOK-CHECKLIST.md` for exactly this conversation.
 2. **Clone Unos.** Boards with CH340 USB chips work on ChromeOS without drivers, but verify with the actual classroom hardware. Genuine Uno R3 (VID 0x2341) and CH340 clones (VID 0x1A86) both need to pass the T3 gate.
-3. **Cold start each period.** Acceptable if under ~15 s. If painful, add a teacher "warm up" button (a no-op compile). Do NOT add a scheduled keep-alive ping without Dalton's sign-off — it keeps billing awake.
+3. **Cold start each period.** Measured 16 s on the live container (2026-09-01). If painful, add a teacher "warm up" button (a no-op compile). Do NOT add a scheduled keep-alive ping without Dalton's sign-off — it keeps billing awake.
 
 ## Ground rules for worker sessions (Opus 4.8)
 
@@ -122,13 +123,44 @@ send-line input, clear button. Monitor must pause and release the reader/port cl
 upload starts, then resume after. Handle unplug mid-session without wedging the UI.
 **Gate:** hardware gate, Dalton runs it: a counter-printing sketch streams live; clicking Upload while the monitor is open flashes successfully and the monitor resumes after. Steps appended to `docs/T3-TEST.md`.
 
-### T5 — Hardening, auth, cost caps, deploy docs
-Class-code check on `/api/compile` (constant-time compare against `CLASS_CODE` secret; frontend
-asks once, stores in localStorage). Rate limit ~6 compiles/min/IP (in-memory in the DO is fine).
-Reject bodies over 100 KB. Confirm `max_instances: 1` and idle sleep are configured. Write
-`docs/DEPLOY.md`: fresh-machine deploy, rotating the class code, adding a library to the
-allowlist, reading the usage dashboard, setting a Cloudflare billing notification.
-**Gate:** curl without class code → 403; wrong code → 403; 7th compile inside a minute → 429 with a friendly JSON message; correct code still compiles. Paste outputs.
+### T5 — Hardening, rolling class phrase, cost caps, deploy docs
+Goal: only students physically in Dalton's class can compile, with zero student accounts.
+
+**Rolling class phrase.**
+- Add a KV namespace binding `CLASS_KV` (create it with wrangler; it is included in Workers Paid).
+- `POST /api/teacher/phrase` with header `x-teacher-key` (constant-time compare against the
+  `TEACHER_KEY` wrangler secret — a long random string Dalton alone holds). Body
+  `{ phrase, ttlSeconds }`; server clamps ttl to 15 min … 12 h, normalizes the phrase (trim,
+  lowercase, collapse spaces), writes it to KV key `phrase` with `expirationTtl`. Returns the
+  expiry time. `GET /api/teacher/phrase` (same header) shows the current phrase + expiry.
+  `DELETE` ends it early.
+- `/teacher` static page: teacher key field (remembered in that browser's localStorage), phrase
+  field, "generate" button (three random simple words, e.g. `blue-robot-pancake`), duration
+  picker (1 period = 90 min, half day, full day), big readable display of the current phrase and
+  countdown so it can be shown on the projector.
+- `POST /api/compile` requires header `x-class-phrase`. Worker reads KV `phrase`; missing or
+  expired → 403 `{ ok: false, error: "No class phrase is active. Ask your teacher." }`; wrong →
+  403 `{ ok: false, error: "Wrong class phrase. Ask your teacher for today's phrase." }`.
+  Compare after the same normalization, constant time.
+- Frontend: on first compile, or on any 403, prompt for the phrase; keep it in `sessionStorage`
+  only (dies with the tab). Never localStorage.
+- Optional in-person lock: env var `ALLOWED_CIDRS` (comma-separated, from district IT). When set
+  and non-empty, compiles whose `cf-connecting-ip` is outside every range → 403 with a message
+  saying the site only works from school. Empty by default. Document how to obtain the ranges.
+
+**Other hardening.** Rate limit ~6 compiles/min/IP (in-memory in the DO is fine). Reject bodies
+over 100 KB at the Worker (413). Confirm `max_instances: 1` and idle sleep. Add a non-root user
+to the container image (T1 security note) and verify the image still builds and compiles.
+
+**Docs.** `docs/DEPLOY.md`: fresh-machine deploy, creating `TEACHER_KEY` and the KV namespace,
+daily phrase routine (walk in, set phrase, project it, hit Compile once to warm the container),
+adding a library to the allowlist, reading the usage dashboard, setting a Cloudflare billing
+notification.
+
+**Gate:** curl compile with no phrase → 403; wrong phrase → 403; teacher sets a phrase with
+`ttlSeconds: 60` → correct phrase compiles Blink green; after 70 s the same phrase → 403; teacher
+endpoint with a wrong `x-teacher-key` → 403; 7th compile inside a minute → 429 with a friendly
+JSON message; 200 KB body → 413. Paste outputs.
 
 ### T6 (optional, only when Dalton asks) — Nice-to-haves
 In-browser simulator tab (avr8js) so hardware-less classes can still run code; shared example
