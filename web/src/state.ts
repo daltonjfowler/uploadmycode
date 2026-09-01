@@ -2,12 +2,19 @@
  * The tiny bit of state that outlives a single click.
  *
  * Everything else lives in the DOM or in localStorage. The important field is
- * `hex`: on a successful compile we keep the Intel HEX text here so T3's Upload
- * button can flash it without compiling again. There is no UI for it yet.
+ * `hex`: on a successful compile we keep the Intel HEX text here so the Upload
+ * button can flash it without compiling again, and `hasFreshHex` is what keeps
+ * Upload disabled once the sketch has been edited out from under the hex.
  */
 
 /** What the status pill is showing. */
-export type Status = "idle" | "compiling" | "success" | "error" | "compiler-busy";
+export type Status =
+	| "idle"
+	| "compiling"
+	| "uploading"
+	| "success"
+	| "error"
+	| "compiler-busy";
 
 export interface AppState {
 	/** Intel HEX from the last successful compile, or null. */
@@ -39,7 +46,7 @@ export function clearCompiledHex(): void {
 }
 
 /**
- * True when there is hex and it was built from exactly this source. T3's Upload
+ * True when there is hex and it was built from exactly this source. The Upload
  * button uses this to decide whether it must compile first.
  */
 export function hasFreshHex(currentSource: string): boolean {

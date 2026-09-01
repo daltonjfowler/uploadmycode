@@ -6,8 +6,8 @@
 		<meta name="robots" content="noindex" />
 		<meta name="color-scheme" content="light dark" />
 		<title>uploadmycode</title>
-		<script type="module" crossorigin src="/assets/index-Cp4mjm4Z.js"></script>
-		<link rel="stylesheet" crossorigin href="/assets/index-C-ff_Iod.css">
+		<script type="module" crossorigin src="/assets/index-C9STsj8U.js"></script>
+		<link rel="stylesheet" crossorigin href="/assets/index-CjmanHd7.css">
 	</head>
 	<body>
 		<div class="app">
@@ -23,17 +23,10 @@
 				<button id="rename-sketch" type="button">Rename</button>
 				<button id="delete-sketch" type="button">Delete</button>
 
-				<label class="field">
-					<span>Examples</span>
-					<select id="examples-select" aria-label="Open an example sketch">
-						<option value="">Choose…</option>
-					</select>
-				</label>
-
 				<button id="download-sketch" type="button">Download</button>
-				<button id="upload-sketch" type="button">Upload</button>
+				<button id="import-sketch" type="button">Import</button>
 				<input
-					id="upload-input"
+					id="import-input"
 					type="file"
 					accept=".ino,.pde,.txt,text/plain"
 					hidden
@@ -49,6 +42,9 @@
 				<span class="grow"></span>
 
 				<button id="compile" class="primary" type="button">Compile</button>
+				<button id="upload" class="primary" type="button" disabled title="Compile first.">
+					Upload
+				</button>
 				<span id="status" class="status" data-state="idle" role="status" aria-live="polite"
 					>Ready</span
 				>
@@ -59,7 +55,15 @@
 			<section class="output" aria-label="Compiler output">
 				<div class="output-head">
 					<h2>Output</h2>
+					<a id="serial-help" class="serial-help" href="/serial-test.html" target="_blank" rel="noopener" hidden
+						>Web Serial test page</a
+					>
+					<span class="grow"></span>
 					<button id="clear-output" type="button" class="link">Clear</button>
+				</div>
+				<div id="upload-progress" class="progress" hidden>
+					<progress id="upload-bar" max="1" value="0"></progress>
+					<span id="upload-count" class="progress-count"></span>
 				</div>
 				<div id="error-list" class="error-list"></div>
 				<pre id="output-text" class="output-text">Click Compile to check your sketch.</pre>

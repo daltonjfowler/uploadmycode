@@ -190,7 +190,8 @@ button.link {
 .status[data-state="idle"] {
 	color: var(--muted);
 }
-.status[data-state="compiling"] {
+.status[data-state="compiling"],
+.status[data-state="uploading"] {
 	color: var(--warn);
 	border-color: var(--warn);
 }
@@ -229,8 +230,15 @@ button.link {
 .output-head {
 	display: flex;
 	align-items: center;
-	justify-content: space-between;
+	gap: 0.6rem;
 	padding: 0.3rem 0.75rem;
+}
+
+/* Only shown when Web Serial is missing or blocked, and it is the one thing
+   worth clicking when that happens. */
+.serial-help {
+	font-size: 0.75rem;
+	color: var(--danger);
 }
 
 .output-head h2 {
@@ -240,6 +248,28 @@ button.link {
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
 	color: var(--muted);
+}
+
+/* Flash progress. <progress> is styled per-browser, so only size is set here
+   and the accent colour comes from the theme. */
+.progress {
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+	padding: 0 0.75rem 0.4rem;
+}
+
+.progress progress {
+	flex: 1 1 auto;
+	height: 0.6rem;
+	accent-color: var(--accent);
+}
+
+.progress-count {
+	font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+	font-size: 0.75rem;
+	color: var(--muted);
+	white-space: nowrap;
 }
 
 .error-list {

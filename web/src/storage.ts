@@ -11,7 +11,20 @@
  * (they just lose autosave). Nothing here is allowed to break the page.
  */
 
-import { BLANK_SKETCH } from "./examples.ts";
+/**
+ * What a new sketch starts as — the Arduino IDE's own template, character for
+ * character. It is the only sketch text this project ships: there is no
+ * examples menu, because the code students type or paste comes from the lesson.
+ */
+export const BLANK_SKETCH = `void setup() {
+  // put your setup code here, to run once:
+
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+
+}`;
 
 const SKETCHES_KEY = "uno-ide.v1.sketches";
 const CURRENT_KEY = "uno-ide.v1.current";

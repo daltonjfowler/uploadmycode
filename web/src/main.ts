@@ -10,9 +10,20 @@ import "./style.css";
 import { hexProgramBytes, requestCompile } from "./compile.ts";
 import { createEditor, type Editor } from "./editor.ts";
 import { errorLines, firstErrorSummary, parseCompileErrors, type CompileError } from "./errors.ts";
-import { BLANK_SKETCH, EXAMPLES } from "./examples.ts";
-import { appState, clearCompiledHex, setCompiledHex, type Status } from "./state.ts";
+import { HexParseError, parseIntelHex } from "./flash/intel-hex.ts";
 import {
+	findGrantedUnoPort,
+	isWebSerialAvailable,
+	NO_WEB_SERIAL_MESSAGE,
+	openTransport,
+	requestPort,
+	type OpenPort,
+	type SerialPortLike,
+} from "./flash/serial.ts";
+import { FlashError, PAGE_SIZE, uploadImage } from "./flash/stk500v1.ts";
+import { appState, clearCompiledHex, hasFreshHex, setCompiledHex, type Status } from "./state.ts";
+import {
+	BLANK_SKETCH,
 	cleanName,
 	DEFAULT_SKETCH_NAME,
 	isStorageBroken,
@@ -39,13 +50,17 @@ function el<T extends HTMLElement>(id: string): T {
 }
 
 const sketchSelect = el<HTMLSelectElement>("sketch-select");
-const examplesSelect = el<HTMLSelectElement>("examples-select");
-const uploadInput = el<HTMLInputElement>("upload-input");
+const importInput = el<HTMLInputElement>("import-input");
 const autocompleteToggle = el<HTMLInputElement>("autocomplete-toggle");
 const compileButton = el<HTMLButtonElement>("compile");
+const uploadButton = el<HTMLButtonElement>("upload");
 const statusPill = el<HTMLSpanElement>("status");
 const errorList = el<HTMLDivElement>("error-list");
 const outputText = el<HTMLPreElement>("output-text");
+const uploadProgress = el<HTMLDivElement>("upload-progress");
+const uploadBar = el<HTMLProgressElement>("upload-bar");
+const uploadCount = el<HTMLSpanElement>("upload-count");
+const serialHelp = el<HTMLAnchorElement>("serial-help");
 
 // ------------------------------------------------------------- sketch library
 
@@ -96,6 +111,7 @@ function openSketch(nameToOpen: string): void {
 	persist();
 	clearCompiledHex();
 	editor.setCode(currentSketch().code);
+	refreshUploadButton();
 	setStatus("idle", "Ready");
 	showOutput("Click Compile to check your sketch.", "plain");
 	editor.focus();
@@ -157,6 +173,7 @@ async function compileSketch(): Promise<void> {
 
 	const code = editor.getCode();
 	clearCompiledHex();
+	refreshUploadButton();
 	clearErrorRows();
 	editor.clearErrorLines();
 	statusPill.title = "";
@@ -203,6 +220,132 @@ async function compileSketch(): Promise<void> {
 	} finally {
 		compiling = false;
 		compileButton.disabled = false;
+		refreshUploadButton();
+	}
+}
+
+// ------------------------------------------------------------------ uploading
+
+/**
+ * The board the student picked. Chrome remembers the permission per device, so
+ * after the first Upload the chooser never appears again — which is what makes
+ * "upload a second sketch without replugging" a single click.
+ */
+let chosenPort: SerialPortLike | null = null;
+/**
+ * Set after a filtered chooser came back with nothing. The next click lists
+ * every serial port, so a board with an unusual USB chip is still reachable.
+ * Each request happens inside its own click, so Chrome still sees a gesture.
+ */
+let showAllPorts = false;
+let uploading = false;
+
+/** Upload is only legal when the hex on hand was built from the text on screen. */
+function refreshUploadButton(): void {
+	const ready = !uploading && !compiling && hasFreshHex(editor.getCode());
+	uploadButton.disabled = !ready;
+	uploadButton.title = ready
+		? "Send this sketch to the Uno over USB."
+		: "Compile first — the board can only be sent a sketch that has just compiled.";
+}
+
+function showUploadProgress(pagesDone: number, pagesTotal: number): void {
+	uploadProgress.hidden = false;
+	uploadBar.max = pagesTotal;
+	uploadBar.value = pagesDone;
+	uploadCount.textContent =
+		pagesDone === 0 ? `${pagesTotal} pages to write` : `page ${pagesDone} of ${pagesTotal}`;
+}
+
+function hideUploadProgress(): void {
+	uploadProgress.hidden = true;
+	uploadBar.value = 0;
+	uploadCount.textContent = "";
+}
+
+async function uploadSketch(): Promise<void> {
+	if (uploading || compiling) return;
+
+	const code = editor.getCode();
+	if (!hasFreshHex(code) || appState.hex === null) {
+		setStatus("error", "Compile first");
+		showOutput(
+			"This sketch has changed since it was last compiled. Click Compile, then Upload.",
+			"error",
+		);
+		return;
+	}
+
+	if (!isWebSerialAvailable()) {
+		serialHelp.hidden = false;
+		setStatus("error", "No Web Serial");
+		showOutput(NO_WEB_SERIAL_MESSAGE, "error");
+		return;
+	}
+
+	// Do the parsing before touching the port: a bad hex should never leave a
+	// board sitting in the bootloader.
+	let image: Uint8Array;
+	try {
+		image = parseIntelHex(appState.hex);
+	} catch (cause) {
+		setStatus("error", "Bad hex");
+		showOutput(
+			cause instanceof HexParseError
+				? cause.message
+				: "The compiled sketch could not be read. Compile again.",
+			"error",
+		);
+		return;
+	}
+
+	uploading = true;
+	uploadButton.disabled = true;
+	compileButton.disabled = true;
+	clearErrorRows();
+	statusPill.title = "";
+	setStatus("uploading", "Uploading…");
+	showOutput("Resetting the board and starting the upload…", "plain");
+	showUploadProgress(0, Math.ceil(image.length / PAGE_SIZE));
+
+	let transport: OpenPort | null = null;
+	try {
+		const port = chosenPort ?? (await findGrantedUnoPort()) ?? (await requestPort(showAllPorts));
+		chosenPort = port;
+		showAllPorts = false;
+
+		transport = await openTransport(port);
+		const result = await uploadImage(transport, image, { onProgress: showUploadProgress });
+
+		setStatus("success", "Uploaded");
+		showOutput(
+			`Uploaded ${result.bytesWritten} bytes in ${result.elapsedMs} ms (${result.pagesWritten} pages).\nThe board is running your sketch now.`,
+			"success",
+		);
+	} catch (cause) {
+		// Whatever went wrong, do not keep holding the old port: after an unplug
+		// Chrome hands out a new one, and the next click should find it.
+		chosenPort = null;
+
+		const kind = cause instanceof FlashError ? cause.kind : "port";
+		if (kind === "no-port" && !showAllPorts) showAllPorts = true;
+		if (kind === "unsupported") serialHelp.hidden = false;
+
+		setStatus("error", kind === "no-port" ? "No board" : "Upload failed");
+		showOutput(
+			cause instanceof FlashError
+				? cause.message
+				: `The upload failed: ${cause instanceof Error ? cause.message : String(cause)}`,
+			"error",
+		);
+	} finally {
+		// Always hand the port back, so T4's serial monitor can open it and so a
+		// second Upload is not blocked by the first one's lock.
+		if (transport) await transport.close();
+		uploading = false;
+		compileButton.disabled = false;
+		hideUploadProgress();
+		refreshUploadButton();
 	}
 }
 
@@ -217,6 +360,7 @@ const editor: Editor = createEditor({
 		persistSoon();
 		// The hex describes the old text now.
 		clearCompiledHex();
+		refreshUploadButton();
 		if (appState.status === "success") setStatus("idle", "Ready");
 	},
 });
@@ -271,14 +415,14 @@ el<HTMLButtonElement>("download-sketch").addEventListener("click", () => {
 	URL.revokeObjectURL(url);
 });
 
-el<HTMLButtonElement>("upload-sketch").addEventListener("click", () => {
-	uploadInput.click();
+el<HTMLButtonElement>("import-sketch").addEventListener("click", () => {
+	importInput.click();
 });
 
-uploadInput.addEventListener("change", async () => {
-	const file = uploadInput.files?.[0];
+importInput.addEventListener("change", async () => {
+	const file = importInput.files?.[0];
 	// Reset first, so choosing the same file twice fires this again.
-	uploadInput.value = "";
+	importInput.value = "";
 	if (!file) return;
 
 	try {
@@ -287,18 +431,6 @@ uploadInput.addEventListener("change", async () => {
 	} catch {
 		window.alert("Could not read that file.");
 	}
-});
-
-examplesSelect.append(
-	...EXAMPLES.map((example) => new Option(example.name, example.name)),
-);
-
-examplesSelect.addEventListener("change", () => {
-	const example = EXAMPLES.find((e) => e.name === examplesSelect.value);
-	// Snap back to "Choose…" so the same example can be opened twice.
-	examplesSelect.value = "";
-	if (!example) return;
-	addSketch(example.name, example.code);
 });
 
 autocompleteToggle.checked = loadAutocompleteEnabled();
@@ -310,6 +442,10 @@ autocompleteToggle.addEventListener("change", () => {
 
 compileButton.addEventListener("click", () => {
 	void compileSketch();
+});
+
+uploadButton.addEventListener("click", () => {
+	void uploadSketch();
 });
 
 el<HTMLButtonElement>("clear-output").addEventListener("click", () => {
@@ -339,13 +475,20 @@ window.addEventListener("keydown", (event) => {
 renderSketchList();
 persist();
 setStatus("idle", "Ready");
+refreshUploadButton();
 
+// Two things a student needs to hear before they hit a wall, not after.
+const bootWarnings: string[] = [];
 if (isStorageBroken()) {
-	showOutput(
+	bootWarnings.push(
 		"This browser is not letting the page save sketches. Your work will be lost when you close the tab — download the .ino before you leave.",
-		"error",
 	);
 }
+if (!isWebSerialAvailable()) {
+	serialHelp.hidden = false;
+	bootWarnings.push(NO_WEB_SERIAL_MESSAGE);
+}
+if (bootWarnings.length > 0) showOutput(bootWarnings.join("\n\n"), "error");
 
 /**
  * A handle for the browser console, and for checking the compile result by hand
