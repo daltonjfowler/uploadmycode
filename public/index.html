@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex" />
+		<title>Uno Web IDE</title>
+		<style>
+			:root {
+				color-scheme: light dark;
+			}
+			body {
+				margin: 0;
+				padding: 2rem 1.25rem;
+				font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+				max-width: 40rem;
+				margin-inline: auto;
+			}
+			h1 {
+				font-size: 1.5rem;
+				margin: 0 0 0.25rem;
+			}
+			p.sub {
+				margin: 0 0 1.5rem;
+				opacity: 0.75;
+			}
+			ul {
+				padding-left: 1.2rem;
+			}
+			#serial-check {
+				margin-top: 1.5rem;
+				padding: 0.75rem 1rem;
+				border: 1px solid currentColor;
+				border-radius: 6px;
+				font-weight: 600;
+			}
+			button {
+				font: inherit;
+				padding: 0.5rem 1rem;
+				margin-top: 0.75rem;
+				cursor: pointer;
+			}
+			#serial-result {
+				white-space: pre-wrap;
+				font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+				font-size: 0.85rem;
+			}
+			footer {
+				margin-top: 2rem;
+				font-size: 0.85rem;
+				opacity: 0.7;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>Uno Web IDE</h1>
+		<p class="sub">Placeholder page. The editor is not built yet.</p>
+
+		<p>
+			This will be a browser Arduino IDE for classroom Chromebooks. Write a sketch, compile it on
+			the server, and flash an Arduino Uno over USB. Arduino Uno only.
+		</p>
+
+		<ul>
+			<li>T0 — scaffold and deploy skeleton (this page)</li>
+			<li>T1 — compile service (<code>arduino-cli</code> in a container)</li>
+			<li>T2 — editor frontend</li>
+			<li>T3 — upload over Web Serial</li>
+			<li>T4 — serial monitor</li>
+			<li>T5 — class code, rate limits, deploy docs</li>
+		</ul>
+
+		<p id="serial-check">Checking for Web Serial support&hellip;</p>
+
+		<p>
+			<button id="serial-test" type="button">Test Web Serial (pick a port)</button>
+		</p>
+		<p id="serial-result"></p>
+
+		<footer>Internal district tool. Not a public service.</footer>
+
+		<script>
+			// Both checks below exist for docs/CHROMEBOOK-CHECKLIST.md, so the district
+			// smoke test needs no DevTools. T2 replaces this page with the real editor.
+			var hasSerial = "serial" in navigator;
+
+			document.getElementById("serial-check").textContent = hasSerial
+				? "Web Serial API: AVAILABLE in this browser."
+				: "Web Serial API: NOT AVAILABLE in this browser.";
+
+			var result = document.getElementById("serial-result");
+
+			document.getElementById("serial-test").addEventListener("click", async function () {
+				if (!hasSerial) {
+					result.textContent = "FAIL: navigator.serial does not exist. Web Serial is off.";
+					return;
+				}
+				result.textContent = "Asking for a port...";
+				try {
+					var port = await navigator.serial.requestPort();
+					var info = port.getInfo();
+					result.textContent =
+						"PASS: port chosen.\nusbVendorId: " +
+						info.usbVendorId +
+						" (0x" +
+						(info.usbVendorId || 0).toString(16) +
+						")\nusbProductId: " +
+						info.usbProductId +
+						" (0x" +
+						(info.usbProductId || 0).toString(16) +
+						")";
+				} catch (err) {
+					result.textContent = "FAIL or CANCELLED: " + err.name + ": " + err.message;
+				}
+			});
+		</script>
+	</body>
+</html>

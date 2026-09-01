@@ -1,0 +1,33 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+
+  "name": "uno-web-ide",
+  "main": "src/worker.ts",
+
+  // Keep this within ~30 days of the last real change to the Worker.
+  "compatibility_date": "2026-08-31",
+  // No "nodejs_compat": this Worker uses zero Node built-ins. Adding the flag
+  // also forces a @types/node dependency. Add it if a later task needs it.
+
+  // Deploy to <name>.<subdomain>.workers.dev. No custom domain yet.
+  "workers_dev": true,
+
+  "assets": {
+    // The frontend. T0 ships a placeholder here; T2 builds Vite output into it.
+    "directory": "./public/",
+    // Lets the Worker fall back to the static site: env.ASSETS.fetch(request).
+    "binding": "ASSETS",
+    // API paths hit the Worker before the asset server. Everything else tries
+    // a static file first and only reaches the Worker if no file matches.
+    "run_worker_first": ["/api/*"],
+    // No SPA rewrite and no custom 404 page. A missing file is a plain 404.
+    "not_found_handling": "none"
+  },
+
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  }
+
+  // T1 adds "containers" + "durable_objects" + "migrations" here for arduino-cli.
+}
