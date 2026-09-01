@@ -61,4 +61,5 @@ node container/server.js
 ## Manual test docs
 
 - [docs/T2-TEST.md](docs/T2-TEST.md) — editor click-through (compile, error highlight, autosave, autocomplete toggle).
+- [docs/T3-TEST.md](docs/T3-TEST.md) — flashing a real Uno from Chrome (hardware gate, Dalton runs it); reset-polarity troubleshooting.
 - [docs/CHROMEBOOK-CHECKLIST.md](docs/CHROMEBOOK-CHECKLIST.md) — district IT Web Serial policy questions and the one-Chromebook/one-Uno smoke test. Go/no-go for the whole project.
