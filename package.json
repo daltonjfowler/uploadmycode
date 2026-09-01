@@ -6,12 +6,24 @@
   "description": "Browser Arduino IDE for district Chromebooks. Arduino Uno only.",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "dev:web": "vite web",
+    "build": "vite build web",
+    "deploy": "npm run build && wrangler deploy",
     "types": "wrangler types",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p web/tsconfig.json",
+    "test": "node --test \"web/test/*.test.mjs\""
   },
   "devDependencies": {
+    "@codemirror/autocomplete": "6.20.3",
+    "@codemirror/commands": "6.11.0",
+    "@codemirror/lang-cpp": "6.0.3",
+    "@codemirror/language": "6.12.4",
+    "@codemirror/search": "6.7.2",
+    "@codemirror/state": "6.7.2",
+    "@codemirror/view": "6.43.10",
+    "@lezer/highlight": "1.2.3",
     "typescript": "5.9.3",
+    "vite": "8.2.2",
     "wrangler": "4.127.1"
   },
   "dependencies": {

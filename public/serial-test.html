@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex" />
+		<meta name="color-scheme" content="light dark" />
+		<title>uploadmycode — Web Serial test</title>
+		<style>
+			:root {
+				color-scheme: light dark;
+			}
+			body {
+				margin: 0 auto;
+				padding: 2rem 1.25rem;
+				max-width: 40rem;
+				font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+			}
+			h1 {
+				font-size: 1.4rem;
+				margin: 0 0 0.25rem;
+			}
+			p.sub {
+				margin: 0 0 1.5rem;
+				opacity: 0.75;
+			}
+			#serial-check {
+				margin-top: 1.5rem;
+				padding: 0.75rem 1rem;
+				border: 1px solid currentColor;
+				border-radius: 6px;
+				font-weight: 600;
+			}
+			button {
+				font: inherit;
+				padding: 0.5rem 1rem;
+				margin-top: 0.75rem;
+				cursor: pointer;
+			}
+			#serial-result {
+				white-space: pre-wrap;
+				font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+				font-size: 0.85rem;
+			}
+			footer {
+				margin-top: 2rem;
+				font-size: 0.85rem;
+				opacity: 0.7;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>Web Serial test</h1>
+		<p class="sub">
+			Diagnostics page for <a href="/">uploadmycode</a>. Used by
+			<code>docs/CHROMEBOOK-CHECKLIST.md</code>.
+		</p>
+
+		<p>
+			This page answers one question: does this Chromebook let this site talk to a USB device? It
+			does not compile or flash anything.
+		</p>
+
+		<p id="serial-check">Checking for Web Serial support&hellip;</p>
+
+		<p>
+			<button id="serial-test" type="button">Test Web Serial (pick a port)</button>
+		</p>
+		<p id="serial-result"></p>
+
+		<footer>
+			Internal district tool. Not a public service. &middot;
+			<a href="https://daltonjfowler.com" target="_blank" rel="noopener">Made by Dalton Fowler</a>
+		</footer>
+
+		<script>
+			// Plain script, no build step: this file is copied to the site root as-is
+			// so the district smoke test needs no DevTools and no editor.
+			var hasSerial = "serial" in navigator;
+
+			document.getElementById("serial-check").textContent = hasSerial
+				? "Web Serial API: AVAILABLE in this browser."
+				: "Web Serial API: NOT AVAILABLE in this browser.";
+
+			var result = document.getElementById("serial-result");
+
+			document.getElementById("serial-test").addEventListener("click", async function () {
+				if (!hasSerial) {
+					result.textContent = "FAIL: navigator.serial does not exist. Web Serial is off.";
+					return;
+				}
+				result.textContent = "Asking for a port...";
+				try {
+					var port = await navigator.serial.requestPort();
+					var info = port.getInfo();
+					result.textContent =
+						"PASS: port chosen.\nusbVendorId: " +
+						info.usbVendorId +
+						" (0x" +
+						(info.usbVendorId || 0).toString(16) +
+						")\nusbProductId: " +
+						info.usbProductId +
+						" (0x" +
+						(info.usbProductId || 0).toString(16) +
+						")";
+				} catch (err) {
+					result.textContent = "FAIL or CANCELLED: " + err.name + ": " + err.message;
+				}
+			});
+		</script>
+	</body>
+</html>

@@ -113,7 +113,7 @@ cables do not), and about ten minutes.
 | # | Step | Expected | Actual |
 |---|---|---|---|
 | 1 | Sign in to the managed Chromebook as a student account. | Normal student session. | |
-| 2 | Open `https://uno-web-ide.daltonjfowler.workers.dev` | Page loads. Placeholder text, no editor yet. | |
+| 2 | Open `https://uno-web-ide.daltonjfowler.workers.dev/serial-test.html` | The "Web Serial test" page loads. (The site root is the editor; this page is the diagnostic.) | |
 | 3 | Read the bordered box on the page. | "Web Serial API: **AVAILABLE** in this browser." | |
 | 4 | Plug the Uno into the Chromebook. | Green power LED on the board is lit. | |
 | 5 | Click the **Test Web Serial (pick a port)** button. | Chrome shows its own port chooser dialog, listing at least one port. | |

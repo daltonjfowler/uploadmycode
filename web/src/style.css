@@ -1,0 +1,337 @@
+/*
+ * One stylesheet, plain CSS, no framework.
+ *
+ * Every colour is a custom property declared twice: once for light and once
+ * inside prefers-color-scheme: dark. The CodeMirror theme in editor.ts uses the
+ * same properties, so the editor follows the system theme with no JavaScript
+ * and nothing to re-create when a student flips their Chromebook to dark mode.
+ */
+
+:root {
+	color-scheme: light dark;
+
+	--bg: #ffffff;
+	--panel: #f3f4f6;
+	--gutter-bg: #f3f4f6;
+	--editor-bg: #ffffff;
+	--fg: #14181d;
+	--muted: #5b6570;
+	--border: #d5dae0;
+	--accent: #007b81; /* Arduino teal, darkened for contrast on white */
+	--accent-fg: #ffffff;
+	--ok: #1a7f37;
+	--danger: #b3261e;
+	--warn: #8a6100;
+	--selection: #b6dcff;
+	--active-line: #f2f5f9;
+	--bracket: #d8e6f5;
+	--error-line: #fdeceb;
+
+	--tok-comment: #6e7781;
+	--tok-keyword: #cf222e;
+	--tok-type: #953800;
+	--tok-number: #0550ae;
+	--tok-string: #0a3069;
+	--tok-function: #8250df;
+	--tok-preproc: #116329;
+	--tok-constant: #0550ae;
+	--tok-punct: #57606a;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: #0d1117;
+		--panel: #161b22;
+		--gutter-bg: #0d1117;
+		--editor-bg: #0d1117;
+		--fg: #e6edf3;
+		--muted: #9198a1;
+		--border: #30363d;
+		--accent: #2f9ea4;
+		--accent-fg: #04191b;
+		--ok: #3fb950;
+		--danger: #f85149;
+		--warn: #d29922;
+		--selection: #23405e;
+		--active-line: #161b22;
+		--bracket: #26374a;
+		--error-line: #2d1618;
+
+		--tok-comment: #8b949e;
+		--tok-keyword: #ff7b72;
+		--tok-type: #ffa657;
+		--tok-number: #79c0ff;
+		--tok-string: #a5d6ff;
+		--tok-function: #d2a8ff;
+		--tok-preproc: #7ee787;
+		--tok-constant: #79c0ff;
+		--tok-punct: #9198a1;
+	}
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	height: 100%;
+}
+
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--fg);
+	font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.app {
+	display: grid;
+	/* toolbar, editor, output, footer */
+	grid-template-rows: auto minmax(0, 1fr) auto auto;
+	height: 100dvh;
+}
+
+/* ------------------------------------------------------------------ toolbar */
+
+.toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.4rem 0.5rem;
+	padding: 0.5rem 0.75rem;
+	background: var(--panel);
+	border-bottom: 1px solid var(--border);
+}
+
+.brand {
+	font-weight: 700;
+	letter-spacing: -0.01em;
+	margin-right: 0.25rem;
+}
+
+.grow {
+	flex: 1 1 auto;
+}
+
+.field {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+	color: var(--muted);
+	font-size: 0.8rem;
+}
+
+.check {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+	font-size: 0.85rem;
+	white-space: nowrap;
+}
+
+button,
+select {
+	font: inherit;
+	font-size: 0.85rem;
+	color: var(--fg);
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 5px;
+	padding: 0.28rem 0.6rem;
+	cursor: pointer;
+}
+
+select {
+	max-width: 12rem;
+}
+
+button:hover:not(:disabled),
+select:hover {
+	border-color: var(--accent);
+}
+
+button:disabled {
+	opacity: 0.55;
+	cursor: default;
+}
+
+button.primary {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: var(--accent-fg);
+	font-weight: 600;
+	padding-inline: 1rem;
+}
+
+button.link {
+	background: none;
+	border: none;
+	color: var(--muted);
+	text-decoration: underline;
+	padding: 0.1rem 0.2rem;
+}
+
+:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
+}
+
+/* The status pill. data-state is set by main.ts. */
+.status {
+	font-size: 0.85rem;
+	font-weight: 600;
+	padding: 0.28rem 0.6rem;
+	border-radius: 999px;
+	border: 1px solid var(--border);
+	white-space: nowrap;
+}
+
+.status[data-state="idle"] {
+	color: var(--muted);
+}
+.status[data-state="compiling"] {
+	color: var(--warn);
+	border-color: var(--warn);
+}
+.status[data-state="success"] {
+	color: var(--ok);
+	border-color: var(--ok);
+}
+.status[data-state="error"] {
+	color: var(--danger);
+	border-color: var(--danger);
+}
+.status[data-state="compiler-busy"] {
+	color: var(--warn);
+	border-color: var(--warn);
+}
+
+/* ------------------------------------------------------------------- editor */
+
+.editor {
+	min-height: 0;
+	overflow: hidden;
+	background: var(--editor-bg);
+}
+
+/* ------------------------------------------------------------------- output */
+
+.output {
+	display: flex;
+	flex-direction: column;
+	min-height: 6rem;
+	max-height: 34vh;
+	background: var(--panel);
+	border-top: 1px solid var(--border);
+}
+
+.output-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 0.3rem 0.75rem;
+}
+
+.output-head h2 {
+	margin: 0;
+	font-size: 0.75rem;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.error-list {
+	display: flex;
+	flex-direction: column;
+	overflow: auto;
+	flex: 0 0 auto;
+	max-height: 12rem;
+}
+
+.error-list:not(:empty) {
+	border-top: 1px solid var(--border);
+}
+
+.error-row {
+	display: block;
+	width: 100%;
+	text-align: left;
+	background: none;
+	border: none;
+	border-bottom: 1px solid var(--border);
+	border-radius: 0;
+	padding: 0.35rem 0.75rem;
+	font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+	font-size: 0.8rem;
+	color: var(--danger);
+}
+
+.error-row[data-severity="warning"],
+.error-row[data-severity="note"] {
+	color: var(--muted);
+}
+
+.error-row:hover {
+	background: var(--bracket);
+	border-color: var(--border);
+}
+
+.error-row .where {
+	font-weight: 700;
+	margin-right: 0.4rem;
+}
+
+.output-text {
+	margin: 0;
+	padding: 0.5rem 0.75rem;
+	overflow: auto;
+	flex: 1 1 auto;
+	white-space: pre-wrap;
+	word-break: break-word;
+	font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+	font-size: 0.8rem;
+	color: var(--muted);
+}
+
+.output-text[data-tone="error"] {
+	color: var(--danger);
+}
+.output-text[data-tone="success"] {
+	color: var(--ok);
+}
+
+/* ------------------------------------------------------------------- footer */
+
+.footer {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	padding: 0.35rem 0.75rem;
+	background: var(--panel);
+	border-top: 1px solid var(--border);
+	font-size: 0.75rem;
+	color: var(--muted);
+}
+
+.footer a {
+	color: var(--muted);
+	text-decoration: underline;
+}
+
+.footer a:hover {
+	color: var(--accent);
+}
+
+/* Narrow Chromebook windows: let the toolbar wrap without a horizontal scroll. */
+@media (max-width: 640px) {
+	.field span {
+		display: none;
+	}
+	.brand {
+		width: 100%;
+	}
+}
