@@ -1,4 +1,4 @@
-# Uno Web IDE compile service: Debian + arduino-cli + the AVR toolchain, serving
+# uploadmycode compile service: Debian + arduino-cli + the AVR toolchain, serving
 # container/server.js. Everything is version-pinned and checksum-verified so a
 # rebuild next year produces the same compiler the class used today.
 #

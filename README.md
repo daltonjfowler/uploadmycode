@@ -1,4 +1,4 @@
-# Uno Web IDE
+# uploadmycode
 
 Browser Arduino IDE for district Chromebooks. Students write a sketch on a website, the sketch
 compiles on a Cloudflare Container running `arduino-cli`, and the browser flashes the resulting
@@ -8,7 +8,7 @@ hex onto an Arduino Uno over USB with the Web Serial API. No installs on student
 - Hosted on Cloudflare Workers + Containers (Workers Paid plan, $5/month + small usage).
 - Internal district tool, not a public service.
 
-**Live:** <https://uno-web-ide.daltonjfowler.workers.dev> — T0 placeholder page, no editor yet.
+**Live:** <https://uploadmycode.com> (fallback: <https://uploadmycode.daltonjfowler.workers.dev>)
 
 **Start here:** [PLAN.md](PLAN.md) — architecture, locked decisions, and the T0–T5 task list for
 worker sessions. One task per session, in order, gate must pass before stopping.
@@ -17,19 +17,22 @@ worker sessions. One task per session, in order, gate must pass before stopping.
 
 ```sh
 npm install
-npm run typecheck   # tsc --noEmit
+npm run typecheck   # tsc --noEmit for the Worker and for web/
+npm test            # node --test web/test/*.test.mjs
+npm run dev:web     # Vite dev server for the editor (proxies /api/compile to localhost:8080)
+npm run build       # vite build web -> public/
 npm run types       # regenerate worker-configuration.d.ts after editing wrangler.jsonc
-npm run deploy      # wrangler deploy
+npm run deploy      # npm run build, then wrangler deploy (needs Docker running)
 ```
 
-`npm run dev` (`wrangler dev`) needs Docker, and so does `wrangler deploy` — it builds
-`container/Dockerfile`. See [docs/BLOCKERS.md](docs/BLOCKERS.md).
+`wrangler deploy` builds `container/Dockerfile`, so Docker Desktop must be running.
+`npm run dev` (`wrangler dev`) also needs it.
 
 ## Running the compile server without Docker
 
-`container/server.js` is the same file the image runs, and it runs directly on Windows. This is
-how T1–T4 are tested while Docker is unavailable. Nothing here is committed: `tools/` is
-gitignored, and the versions must match the pins at the top of `container/Dockerfile`.
+`container/server.js` is the same file the image runs, and it runs directly on Windows. Useful for
+frontend work: `npm run dev:web` proxies `/api/compile` to it. Nothing here is committed: `tools/`
+is gitignored, and the versions must match the pins at the top of `container/Dockerfile`.
 
 ```powershell
 $tools = "$PWD\tools"
@@ -55,15 +58,7 @@ arduino-cli lib install LiquidCrystal@1.0.7
 node container/server.js
 ```
 
-Then, from another shell:
+## Manual test docs
 
-```powershell
-$body = @{ code = "void setup(){} void loop(){}" } | ConvertTo-Json -Compress
-Invoke-WebRequest -UseBasicParsing -Uri 'http://localhost:8080/compile' -Method Post `
-  -ContentType 'application/json' -Body ([Text.Encoding]::UTF8.GetBytes($body)) | Select-Object -Expand Content
-```
-
-## Before T2
-
-Run [docs/CHROMEBOOK-CHECKLIST.md](docs/CHROMEBOOK-CHECKLIST.md). Web Serial policy on managed
-Chromebooks is the go/no-go risk for the whole project.
+- [docs/T2-TEST.md](docs/T2-TEST.md) — editor click-through (compile, error highlight, autosave, autocomplete toggle).
+- [docs/CHROMEBOOK-CHECKLIST.md](docs/CHROMEBOOK-CHECKLIST.md) — district IT Web Serial policy questions and the one-Chromebook/one-Uno smoke test. Go/no-go for the whole project.

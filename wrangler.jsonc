@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
 
-  "name": "uno-web-ide",
+  "name": "uploadmycode",
   "main": "src/worker.ts",
 
   // Keep this within ~30 days of the last real change to the Worker.

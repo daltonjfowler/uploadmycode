@@ -11,7 +11,7 @@ There are two parts:
 1. Questions for district IT (below).
 2. A one-Chromebook / one-Uno smoke test that produces a yes or no.
 
-**Site origin to allowlist:** `https://uno-web-ide.daltonjfowler.workers.dev`
+**Site origin to allowlist:** `https://uploadmycode.com`
 
 What the site is, in one paragraph for IT: an internally-built classroom tool for an Arduino unit.
 It is served over HTTPS from Cloudflare. There is no install, no extension, no student account, and
@@ -63,7 +63,7 @@ Example value (confirm the exact IDs with step 6 of the smoke test before submit
       { "vendor_id": 10755 },
       { "vendor_id": 6790, "product_id": 29987 }
     ],
-    "urls": ["https://uno-web-ide.daltonjfowler.workers.dev"]
+    "urls": ["https://uploadmycode.com"]
   }
 ]
 ```
@@ -113,7 +113,7 @@ cables do not), and about ten minutes.
 | # | Step | Expected | Actual |
 |---|---|---|---|
 | 1 | Sign in to the managed Chromebook as a student account. | Normal student session. | |
-| 2 | Open `https://uno-web-ide.daltonjfowler.workers.dev/serial-test.html` | The "Web Serial test" page loads. (The site root is the editor; this page is the diagnostic.) | |
+| 2 | Open `https://uploadmycode.com/serial-test.html` | The "Web Serial test" page loads. (The site root is the editor; this page is the diagnostic.) | |
 | 3 | Read the bordered box on the page. | "Web Serial API: **AVAILABLE** in this browser." | |
 | 4 | Plug the Uno into the Chromebook. | Green power LED on the board is lit. | |
 | 5 | Click the **Test Web Serial (pick a port)** button. | Chrome shows its own port chooser dialog, listing at least one port. | |

@@ -1,4 +1,4 @@
-# CLAUDE.md — Uno Web IDE
+# CLAUDE.md — uploadmycode
 
 Classroom tool: browser Arduino IDE for Chromebooks. Compile on a Cloudflare Container
 (`arduino-cli`), flash an Arduino Uno from the browser via Web Serial. Uno only, ever.

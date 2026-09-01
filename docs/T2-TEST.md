@@ -19,7 +19,7 @@ the README section "Running the compile server without Docker"). If `tools/` is 
 the README recipe first.
 
 ```powershell
-cd C:\Users\Mo Chara\Desktop\uno-web-ide
+cd C:\Users\Mo Chara\Desktop\uploadmycode
 $tools = "$PWD\tools"
 $env:ARDUINO_CLI = "$tools\arduino-cli\arduino-cli.exe"
 $env:ARDUINO_DIRECTORIES_DATA = "$tools\arduino-data"
@@ -33,7 +33,7 @@ Expected, immediately: `{"event":"listening","port":8080,"fqbn":"arduino:avr:uno
 **Terminal 2 — the editor**
 
 ```powershell
-cd C:\Users\Mo Chara\Desktop\uno-web-ide
+cd C:\Users\Mo Chara\Desktop\uploadmycode
 npm run dev:web
 ```
 

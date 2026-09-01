@@ -1,4 +1,4 @@
-# PLAN.md — Uno Web IDE
+# PLAN.md — uploadmycode
 
 Browser Arduino IDE for district Chromebooks. Students open a website, write a sketch, click
 **Compile** (server-side `arduino-cli` running in a Cloudflare Container), click **Upload**
@@ -56,7 +56,7 @@ Chromebook browser                         Cloudflare
 - wrangler 4.127.1 authenticated (OAuth, daltonjfowler@gmail.com, account `8a77f2d8ecd25793e3a979cef8ac2646`). Use `npx wrangler`.
 - **Workers Paid is active** on the account (confirmed by Dalton and by a clean container deploy).
 - **Docker Desktop 4.88.1 works** (WSL2 backend, engine 29.7.2). `docker` is on PATH in fresh shells. If the engine is down, start `C:UsersMo CharaAppDataLocalProgramsDockerDesktopDocker Desktop.exe` and wait ~10 s.
-- **Container is deployed and live.** `POST https://uno-web-ide.daltonjfowler.workers.dev/api/compile` compiles Blink: cold start ~16 s, warm ~0.8 s. Measured 2026-09-01 by the lead. Blocker B1 is cleared.
+- **Container is deployed and live.** `POST https://uploadmycode.com/api/compile` compiles Blink: cold start ~16 s, warm ~0.8 s. Measured 2026-09-01 by the lead. Blocker B1 is cleared.
 - `npx wrangler deploy` is allowed for T3–T5 workers; it rebuilds the image (cached layers, ~1 min when the Dockerfile is unchanged) and re-uploads assets. Build `public/` from `web/` before deploying.
 - Domain `uploadmycode.com` is registered at Cloudflare Registrar on this account (2026-09-01). The lead attaches it as a custom domain; it becomes the final origin for the Chromebook checklist.
 - Local gates still run against `node container/server.js` + `tools/` arduino-cli (README recipe) when a full deploy is not needed.

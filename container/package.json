@@ -1,6 +1,6 @@
 {
 	"private": true,
-	"name": "uno-web-ide-compile-server",
+	"name": "uploadmycode-compile-server",
 	"version": "0.0.0",
 	"description": "Compile server that runs inside the container. No dependencies, ever.",
 	"//": "Only here to make server.js an ES module in the image too. Without it Node treats /app/server.js as CommonJS and the imports fail. Never add dependencies to this file.",

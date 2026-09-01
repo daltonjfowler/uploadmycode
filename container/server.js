@@ -1,5 +1,5 @@
 /**
- * Uno Web IDE compile server.
+ * uploadmycode compile server.
  *
  * Runs inside the Cloudflare Container (see Dockerfile) and, unchanged, on a
  * Windows dev box with tools/arduino-cli on PATH. Node built-ins only, zero npm

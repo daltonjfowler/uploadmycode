@@ -1,5 +1,5 @@
 /**
- * Uno Web IDE Worker.
+ * uploadmycode Worker.
  *
  * Two jobs:
  *   1. Serve the static frontend out of public/ (the ASSETS binding).
