@@ -185,16 +185,18 @@ is refusing everyone and the Worker log says so.
 
 ## 4. What actually guards a compile
 
-`POST /api/compile` runs five checks, in this order:
+`POST /api/compile` runs six checks, in this order:
 
 1. **Size.** Over 100 KB → 413. Answered from `Content-Length` before the body is read where
    possible, and re-checked against the real byte count after, so a chunked upload cannot slip past.
 2. **School IP lock.** Off unless `ALLOWED_CIDRS` is set (section 6).
-3. **Class phrase.** Read from KV, compared in constant time after both sides are normalized.
+3. **Phrase lockout.** Is this address already serving a wrong-phrase lockout? → 429. Checked
+   before the KV read, so a locked address costs nothing (section 4a).
+4. **Class phrase.** Read from KV, compared in constant time after both sides are normalized.
    Missing or expired → 403 "No class phrase is active"; wrong → 403 "Wrong class phrase".
-4. **Rate limit.** Six compiles a minute per IP, counted in the container's Durable Object, with a
+5. **Rate limit.** Six compiles a minute per IP, counted in the container's Durable Object, with a
    `Retry-After` header on the 429.
-5. **Compile.** Only now is the container touched.
+6. **Compile.** Only now is the container touched.
 
 A phrase is valid only while `Date.now() < expiresAt`. KV's own `expirationTtl` is set as well, but
 a KV read can be served from a per-location cache for up to 60 seconds, so the Worker never trusts
@@ -202,6 +204,69 @@ the key's absence alone — it re-checks the timestamp every time.
 
 The teacher endpoint compares the key in constant time and waits a fixed 300 ms before every
 rejection, so guessing is slow and the reply time says nothing about how close a guess was.
+
+---
+
+## 4a. Abuse protection
+
+The phrase and the key are short enough to guess if guessing is free, so it is not free. Everything
+below is counted in the compile container's Durable Object — the single instance every request
+already passes through — which makes the counts site-wide rather than per Worker isolate. Nothing
+is written to storage: if that object is ever evicted the counts reset, which is the same trade the
+compile rate limit makes.
+
+| Guard | Limit | Then | Message |
+|---|---|---|---|
+| Wrong teacher key, per IP | 5 in 15 minutes | 429 for 15 minutes from the fifth | "Too many wrong keys from this network. Try again in N minutes." |
+| Wrong teacher key, everywhere | more than 100 in 15 minutes | 429 for 15 minutes — **but a correct key still gets in** | "Too many wrong keys from everywhere right now. Try again in N minutes. The right key still works." |
+| Wrong class phrase, per IP | 10 in 10 minutes | 429 for 10 minutes from the tenth | "Too many wrong phrases. Wait N minutes, then ask your teacher for today's phrase." |
+| Compiles, per IP | 6 per minute | 429 until the window slides | "That is a lot of compiles in one minute…" |
+
+Every 429 carries a `Retry-After` header in seconds. The phrase lockout also sends
+`x-lockout: class-phrase`, which is how the editor tells it apart from the ordinary compile rate
+limit and shows it next to the phrase field rather than in the output panel.
+
+Details worth knowing before you change any of it:
+
+- **A correct answer clears that address.** A class that fumbled the phrase all morning is not one
+  typo away from a lockout all afternoon, and a good teacher key wipes that machine's slate.
+- **Setting a phrase unlocks the room.** A whole school usually leaves Cloudflare through one
+  address, so the class shares one bucket of ten wrong phrases — and a phrase expiring mid-period
+  is exactly when thirty open tabs all send a stale one at once. Setting a new phrase from
+  `/teacher.html` therefore forgives every wrong-phrase lockout everywhere. **If a class is ever
+  locked out, set the phrase again; that is the fix.** It does not touch teacher-key lockouts.
+- **A student with no phrase yet is not a guesser.** A compile with no `x-class-phrase` header at
+  all is refused but never counted; only a wrong, non-empty phrase costs a strike. The first
+  compile of the day therefore never eats one.
+- **The wide teacher guard cannot lock you out.** The key is compared *first*, and the all-IP guard
+  is consulted only after a key turns out to be wrong. That ordering is deliberate: if the guard
+  ran before the compare, anyone could lock the teacher out of his own class for the price of a
+  hundred junk requests. Your own per-IP lock still applies — five wrong keys from your own laptop
+  is still fifteen minutes — so if you are locked out and the phrase must change now, set it from
+  the terminal instead: `npx wrangler kv key put --binding CLASS_KV phrase ... --remote`, or wait.
+- **The lock does not grow while you push on it.** Refused requests are not counted, so retrying
+  during a lockout never extends it. The wait shown is the real one.
+- **The limits live in one place**, `src/lockout.ts` (`LOCKOUT_POLICIES`), with unit tests in
+  `test/lockout.test.mjs`. Change the numbers there and the tests will tell you what you broke.
+
+### Optional: a Cloudflare Rate Limiting rule on `/api/teacher/*`
+
+Not configured, and not needed — the lockouts above already run before any KV read. Add it only if
+the teacher page ever draws real traffic, because a zone rule refuses at Cloudflare's edge and the
+Worker never runs at all, which is cheaper still. Dashboard steps, if that day comes:
+
+1. <https://dash.cloudflare.com> → the `uploadmycode.com` zone → **Security** → **WAF** → **Rate
+   limiting rules** → **Create rule**.
+2. Name it `teacher-endpoint`. Match **Custom filter expression**: field *URI Path*, operator
+   *starts with*, value `/api/teacher/`.
+3. Characteristics: **IP** (the free tier's only choice).
+4. Period **10 seconds**, requests **20**, duration **60 seconds**, action **Block**.
+5. Deploy.
+
+Keep the numbers loose. The teacher page fires one GET on load and one request per button press,
+so twenty in ten seconds is far above real use and far below a script. A blocked request gets
+Cloudflare's own 429 page, not this site's JSON, so do not tighten it to where a real person can
+hit it.
 
 ---
 
@@ -308,6 +373,7 @@ The guardrails, all already in place:
 | Compile timeout | `container/server.js` | 30 s |
 | Request size cap | `src/worker.ts` | 100 KB |
 | Rate limit | `src/ratelimit.ts` | 6 per minute per IP |
+| Failure lockouts | `src/lockout.ts` | 5 wrong keys / 15 min, 10 wrong phrases / 10 min (section 4a) |
 | Class phrase | KV + `src/worker.ts` | required on every compile |
 
 Memory and disk are billed while the instance is **awake**, CPU only while it is **working**. That

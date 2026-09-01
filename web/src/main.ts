@@ -284,6 +284,18 @@ async function compileSketch(): Promise<void> {
 			return;
 		}
 
+		if (outcome.kind === "phrase-locked") {
+			// Too many wrong phrases from this network. Typing another one right
+			// now cannot help, so the Worker's sentence — which carries the wait
+			// in minutes — goes up next to the phrase field, and the field stays
+			// open for when the wait is over. Whatever this tab already had is
+			// kept: it may be the right phrase, entered one minute too late.
+			renderPhraseRow(true);
+			setStatus("error", "Too many tries");
+			showOutput(outcome.message, "error");
+			return;
+		}
+
 		if (outcome.kind === "busy") {
 			setStatus("compiler-busy", "Compiler busy");
 			showOutput(outcome.message, "error");

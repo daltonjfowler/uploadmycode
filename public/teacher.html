@@ -84,6 +84,15 @@
 				opacity: 0.55;
 				cursor: default;
 			}
+			/* Small, quiet, and next to the field it acts on. */
+			button.link {
+				border: 0;
+				padding: 0.45rem 0.2rem;
+				background: none;
+				color: var(--accent);
+				font-size: 0.85rem;
+				text-decoration: underline;
+			}
 			.row {
 				display: flex;
 				flex-wrap: wrap;
@@ -167,7 +176,7 @@
 				<button id="remember" type="button">Remember on this machine</button>
 			</div>
 			<div class="fixed">
-				<button id="forget" type="button">Forget</button>
+				<button id="forget" type="button" class="link">Forget key on this device</button>
 			</div>
 		</div>
 
@@ -270,6 +279,13 @@
 					return picked.join("-");
 				}
 
+				/** The Worker's own 429 sentence, verbatim, minutes and all. */
+				function lockoutText(body) {
+					return body && body.error
+						? body.error
+						: "Too many tries from this network. Wait 15 minutes.";
+				}
+
 				function say(text, tone) {
 					message.textContent = text;
 					message.dataset.tone = tone || "plain";
@@ -370,6 +386,13 @@
 						say("That teacher key was refused. Check it and try again.", "error");
 						return;
 					}
+					if (result.status === 429) {
+						// Locked out after too many wrong keys. The Worker's
+						// sentence carries the wait in minutes, so show it word
+						// for word rather than inventing a shorter one.
+						say(lockoutText(result.body), "error");
+						return;
+					}
 					var detail = result.body && result.body.error ? result.body.error : "Something went wrong.";
 					say(detail, "error");
 				}
@@ -395,7 +418,7 @@
 						// Nothing to do: there was nothing saved.
 					}
 					keyInput.value = "";
-					say("Key forgotten on this machine.", "ok");
+					say("Key forgotten on this device.", "ok");
 				});
 
 				document.getElementById("set").addEventListener("click", function () {
@@ -440,6 +463,7 @@
 					call("GET", null).then(function (result) {
 						if (result.status === 200) show(result.body);
 						else if (result.status === 403) say("The saved teacher key was refused.", "error");
+						else if (result.status === 429) say(lockoutText(result.body), "error");
 					});
 				}
 			})();

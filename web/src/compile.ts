@@ -15,6 +15,11 @@
  * header. A 403 means the phrase is missing, wrong, or has expired; the message
  * the Worker sends is the one shown, word for word, because it is the sentence
  * that tells a student to go and ask the teacher.
+ *
+ * Two different problems arrive as HTTP 429, so they are told apart by the
+ * Worker's `x-lockout` header rather than by reading the sentence: too many
+ * compiles in a minute (wait, then click Compile), and too many wrong phrases
+ * from this network (a lockout, and the phrase is what has to be fixed).
  */
 
 export type CompileOutcome =
@@ -23,6 +28,8 @@ export type CompileOutcome =
 	| { kind: "busy"; message: string }
 	/** HTTP 403. The page must ask for the phrase again. */
 	| { kind: "phrase-required"; message: string }
+	/** HTTP 429 after too many wrong phrases from this network. */
+	| { kind: "phrase-locked"; message: string }
 	| { kind: "service-error"; message: string };
 
 /** Same path in dev (Vite proxies it to the local server) and in production. */
@@ -66,6 +73,9 @@ export async function requestCompile(code: string, phrase: string): Promise<Comp
 	// as it was written: 403 phrase, 413 too big, 429 too fast, 503 over capacity.
 	if (typeof reply.error === "string") {
 		if (response.status === 403) return { kind: "phrase-required", message: reply.error };
+		if (response.headers.get("x-lockout") === "class-phrase") {
+			return { kind: "phrase-locked", message: reply.error };
+		}
 		return response.status === 503
 			? { kind: "busy", message: reply.error }
 			: { kind: "service-error", message: reply.error };
