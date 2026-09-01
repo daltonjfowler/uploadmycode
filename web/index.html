@@ -37,15 +37,17 @@
 					Autocomplete
 				</label>
 
-				<span class="grow"></span>
-
-				<button id="compile" class="primary" type="button">Compile</button>
-				<button id="upload" class="primary" type="button" disabled title="Compile first.">
-					Upload
-				</button>
-				<span id="status" class="status" data-state="idle" role="status" aria-live="polite"
-					>Ready</span
-				>
+				<!-- One group so a wrapping toolbar never splits the two buttons from
+				     the pill that reports on them. -->
+				<div class="run-group">
+					<button id="compile" class="primary" type="button">Compile</button>
+					<button id="upload" class="primary" type="button" disabled title="Compile first.">
+						Upload
+					</button>
+					<span id="status" class="status" data-state="idle" role="status" aria-live="polite"
+						>Ready</span
+					>
+				</div>
 			</header>
 
 			<main id="editor" class="editor"></main>
@@ -60,7 +62,7 @@
 					<button id="clear-output" type="button" class="link">Clear</button>
 				</div>
 				<form id="phrase-form" class="phrase-form" hidden>
-					<label class="field" for="phrase-input"><span>Class phrase</span></label>
+					<label class="phrase-label" for="phrase-input">Class phrase</label>
 					<input
 						id="phrase-input"
 						type="text"
@@ -70,8 +72,15 @@
 						placeholder="today's class phrase"
 						aria-label="Today's class phrase"
 					/>
-					<button id="phrase-submit" class="primary" type="submit">Start</button>
+					<button id="phrase-submit" class="primary" type="submit">Save</button>
 				</form>
+
+				<!-- What the phrase looks like once this tab has one: one small line. -->
+				<div id="phrase-set" class="phrase-set" hidden>
+					<span>Class phrase set</span>
+					<span aria-hidden="true">·</span>
+					<button id="phrase-change" type="button" class="link">Change</button>
+				</div>
 
 				<div id="upload-progress" class="progress" hidden>
 					<progress id="upload-bar" max="1" value="0"></progress>

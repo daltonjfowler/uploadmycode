@@ -75,6 +75,8 @@ const uploadCount = el<HTMLSpanElement>("upload-count");
 const serialHelp = el<HTMLAnchorElement>("serial-help");
 const phraseForm = el<HTMLFormElement>("phrase-form");
 const phraseInput = el<HTMLInputElement>("phrase-input");
+const phraseSet = el<HTMLDivElement>("phrase-set");
+const phraseChange = el<HTMLButtonElement>("phrase-change");
 
 // ------------------------------------------------------------- sketch library
 
@@ -181,6 +183,18 @@ function clearErrorRows(): void {
 // --------------------------------------------------------------- class phrase
 
 /**
+ * The phrase row has three looks: nothing at all until a phrase is first asked
+ * for, the field while one is wanted, and one small line once this tab has one.
+ * Only the middle look is tall, and it is only up while a student is typing.
+ */
+function renderPhraseRow(asking: boolean): void {
+	phraseForm.hidden = !asking;
+	phraseSet.hidden = asking || loadPhrase() === "";
+	// Never leave a turned-down phrase sitting in the box, opening or closing.
+	phraseInput.value = "";
+}
+
+/**
  * Ask for today's phrase, in the page rather than in a browser dialog.
  *
  * The message is whatever the Worker said, word for word: "No class phrase is
@@ -188,16 +202,14 @@ function clearErrorRows(): void {
  * paraphrasing them here would lose that.
  */
 function askForPhrase(message: string): void {
-	phraseForm.hidden = false;
-	phraseInput.value = "";
+	renderPhraseRow(true);
 	setStatus("error", "Phrase needed");
 	showOutput(message, "error");
 	phraseInput.focus();
 }
 
 function hidePhraseForm(): void {
-	phraseForm.hidden = true;
-	phraseInput.value = "";
+	renderPhraseRow(false);
 }
 
 phraseForm.addEventListener("submit", (event) => {
@@ -208,6 +220,13 @@ phraseForm.addEventListener("submit", (event) => {
 	savePhrase(typed);
 	hidePhraseForm();
 	void compileSketch();
+});
+
+// Nothing is wrong when this one is clicked — the student simply wants to type
+// a different phrase — so it opens the field without the error status.
+phraseChange.addEventListener("click", () => {
+	renderPhraseRow(true);
+	phraseInput.focus();
 });
 
 // ------------------------------------------------------------------- compiling
@@ -747,6 +766,9 @@ renderSketchList();
 persist();
 setStatus("idle", "Ready");
 refreshUploadButton();
+// A reloaded tab still has its phrase in sessionStorage, so say so in one line
+// instead of leaving a student wondering whether it will be asked for again.
+renderPhraseRow(false);
 
 // The two monitor pickers are built from the module's own lists, so the page
 // and the code can never disagree about what a baud rate or an ending is.

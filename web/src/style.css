@@ -5,6 +5,11 @@
  * inside prefers-color-scheme: dark. The CodeMirror theme in editor.ts uses the
  * same properties, so the editor follows the system theme with no JavaScript
  * and nothing to re-create when a student flips their Chromebook to dark mode.
+ *
+ * The layout in one sentence: .app is a column, the editor is the only row in
+ * it that flexes, and every other row is as tall as its own content and no
+ * taller. Panels scroll inside themselves; the page as a whole only scrolls
+ * when even those minimums do not fit.
  */
 
 :root {
@@ -73,9 +78,33 @@
 	box-sizing: border-box;
 }
 
+/*
+ * The hidden attribute has to win. Several panels below are display: flex, and
+ * an author display beats the browser's own [hidden] { display: none } however
+ * specific that rule is — which is what kept the upload progress bar, the class
+ * phrase field and the "collapsed" serial monitor body on screen at all times,
+ * eating the editor's rows. main.ts toggles .hidden on exactly those elements;
+ * this rule is what makes the toggle real.
+ */
+[hidden] {
+	display: none !important;
+}
+
+html {
+	/*
+	 * Last-resort scrolling. Normally nothing here overflows: the app is one
+	 * viewport tall. On a very short viewport — phone landscape, or the
+	 * on-screen keyboard open — the minimum heights add up to more than that,
+	 * and then the whole page scrolls rather than clipping the footer.
+	 * Sideways is never wanted, hence setting the two axes apart.
+	 */
+	overflow-x: hidden;
+	overflow-y: auto;
+}
+
 html,
 body {
-	height: 100%;
+	min-height: 100%;
 }
 
 body {
@@ -85,15 +114,28 @@ body {
 	font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
+/* toolbar, editor, output, serial monitor, footer: one column, one viewport.
+   min-height rather than height so the box may grow past the viewport when the
+   minimums do not fit, which is what lets the page scroll instead of clip. */
 .app {
-	display: grid;
-	/* toolbar, editor, output, serial monitor, footer */
-	grid-template-rows: auto minmax(0, 1fr) auto auto auto;
-	height: 100dvh;
+	display: flex;
+	flex-direction: column;
+	min-height: 100vh; /* fallback: browsers without dvh */
+	min-height: 100dvh;
+}
+
+/* Everything except the editor is worth exactly its own content height. */
+.toolbar,
+.output,
+.monitor,
+.footer {
+	flex: 0 0 auto;
 }
 
 /* ------------------------------------------------------------------ toolbar */
 
+/* align-items: center, not the default stretch, so a button on a wrapped row is
+   never taller than its own text. */
 .toolbar {
 	display: flex;
 	flex-wrap: wrap;
@@ -102,6 +144,16 @@ body {
 	padding: 0.5rem 0.75rem;
 	background: var(--panel);
 	border-bottom: 1px solid var(--border);
+}
+
+/* Compile, Upload and the status pill travel as one group, pushed to the right
+   end of whichever row they land on. Grouping them is what keeps the pill on
+   the same row as the two buttons it reports on when the toolbar wraps. */
+.run-group {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem 0.5rem;
+	margin-left: auto;
 }
 
 .brand {
@@ -210,20 +262,38 @@ button.link {
 
 /* ------------------------------------------------------------------- editor */
 
+/* The one flexible row: flex: 1 1 0 takes every pixel the other rows did not
+   ask for. 12rem is the floor under that — about ten lines — below which the
+   editor stops giving ground and the page scrolls instead. */
 .editor {
-	min-height: 0;
+	flex: 1 1 0;
+	min-height: 12rem;
 	overflow: hidden;
 	background: var(--editor-bg);
 }
 
+/* CodeMirror fills the region and scrolls inside it, so a 400-line sketch never
+   stretches the page. editor.ts sets the same height through its theme; it is
+   repeated here so the layout does not depend on that theme surviving an edit. */
+.editor .cm-editor {
+	height: 100%;
+}
+
+.editor .cm-scroller {
+	overflow: auto;
+}
+
 /* ------------------------------------------------------------------- output */
 
+/* As tall as its content and never taller than 28vh, which leaves room for the
+   serial monitor underneath on a 768px Chromebook. Idle, that content is one
+   head strip and one line of text: the progress bar and the phrase field are
+   display: none until they have something to say. */
 .output {
 	display: flex;
 	flex-direction: column;
-	min-height: 6rem;
-	/* Leaves room for the serial monitor underneath on a 768px Chromebook. */
 	max-height: 28vh;
+	overflow: auto;
 	background: var(--panel);
 	border-top: 1px solid var(--border);
 }
@@ -252,7 +322,8 @@ button.link {
 }
 
 /* Flash progress. <progress> is styled per-browser, so only size is set here
-   and the accent colour comes from the theme. */
+   and the accent colour comes from the theme. Hidden — and so zero rows tall —
+   except while an upload is actually running. */
 .progress {
 	display: flex;
 	align-items: center;
@@ -276,26 +347,51 @@ button.link {
 /* The class phrase. Hidden until the page needs it, which is the first compile
    of a session and any time the Worker turns one down. Deliberately an inline
    field and not window.prompt: a browser prompt cannot be read from the back of
-   the room, and it blocks the tab. */
+   the room, and it blocks the tab.
+   One row — label, field, button — because the editor needs those pixels more
+   than a text box does. */
 .phrase-form {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: 0.4rem 0.5rem;
-	padding: 0 0.75rem 0.5rem;
+	gap: 0.35rem 0.5rem;
+	padding: 0 0.75rem 0.4rem;
+}
+
+/* Its own class rather than .field: .field hides its text on narrow screens,
+   and this label is the only thing on the page that says what to type. */
+.phrase-label {
+	font-size: 0.8rem;
+	color: var(--muted);
 }
 
 .phrase-form input[type="text"] {
-	flex: 1 1 14rem;
+	flex: 1 1 10rem;
 	max-width: 22rem;
 	min-width: 0;
+	height: 2rem; /* one comfortable thumb-sized row, and no more */
 	font: inherit;
 	font-size: 0.95rem;
 	color: var(--fg);
 	background: var(--bg);
 	border: 1px solid var(--accent);
 	border-radius: 5px;
-	padding: 0.3rem 0.5rem;
+	padding: 0 0.5rem;
+}
+
+/* Once this tab has a phrase there is nothing left to type, so the field
+   collapses to this one line. Change puts the field back. */
+.phrase-set {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+	padding: 0 0.75rem 0.4rem;
+	font-size: 0.8rem;
+	color: var(--muted);
+}
+
+.phrase-set button {
+	font-size: inherit;
 }
 
 .error-list {
@@ -344,6 +440,9 @@ button.link {
 	padding: 0.5rem 0.75rem;
 	overflow: auto;
 	flex: 1 1 auto;
+	/* A long error list must not squeeze the message down to nothing: the first
+	   line of it always survives. */
+	min-height: 2.5rem;
 	white-space: pre-wrap;
 	word-break: break-word;
 	font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
@@ -399,11 +498,13 @@ button.link {
 	padding: 0 0.75rem 0.4rem;
 }
 
+/* Enough to read a handful of lines, never enough to push the editor off the
+   screen: 22vh is about nine lines on a Chromebook and ten on a phone, with a
+   4rem floor for a short window and a 14rem ceiling for a tall one. */
 .monitor-output {
 	margin: 0;
 	padding: 0.5rem 0.75rem;
-	height: 9rem;
-	max-height: 24vh;
+	height: clamp(4rem, 22vh, 14rem);
 	overflow: auto;
 	background: var(--editor-bg);
 	border-top: 1px solid var(--border);
