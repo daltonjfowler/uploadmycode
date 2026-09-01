@@ -63,6 +63,10 @@ Open **http://localhost:5173/** in Chrome, in a normal (not Incognito) window.
 
 Plug the Uno in **now**, before the first upload, and leave it plugged in for the whole of Part A.
 
+> Since T4 there is also a collapsed **SERIAL MONITOR** strip under the Output panel. Leave it
+> collapsed for this test: none of the steps below change because of it. Sharing one board between
+> that monitor and the Upload button is its own document, [docs/T4-TEST.md](T4-TEST.md).
+
 ---
 
 ## Part A — the gate
@@ -102,7 +106,7 @@ one costs a whole period of class time.
 | B5 | With the board plugged back in: press and **hold** the board's reset button, then click **Upload** and pick the board, and keep holding reset for ten seconds. | After about three seconds of trying: red `Upload failed`, message exactly "The board did not answer. Unplug the board, plug it back in, then try Upload again." Release reset. | |
 | B6 | Click **Upload** once more (board plugged in, nothing held). | It works again — a failed upload does not wedge the page or leave the port locked. | |
 | B7 | Open the same page in a **second Chrome tab**, compile Blink there, and click Upload while the first tab still has the board. | The second tab reports the port is in use, in the words from B3. (This is the classroom case of a student opening the page twice.) | |
-| B8 | Open **http://localhost:5173/** in **Firefox**. | The Output panel says, on load, that the browser cannot talk to USB devices and to use Chrome, and a red **Web Serial test page** link appears in the Output panel header. Click it: `/serial-test.html` opens in a new tab and says Web Serial is not available. | |
+| B8 | Open **http://localhost:5173/** in **Firefox**. | The Output panel says, on load, that the browser cannot talk to USB devices and to use Chrome, and a red **Web Serial test page** link appears in the Output panel header. Click it: `/serial-test.html` opens in a new tab and says Web Serial is not available. Since T4, the Serial Monitor's **Connect** button is greyed out in the same breath. | |
 
 ### On a managed Chromebook, additionally
 

@@ -67,6 +67,59 @@
 				<pre id="output-text" class="output-text">Click Compile to check your sketch.</pre>
 			</section>
 
+			<section class="monitor" aria-label="Serial monitor">
+				<div class="output-head">
+					<h2>Serial Monitor</h2>
+					<span id="monitor-state" class="monitor-state" data-state="disconnected" role="status"
+						>Not connected</span
+					>
+					<span class="grow"></span>
+					<button id="monitor-show" type="button" class="link" aria-expanded="false">Show</button>
+				</div>
+
+				<div id="monitor-body" class="monitor-body" hidden>
+					<div class="monitor-controls">
+						<button id="monitor-connect" type="button">Connect</button>
+
+						<label class="field">
+							<span>Baud</span>
+							<select id="monitor-baud" aria-label="Baud rate"></select>
+						</label>
+
+						<label class="check">
+							<input id="monitor-autoscroll" type="checkbox" checked />
+							Autoscroll
+						</label>
+
+						<label class="check">
+							<input id="monitor-timestamps" type="checkbox" />
+							Timestamps
+						</label>
+
+						<span class="grow"></span>
+						<button id="monitor-clear" type="button" class="link">Clear</button>
+					</div>
+
+					<pre id="monitor-output" class="monitor-output" tabindex="0"></pre>
+
+					<form id="monitor-send" class="monitor-send">
+						<input
+							id="monitor-input"
+							type="text"
+							placeholder="Type a message, press Enter to send"
+							autocomplete="off"
+							aria-label="Message to send to the board"
+							disabled
+						/>
+						<label class="field">
+							<span>Ending</span>
+							<select id="monitor-ending" aria-label="Line ending"></select>
+						</label>
+						<button id="monitor-send-button" type="submit" disabled>Send</button>
+					</form>
+				</div>
+			</section>
+
 			<footer class="footer">
 				<span>Arduino Uno only. Internal district tool.</span>
 				<a href="https://daltonjfowler.com" target="_blank" rel="noopener"

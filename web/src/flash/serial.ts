@@ -86,8 +86,14 @@ export async function findGrantedUnoPort(): Promise<SerialPortLike | null> {
  * boards are listed, which is what a student wants; the caller falls back to
  * `showAll` true after a first attempt found nothing, because a board with an
  * unusual USB chip is invisible under the filters.
+ *
+ * `action` only chooses which button the message sends the student back to:
+ * both Upload and the serial monitor ask for a port the same way.
  */
-export async function requestPort(showAll: boolean): Promise<SerialPortLike> {
+export async function requestPort(
+	showAll: boolean,
+	action: "upload" | "monitor" = "upload",
+): Promise<SerialPortLike> {
 	const serial = serialApi();
 	if (!serial) throw new FlashError("unsupported", NO_WEB_SERIAL_MESSAGE);
 
@@ -100,11 +106,12 @@ export async function requestPort(showAll: boolean): Promise<SerialPortLike> {
 	} catch {
 		// Chrome throws the same NotFoundError whether the student pressed Cancel
 		// or the list was empty, so this one message has to cover both.
+		const retry = action === "monitor" ? "click Connect again" : "click Upload again";
 		throw new FlashError(
 			"no-port",
 			showAll
-				? "No board chosen. Check the USB cable is plugged into the Uno and into the Chromebook, then click Upload again."
-				: "No board chosen. Plug the Uno in and click Upload again — the next list shows every port on the computer, so pick the one the board is on.",
+				? `No board chosen. Check the USB cable is plugged into the Uno and into the Chromebook, then ${retry}.`
+				: `No board chosen. Plug the Uno in and ${retry} — the next list shows every port on the computer, so pick the one the board is on.`,
 		);
 	}
 }
@@ -256,15 +263,33 @@ function errorText(cause: unknown): string {
 	return cause instanceof Error ? cause.message : String(cause);
 }
 
-function describeOpenFailure(cause: unknown): string {
+/**
+ * Why `port.open()` failed, as a sentence for a student.
+ *
+ * The serial monitor opens the same ports the flasher does and fails in the
+ * same three ways, so it shares these words; only the button it sends the
+ * student back to differs.
+ */
+export function describeOpenFailure(
+	cause: unknown,
+	action: "upload" | "monitor" = "upload",
+): string {
 	const name = cause instanceof Error ? cause.name : "";
+	const monitor = action === "monitor";
+
 	if (name === "InvalidStateError") {
-		return "That port is already open in this tab. Close the Serial Monitor and try Upload again.";
+		return monitor
+			? "That port is already open in this tab. Click Disconnect, wait a moment, then Connect again."
+			: "That port is already open in this tab. Close the Serial Monitor and try Upload again.";
 	}
 	if (name === "NetworkError") {
 		// Chrome gives the same NetworkError for "someone else has it" and for
 		// "the board is not there any more", so the message has to cover both.
-		return "Could not open the board's port. Either something else is using it — close the Arduino IDE and any other tab with this page open — or the board came unplugged. Plug it back in, then try Upload again.";
+		return monitor
+			? "Could not open the board's port. Either something else is using it — close the Arduino IDE and any other tab with this page open — or the board came unplugged. Plug it back in, then click Connect again."
+			: "Could not open the board's port. Either something else is using it — close the Arduino IDE and any other tab with this page open — or the board came unplugged. Plug it back in, then try Upload again.";
 	}
-	return `Could not open the board's port (${errorText(cause)}). Close anything else that might be using it, then try Upload again.`;
+	return monitor
+		? `Could not open the board's port (${errorText(cause)}). Close anything else that might be using it, then click Connect again.`
+		: `Could not open the board's port (${errorText(cause)}). Close anything else that might be using it, then try Upload again.`;
 }

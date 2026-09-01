@@ -29,6 +29,8 @@ void loop() {
 const SKETCHES_KEY = "uno-ide.v1.sketches";
 const CURRENT_KEY = "uno-ide.v1.current";
 const AUTOCOMPLETE_KEY = "uno-ide.v1.autocomplete";
+const MONITOR_OPEN_KEY = "uno-ide.v1.monitor-open";
+const MONITOR_BAUD_KEY = "uno-ide.v1.monitor-baud";
 
 /** Name given to the sketch created on a first visit. */
 export const DEFAULT_SKETCH_NAME = "sketch";
@@ -110,6 +112,31 @@ export function loadAutocompleteEnabled(): boolean {
 
 export function saveAutocompleteEnabled(enabled: boolean): void {
 	writeKey(AUTOCOMPLETE_KEY, enabled ? "on" : "off");
+}
+
+export function loadMonitorOpen(): boolean {
+	// Default OFF: the monitor panel takes room from the editor, and a student
+	// who has never used it should not lose those lines of code on screen.
+	return readKey(MONITOR_OPEN_KEY) === "open";
+}
+
+export function saveMonitorOpen(open: boolean): void {
+	writeKey(MONITOR_OPEN_KEY, open ? "open" : "closed");
+}
+
+/**
+ * The baud rate last used, or null. The caller checks it against the list it
+ * offers, so a hand-edited key cannot put a nonsense rate in the picker.
+ */
+export function loadMonitorBaud(): number | null {
+	const raw = readKey(MONITOR_BAUD_KEY);
+	if (!raw) return null;
+	const parsed = Number.parseInt(raw, 10);
+	return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function saveMonitorBaud(baudRate: number): void {
+	writeKey(MONITOR_BAUD_KEY, String(baudRate));
 }
 
 /**

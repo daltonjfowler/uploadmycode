@@ -87,8 +87,8 @@ body {
 
 .app {
 	display: grid;
-	/* toolbar, editor, output, footer */
-	grid-template-rows: auto minmax(0, 1fr) auto auto;
+	/* toolbar, editor, output, serial monitor, footer */
+	grid-template-rows: auto minmax(0, 1fr) auto auto auto;
 	height: 100dvh;
 }
 
@@ -222,7 +222,8 @@ button.link {
 	display: flex;
 	flex-direction: column;
 	min-height: 6rem;
-	max-height: 34vh;
+	/* Leaves room for the serial monitor underneath on a 768px Chromebook. */
+	max-height: 28vh;
 	background: var(--panel);
 	border-top: 1px solid var(--border);
 }
@@ -330,6 +331,83 @@ button.link {
 }
 .output-text[data-tone="success"] {
 	color: var(--ok);
+}
+
+/* ----------------------------------------------------------- serial monitor */
+
+/* Collapsed by default: the head strip is one row, and the body only appears
+   when a student asks for it, so the editor keeps its lines. */
+.monitor {
+	display: flex;
+	flex-direction: column;
+	background: var(--panel);
+	border-top: 1px solid var(--border);
+}
+
+.monitor-state {
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: var(--muted);
+	white-space: nowrap;
+}
+
+.monitor-state[data-state="connected"] {
+	color: var(--ok);
+}
+.monitor-state[data-state="connecting"],
+.monitor-state[data-state="paused"] {
+	color: var(--warn);
+}
+
+.monitor-body {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+}
+
+.monitor-controls,
+.monitor-send {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.35rem 0.5rem;
+	padding: 0 0.75rem 0.4rem;
+}
+
+.monitor-output {
+	margin: 0;
+	padding: 0.5rem 0.75rem;
+	height: 9rem;
+	max-height: 24vh;
+	overflow: auto;
+	background: var(--editor-bg);
+	border-top: 1px solid var(--border);
+	border-bottom: 1px solid var(--border);
+	white-space: pre-wrap;
+	word-break: break-word;
+	font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+	font-size: 0.8rem;
+	color: var(--fg);
+}
+
+.monitor-send {
+	padding-top: 0.4rem;
+}
+
+.monitor-send input[type="text"] {
+	flex: 1 1 12rem;
+	min-width: 0;
+	font: inherit;
+	font-size: 0.85rem;
+	color: var(--fg);
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 5px;
+	padding: 0.28rem 0.5rem;
+}
+
+.monitor-send input[type="text"]:disabled {
+	opacity: 0.55;
 }
 
 /* ------------------------------------------------------------------- footer */
