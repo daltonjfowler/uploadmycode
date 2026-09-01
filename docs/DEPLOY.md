@@ -315,6 +315,87 @@ this site's JSON, so do not tighten it to where a real person can hit it.
 
 ---
 
+## 4b. Security headers, and https only
+
+Two things happen to every request before anything else does. Both live in `src/headers.ts`, both
+are tested in `test/headers.test.mjs`, and both are wired in at the top of the `fetch` handler in
+`src/worker.ts`.
+
+**Plain http gets a 301 to https.** Path and query are kept, the port is dropped (Cloudflare
+answers plain http on 8080 and friends, and those ports serve no TLS), and `localhost` is left
+alone so `wrangler dev` still works.
+
+**Every response is stamped**, static files included. That last word is why
+`assets.run_worker_first` in `wrangler.jsonc` is now `true` instead of `["/api/*"]`: with the old
+value the asset server answered `/` on its own and the Worker never ran, so nothing outside
+`/api/*` carried a single header.
+
+| Header | Value | Why |
+|---|---|---|
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` | A year. The browser stops trying http at all. |
+| `X-Content-Type-Options` | `nosniff` | An uploaded `.ino` is never guessed into something executable. |
+| `X-Frame-Options` | `DENY` | Nobody frames the teacher page to harvest the key. |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | The class phrase never leaves in a URL. |
+| `Permissions-Policy` | `serial=(self), usb=(), camera=(), microphone=(), geolocation=(), payment=()` | **`serial=(self)` is load-bearing.** Drop it and Upload and the serial monitor stop working. Everything else is off by name. |
+| `Cross-Origin-Opener-Policy` | `same-origin` | A window this site opens cannot reach back into it. |
+| `X-Robots-Tag` | `noindex, nofollow` | Internal district tool. `public/robots.txt` says the same to crawlers that read it. |
+| `Cache-Control` | `no-store` on `/api/*` only | A phrase or a compiled sketch has no business in a shared cache or on a Chromebook's disk. |
+
+And on HTML only:
+
+```
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';
+  img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self';
+  worker-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self';
+  frame-ancestors 'none'; upgrade-insecure-requests
+```
+
+(One line in the real header; wrapped here to fit.)
+
+### Why `style-src` allows `'unsafe-inline'` and `script-src` does not
+
+`script-src 'self'` is strict, with no `'unsafe-inline'` and no nonce, because the site has no
+inline script left at all. The teacher page and the Web Serial test page used to carry one each;
+they are now `public/teacher.js` and `public/serial-test.js`, loaded with `defer`. Keep it that
+way: an inline `<script>` added to any page under `web/` will simply not run in a browser.
+
+`style-src` is the exception, and it is deliberate. CodeMirror styles the editor by building a
+`<style>` element at runtime (style-mod, reached through `EditorView.theme` in `web/src/editor.ts`),
+and `teacher.html` and `serial-test.html` each carry their own `<style>` block so they keep working
+with no build step. CodeMirror can be given a nonce — the `EditorView.cspNonce` facet — but a nonce
+must be minted per response and written into the HTML, which means rewriting every HTML file on
+every request and giving up the asset cache, and it would still not cover the two standalone pages.
+Inline style cannot fetch or execute anything; inline script can. So style is loose, script is
+strict.
+
+`worker-src 'none'` is safe because nothing here starts a Worker, a SharedWorker or a service
+worker — checked across `web/src` and the CodeMirror packages. If a dependency ever does, this is
+the directive that will break first, and `'self'` is the fix.
+
+### Dashboard, not code
+
+Two zone settings do the same job one layer earlier and are worth turning on by hand. Neither is
+configured by this repo, and neither replaces the Worker:
+
+1. <https://dash.cloudflare.com> → the `uploadmycode.com` zone → **SSL/TLS** → **Edge Certificates**
+   → **Always Use HTTPS**: on. Cloudflare then redirects before the Worker is even invoked.
+2. Same page → **HSTS (HTTP Strict Transport Security)** → Enable, if desired. Read the warning
+   first: with `includeSubDomains` and a long max-age, every subdomain of `uploadmycode.com` must
+   serve valid TLS for as long as the max-age lasts. The Worker already sends the header itself, so
+   this only adds Cloudflare's own copy on responses the Worker does not produce.
+
+### Checking it
+
+```powershell
+curl.exe -sSI https://uploadmycode.com/            # CSP + all seven common headers
+curl.exe -sSI https://uploadmycode.com/teacher     # same, and it is HTML
+curl.exe -sSI http://uploadmycode.com/             # 301 to https, no body
+curl.exe -sS -o NUL -D - -X POST https://uploadmycode.com/api/compile `
+  -H "content-type: application/json" -d "{}"      # cache-control: no-store, and no CSP
+```
+
+---
+
 ## 5. Adding a library to the allowlist
 
 Students cannot install libraries. The set is baked into the image, which is what keeps a compile

@@ -5,6 +5,9 @@
  *   1. Serve the static frontend out of public/ (the ASSETS binding).
  *   2. Answer /api/* routes.
  *
+ * Both go out through the same door in `fetch` below, which forces https and
+ * stamps the security headers on whatever comes back. See src/headers.ts.
+ *
  * POST /api/compile hands the sketch to the arduino-cli container and passes
  * its answer straight back, but only after the gate in src/compile-gate.ts:
  * size, the optional school IP lock, the class phrase, six compiles a minute
@@ -24,6 +27,7 @@ import { Container, getContainer } from "@cloudflare/containers";
 
 import { gateCompile, readActivePhrase, type CompileCounters } from "./compile-gate.ts";
 import { constantTimeEquals } from "./constant-time.ts";
+import { httpsRedirect, withSecurityHeaders } from "./headers.ts";
 import { json } from "./http.ts";
 import {
 	clampTtlSeconds,
@@ -302,8 +306,18 @@ async function handle(request: Request, env: Env): Promise<Response> {
 
 export default {
 	async fetch(request, env): Promise<Response> {
+		// Before anything else, and before any secret is read: an http request is
+		// answered with a redirect and nothing more. See src/headers.ts.
+		const insecure = httpsRedirect(request.url);
+		if (insecure !== null) return insecure;
+
+		// /api/* is always JSON, so it always gets no-store. Everything else came
+		// from the asset server and its content-type decides whether it gets the
+		// Content-Security-Policy.
+		const kind = new URL(request.url).pathname.startsWith("/api/") ? "json" : "asset";
+
 		try {
-			return await handle(request, env);
+			return withSecurityHeaders(await handle(request, env), kind);
 		} catch (error) {
 			console.error(
 				JSON.stringify({
@@ -312,7 +326,10 @@ export default {
 					error: String(error),
 				}),
 			);
-			return json(500, { ok: false, error: "Server error. Tell your teacher." });
+			return withSecurityHeaders(
+				json(500, { ok: false, error: "Server error. Tell your teacher." }),
+				"json",
+			);
 		}
 	},
 } satisfies ExportedHandler<Env>;

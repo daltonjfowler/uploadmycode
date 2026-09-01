@@ -24,9 +24,15 @@
     "directory": "./public/",
     // Lets the Worker fall back to the static site: env.ASSETS.fetch(request).
     "binding": "ASSETS",
-    // API paths hit the Worker before the asset server. Everything else tries
-    // a static file first and only reaches the Worker if no file matches.
-    "run_worker_first": ["/api/*"],
+    // EVERY request runs the Worker first, including one for a static file.
+    // That is what lets src/headers.ts put the security headers on the editor,
+    // the teacher page and every icon, and what lets the http -> https redirect
+    // catch a student who typed the bare domain. With the old ["/api/*"] the
+    // asset server answered "/" by itself and the Worker never ran, so nothing
+    // but /api/* was ever stamped. The Worker still serves the files: the
+    // fall-through in src/worker.ts is env.ASSETS.fetch(request), and
+    // not_found_handling below still decides what a missing file gets.
+    "run_worker_first": true,
     // No SPA rewrite and no custom 404 page. A missing file is a plain 404.
     "not_found_handling": "none"
   },
