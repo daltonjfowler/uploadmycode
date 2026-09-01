@@ -11,7 +11,7 @@ This file is the single source of truth for the worker team. Read it fully befor
 
 ## Status (2026-09-02)
 
-T0–T5 built, tested, committed, and deployed to https://uploadmycode.com. Remaining are the hardware gates only Dalton can run (`docs/T3-TEST.md`, `docs/T4-TEST.md`), the browser click-throughs (`docs/T2-TEST.md`), and the district IT checklist (`docs/CHROMEBOOK-CHECKLIST.md`). T6 is optional and not started.
+T0–T5 built, tested, committed, and deployed to https://uploadmycode.com. Remaining are the hardware gates only Dalton can run (`docs/T3-TEST.md`, `docs/T4-TEST.md`), the browser click-throughs (`docs/T2-TEST.md`), and the district IT checklist (`docs/CHROMEBOOK-CHECKLIST.md`). T6 was dropped: Tinkercad Circuits covers simulation.
 
 ---
 
@@ -168,9 +168,9 @@ notification.
 endpoint with a wrong `x-teacher-key` → 403; 7th compile inside a minute → 429 with a friendly
 JSON message; 200 KB body → 413. Paste outputs.
 
-### T6 (optional, only when Dalton asks) — Nice-to-haves
-In-browser simulator tab (avr8js) so hardware-less classes can still run code; shared example
-sketches via KV short codes; teacher page. Do not start any of this unprompted.
+### T6 — dropped (2026-09-01)
+Simulator, shared sketches, teacher view: not happening. The district already uses Tinkercad
+Circuits for simulation, so there is nothing to rebuild. Do not start any of this.
 
 ## Cost expectation (estimates, verify against dashboard after first real class)
 

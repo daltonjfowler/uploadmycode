@@ -5,7 +5,7 @@ Classroom tool: browser Arduino IDE for Chromebooks. Compile on a Cloudflare Con
 
 Rules for every session in this repo:
 
-1. Read `PLAN.md` first. It holds the locked decisions, the architecture, and tasks T0–T6.
+1. Read `PLAN.md` first. It holds the locked decisions, the architecture, and tasks T0–T5 (T6 was dropped; do not revive it).
 2. **One task per session, in the listed order.** Do the task, run its gate, report the gate
    output verbatim, commit as `T<N>: <short name>`, stop. Never start the next task, never spawn
    subagents.
