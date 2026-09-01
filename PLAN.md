@@ -9,6 +9,12 @@ This file is the single source of truth for the worker team. Read it fully befor
 
 ---
 
+## Status (2026-09-02)
+
+T0–T5 built, tested, committed, and deployed to https://uploadmycode.com. Remaining are the hardware gates only Dalton can run (`docs/T3-TEST.md`, `docs/T4-TEST.md`), the browser click-throughs (`docs/T2-TEST.md`), and the district IT checklist (`docs/CHROMEBOOK-CHECKLIST.md`). T6 is optional and not started.
+
+---
+
 ## Locked decisions (do not relitigate)
 
 | Decision | Value |
