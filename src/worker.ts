@@ -5,9 +5,36 @@
  *   1. Serve the static frontend out of public/ (the ASSETS binding).
  *   2. Answer /api/* routes.
  *
- * T0 only stubs POST /api/compile with 501. T1 replaces the stub with a call
- * into the arduino-cli container. Keep this file small; a teacher maintains it.
+ * POST /api/compile hands the sketch to the arduino-cli container and passes
+ * its answer straight back. Keep this file small; a teacher maintains it.
  */
+
+import { Container, getContainer } from "@cloudflare/containers";
+
+/**
+ * The arduino-cli compile service. See container/Dockerfile and
+ * container/server.js; the wiring lives in wrangler.jsonc.
+ */
+export class CompilerContainer extends Container {
+	/** Matches EXPOSE / PORT in the Dockerfile. */
+	override defaultPort = 8080;
+	/**
+	 * Idle shutdown. Long enough to stay warm across a class period's gaps,
+	 * short enough that an idle evening bills nothing. Memory is billed while
+	 * the instance is awake, so do not make this generous.
+	 */
+	override sleepAfter = "10m";
+
+	override onError(error: unknown): Response {
+		console.error(
+			JSON.stringify({ message: "container error", error: String(error) }),
+		);
+		return json(503, {
+			ok: false,
+			error: "The compiler is busy or starting up. Wait a few seconds and try again.",
+		});
+	}
+}
 
 /** Every API response is JSON, so build them in one place. */
 function json(status: number, body: unknown, headers: HeadersInit = {}): Response {
@@ -20,6 +47,37 @@ function json(status: number, body: unknown, headers: HeadersInit = {}): Respons
 	});
 }
 
+/**
+ * Forward a compile to the container and return its answer unchanged.
+ *
+ * The body is streamed rather than buffered, and the response comes back as-is,
+ * so this Worker never has to know what a sketch or an Intel HEX file is. The
+ * container's own JSON shape ({ ok, hex } / { ok, stderr }) is the API.
+ */
+async function compile(request: Request, env: Env): Promise<Response> {
+	// max_instances is 1, so every request goes to the same named instance.
+	const container = getContainer(env.COMPILER, "compiler");
+	const proxied = new Request("http://compiler/compile", {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: request.body,
+	});
+
+	try {
+		return await container.fetch(proxied);
+	} catch (error) {
+		// Container over capacity, still booting, or crashed. Students see one
+		// clear sentence; the detail goes to the logs.
+		console.error(
+			JSON.stringify({ message: "compile container unreachable", error: String(error) }),
+		);
+		return json(503, {
+			ok: false,
+			error: "The compiler is busy or starting up. Wait a few seconds and try again.",
+		});
+	}
+}
+
 async function handle(request: Request, env: Env): Promise<Response> {
 	const url = new URL(request.url);
 
@@ -27,11 +85,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
 		if (request.method !== "POST") {
 			return json(405, { ok: false, error: "Use POST for /api/compile." }, { allow: "POST" });
 		}
-		// Not built yet. See T1 in PLAN.md.
-		return json(501, {
-			ok: false,
-			error: "Compile service is not deployed yet.",
-		});
+		return await compile(request, env);
 	}
 
 	if (url.pathname.startsWith("/api/")) {

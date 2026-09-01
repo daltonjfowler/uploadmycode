@@ -27,7 +27,38 @@
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
-  }
+  },
 
-  // T1 adds "containers" + "durable_objects" + "migrations" here for arduino-cli.
+  // The arduino-cli compile service. One container, wrapped in a Durable Object
+  // so the Worker can address it. All three blocks below describe the same
+  // class and must agree on "CompilerContainer".
+  "containers": [
+    {
+      "class_name": "CompilerContainer",
+      "image": "./container/Dockerfile",
+      // Explicit so "COPY package.json server.js" resolves against container/.
+      "image_build_context": "./container",
+      // 1/4 vCPU, 1 GiB memory, 4 GB disk. Enough for avr-gcc; see PLAN.md cost caps.
+      "instance_type": "basic",
+      // Cost cap. Requests past this error, and the Worker turns that into a
+      // "compiler is busy" message. Raise to 2 only if a real class saturates it.
+      "max_instances": 1
+    }
+  ],
+
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "COMPILER",
+        "class_name": "CompilerContainer"
+      }
+    ]
+  },
+
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["CompilerContainer"]
+    }
+  ]
 }

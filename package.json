@@ -13,5 +13,8 @@
   "devDependencies": {
     "typescript": "5.9.3",
     "wrangler": "4.127.1"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "0.3.7"
   }
 }
