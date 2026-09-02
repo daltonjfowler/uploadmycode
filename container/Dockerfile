@@ -20,6 +20,8 @@ ARG ARDUINO_CLI_SHA256=28a8e119c498a25607821c36cb2dc49e8463941b261a0d99091baa7bc
 ARG AVR_CORE_VERSION=1.8.8
 ARG SERVO_VERSION=1.3.0
 ARG LIQUIDCRYSTAL_VERSION=1.0.7
+ARG LCD_I2C_VERSION=1.1.2
+ARG STEPPER_VERSION=1.1.3
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -65,6 +67,8 @@ RUN arduino-cli core update-index \
 	&& arduino-cli core install "arduino:avr@${AVR_CORE_VERSION}" \
 	&& arduino-cli lib install "Servo@${SERVO_VERSION}" \
 	&& arduino-cli lib install "LiquidCrystal@${LIQUIDCRYSTAL_VERSION}" \
+	&& arduino-cli lib install "LiquidCrystal I2C@${LCD_I2C_VERSION}" \
+	&& arduino-cli lib install "Stepper@${STEPPER_VERSION}" \
 	&& rm -rf /opt/arduino/downloads \
 	&& arduino-cli core list \
 	&& arduino-cli lib list

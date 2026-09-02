@@ -67,6 +67,8 @@ arduino-cli core update-index
 arduino-cli core install arduino:avr@1.8.8
 arduino-cli lib install Servo@1.3.0
 arduino-cli lib install LiquidCrystal@1.0.7
+arduino-cli lib install "LiquidCrystal I2C@1.1.2"
+arduino-cli lib install Stepper@1.1.3
 
 # 4. Serve on http://localhost:8080.
 node container/server.js
