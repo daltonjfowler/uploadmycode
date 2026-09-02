@@ -31,7 +31,7 @@ import {
 	syntaxHighlighting,
 } from "@codemirror/language";
 import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
-import { Compartment, EditorState, StateEffect, StateField } from "@codemirror/state";
+import { Compartment, EditorState, StateEffect, StateField, Text } from "@codemirror/state";
 import {
 	Decoration,
 	EditorView,
@@ -203,6 +203,12 @@ export interface Editor {
 	getCode(): string;
 	/** Replace the whole document, clear markers, and forget the undo history. */
 	setCode(code: string): void;
+	/**
+	 * Replace the document in one transaction — so one Ctrl-Z takes it back —
+	 * and leave the caret at the end of `caretLine`. This is for an edit the
+	 * student asked for, so unlike setCode the undo history survives.
+	 */
+	replaceCode(code: string, caretLine: number): void;
 	/** Highlight these 1-based lines and scroll the first one into view. */
 	showErrorLines(lines: readonly number[]): void;
 	clearErrorLines(): void;
@@ -285,6 +291,22 @@ export function createEditor(options: EditorOptions): Editor {
 				// A fresh history() replaces the old field, so a student cannot undo
 				// their way from a new sketch back into the previous one.
 				effects: [historyConf.reconfigure(history()), setErrorLines.of([])],
+				scrollIntoView: true,
+			});
+		},
+
+		replaceCode(code, caretLine) {
+			// A transaction's selection is resolved against the document the
+			// transaction produces, so the caret is measured on the new text.
+			const next = Text.of(code.split("\n"));
+			const clamped = Math.min(Math.max(caretLine, 1), next.lines);
+			view.dispatch({
+				changes: { from: 0, to: view.state.doc.length, insert: code },
+				selection: { anchor: next.line(clamped).to },
+				// Every line has moved, so the compiler's line numbers no longer
+				// describe this text; clearing beats leaving markers in the wrong
+				// place. Same transaction, so it is still one undo step.
+				effects: [setErrorLines.of([])],
 				scrollIntoView: true,
 			});
 		},

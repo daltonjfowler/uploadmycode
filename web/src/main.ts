@@ -11,6 +11,7 @@ import { hexProgramBytes, requestCompile } from "./compile.ts";
 import { createEditor, type Editor } from "./editor.ts";
 import { errorLines, firstErrorSummary, parseCompileErrors, type CompileError } from "./errors.ts";
 import { HexParseError, parseIntelHex } from "./flash/intel-hex.ts";
+import { findIncludeLine, insertInclude, LIBRARIES } from "./libraries.ts";
 import {
 	findGrantedUnoPort,
 	isWebSerialAvailable,
@@ -54,6 +55,12 @@ import {
 const UNO_FLASH_BYTES = 32256;
 /** Autosave delay. Long enough not to write on every keystroke. */
 const SAVE_DELAY_MS = 400;
+/** How long a passing remark stays up before the panel goes back to idle. */
+const NOTICE_MS = 2500;
+/** The Library dropdown's own first entry: a label, never a choice. */
+const LIBRARY_PLACEHOLDER = "Library…";
+/** What the output panel says when it has nothing to report. */
+const IDLE_OUTPUT = "Click Compile to check your sketch.";
 
 function el<T extends HTMLElement>(id: string): T {
 	const found = document.getElementById(id);
@@ -63,6 +70,7 @@ function el<T extends HTMLElement>(id: string): T {
 
 const sketchSelect = el<HTMLSelectElement>("sketch-select");
 const importInput = el<HTMLInputElement>("import-input");
+const librarySelect = el<HTMLSelectElement>("library-select");
 const autocompleteToggle = el<HTMLInputElement>("autocomplete-toggle");
 const compileButton = el<HTMLButtonElement>("compile");
 const uploadButton = el<HTMLButtonElement>("upload");
@@ -129,7 +137,7 @@ function openSketch(nameToOpen: string): void {
 	editor.setCode(currentSketch().code);
 	refreshUploadButton();
 	setStatus("idle", "Ready");
-	showOutput("Click Compile to check your sketch.", "plain");
+	showOutput(IDLE_OUTPUT, "plain");
 	editor.focus();
 }
 
@@ -151,6 +159,26 @@ function setStatus(state: Status, text: string): void {
 function showOutput(text: string, tone: "plain" | "success" | "error"): void {
 	outputText.textContent = text;
 	outputText.dataset.tone = tone;
+}
+
+let noticeTimer: number | undefined;
+
+/**
+ * Say something small that takes itself back down again — nothing has gone
+ * wrong and nothing is running, so neither the red pill nor a permanent line in
+ * the output panel would be honest. The guard is what keeps a compile started
+ * in the meantime from being wiped: the panel is only reset if the notice is
+ * still the last thing that wrote to it.
+ */
+function showNotice(pillText: string, detail: string): void {
+	window.clearTimeout(noticeTimer);
+	setStatus("idle", pillText);
+	showOutput(detail, "plain");
+	noticeTimer = window.setTimeout(() => {
+		if (statusPill.textContent !== pillText) return;
+		setStatus("idle", "Ready");
+		showOutput(IDLE_OUTPUT, "plain");
+	}, NOTICE_MS);
 }
 
 function showErrorRows(errors: CompileError[]): void {
@@ -723,6 +751,49 @@ importInput.addEventListener("change", async () => {
 	}
 });
 
+/**
+ * The Library menu. The first entry is the menu's own name rather than a choice,
+ * so it is disabled, and every pick puts it back — the dropdown is a button that
+ * happens to have eight faces, not a setting that remembers one.
+ */
+function renderLibraryList(): void {
+	const placeholder = new Option(LIBRARY_PLACEHOLDER, "", true, true);
+	placeholder.disabled = true;
+	librarySelect.replaceChildren(
+		placeholder,
+		...LIBRARIES.map((library) => new Option(`${library.label} — ${library.note}`, library.header)),
+	);
+}
+
+librarySelect.addEventListener("change", () => {
+	const header = librarySelect.value;
+	// Back to the placeholder first, whatever happens next, so picking the same
+	// library twice in a row still fires this.
+	librarySelect.selectedIndex = 0;
+	if (header === "") return;
+
+	const code = editor.getCode();
+	const added = insertInclude(code, header);
+
+	if (added === null) {
+		// Already there. Put the caret on the line that has it — the active-line
+		// highlight is then doing the pointing, with no new machinery for it.
+		const existing = findIncludeLine(code, header);
+		showNotice(
+			"Already included",
+			`This sketch already has #include <${header}> on line ${existing}.`,
+		);
+		editor.goToLine(existing, 0);
+		editor.focus();
+		return;
+	}
+
+	// One transaction, so one Ctrl-Z takes the line back out again.
+	editor.replaceCode(added.code, added.line);
+	clearErrorRows();
+	editor.focus();
+});
+
 autocompleteToggle.checked = loadAutocompleteEnabled();
 autocompleteToggle.addEventListener("change", () => {
 	saveAutocompleteEnabled(autocompleteToggle.checked);
@@ -741,7 +812,7 @@ uploadButton.addEventListener("click", () => {
 el<HTMLButtonElement>("clear-output").addEventListener("click", () => {
 	clearErrorRows();
 	editor.clearErrorLines();
-	showOutput("Click Compile to check your sketch.", "plain");
+	showOutput(IDLE_OUTPUT, "plain");
 	setStatus("idle", "Ready");
 });
 
@@ -763,6 +834,7 @@ window.addEventListener("keydown", (event) => {
 // ----------------------------------------------------------------------- boot
 
 renderSketchList();
+renderLibraryList();
 persist();
 setStatus("idle", "Ready");
 refreshUploadButton();

@@ -37,6 +37,13 @@
 					tabindex="-1"
 				/>
 
+				<!-- Options come from src/libraries.ts, so the menu and the list the
+				     container installs cannot drift apart in the markup. -->
+				<label class="field">
+					<span>Library</span>
+					<select id="library-select" aria-label="Add a library include"></select>
+				</label>
+
 				<label class="check">
 					<input id="autocomplete-toggle" type="checkbox" checked />
 					Autocomplete

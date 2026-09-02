@@ -11,8 +11,8 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="manifest" href="/manifest.webmanifest">
     <meta name="theme-color" content="#1F9FA5">
-  <script type="module" crossorigin src="/assets/index-Qtxu8DSI.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-DRNX5j1m.css">
+  <script type="module" crossorigin src="/assets/index-Dmht2PEi.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-DHy-VG8d.css">
 </head>
 	<body>
 		<div class="app">
@@ -38,6 +38,13 @@
 					aria-hidden="true"
 					tabindex="-1"
 				/>
+
+				<!-- Options come from src/libraries.ts, so the menu and the list the
+				     container installs cannot drift apart in the markup. -->
+				<label class="field">
+					<span>Library</span>
+					<select id="library-select" aria-label="Add a library include"></select>
+				</label>
 
 				<label class="check">
 					<input id="autocomplete-toggle" type="checkbox" checked />

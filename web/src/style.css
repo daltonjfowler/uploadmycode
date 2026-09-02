@@ -198,6 +198,14 @@ select {
 	max-width: 12rem;
 }
 
+/* The Library menu always shows its own name — it snaps back to the placeholder
+   the moment a library is picked — so it never needs room for the longest entry.
+   The open list is drawn at full width by the browser whatever this says. Narrow
+   keeps it beside Import on a phone instead of costing the toolbar a row. */
+#library-select {
+	max-width: 9rem;
+}
+
 button:hover:not(:disabled),
 select:hover {
 	border-color: var(--accent);
