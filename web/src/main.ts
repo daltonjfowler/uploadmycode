@@ -563,7 +563,7 @@ function refreshMonitorControls(): void {
 
 function setMonitorOpen(open: boolean, remember: boolean): void {
 	monitorBody.hidden = !open;
-	monitorShowButton.textContent = open ? "Hide" : "Show";
+	monitorShowButton.textContent = open ? "🔍 Hide" : "🔍 Show";
 	monitorShowButton.setAttribute("aria-expanded", open ? "true" : "false");
 	if (remember) saveMonitorOpen(open);
 	if (open) renderMonitor();
