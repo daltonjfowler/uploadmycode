@@ -443,6 +443,24 @@ button.link {
 	margin-right: 0.4rem;
 }
 
+.error-said {
+	display: block;
+}
+
+/* The plain-English line under the compiler's own words. Muted, smaller, in the
+   page font rather than the row's monospace, and indented under the message, so
+   it reads as an aside and not as a second thing to click. Both themes get it
+   for free: --muted is declared in each. */
+.error-hint {
+	display: block;
+	margin-top: 0.15rem;
+	padding-left: 1.1rem;
+	font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	font-size: 0.75rem;
+	font-weight: 400;
+	color: var(--muted);
+}
+
 .output-text {
 	margin: 0;
 	padding: 0.5rem 0.75rem;

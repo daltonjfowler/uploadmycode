@@ -9,6 +9,7 @@ import "./style.css";
 
 import { hexProgramBytes, requestCompile } from "./compile.ts";
 import { createEditor, type Editor } from "./editor.ts";
+import { hintFor } from "./error-hints.ts";
 import { errorLines, firstErrorSummary, parseCompileErrors, type CompileError } from "./errors.ts";
 import { HexParseError, parseIntelHex } from "./flash/intel-hex.ts";
 import { findIncludeLine, insertInclude, LIBRARIES } from "./libraries.ts";
@@ -194,7 +195,23 @@ function showErrorRows(errors: CompileError[]): void {
 			where.textContent =
 				error.column > 0 ? `Line ${error.line}:${error.column}` : `Line ${error.line}`;
 
-			row.append(where, document.createTextNode(`${error.severity}: ${error.message}`));
+			// The compiler's own words on the first line, so nothing is hidden.
+			const said = document.createElement("span");
+			said.className = "error-said";
+			said.append(where, document.createTextNode(`${error.severity}: ${error.message}`));
+			row.append(said);
+
+			// Then the translation, when there is one we trust. It is part of the
+			// row rather than a thing of its own, so clicking anywhere still jumps
+			// to the line; the styling is what keeps it from reading as a button.
+			const hint = hintFor(error.message);
+			if (hint !== null) {
+				const hintLine = document.createElement("span");
+				hintLine.className = "error-hint";
+				hintLine.textContent = `💡 ${hint}`;
+				row.append(hintLine);
+			}
+
 			row.addEventListener("click", () => {
 				editor.goToLine(error.line, error.column);
 				editor.focus();
