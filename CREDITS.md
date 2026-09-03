@@ -144,8 +144,10 @@ Seven packages are used, all **MIT**, all verified from the `license` field and 
 - Repos: <https://code.haverbeke.berlin/codemirror/> and
   <https://github.com/codemirror/lang-cpp>
 - Forum: <https://discuss.codemirror.net/>
-- Support: none of the packages carry a `funding` field, so this repo has no funding URL to quote.
-  The project page above is where to start.
+- **Support: <https://github.com/sponsors/marijnh>** — the author's GitHub Sponsors page,
+  fetched live on 2026-09-02; the page itself says "Fund me (CodeMirror, ProseMirror, Lezer,
+  Eloquent JavaScript)", so it covers the `@lezer/highlight` package below as well. Not read
+  from a local file; disclosed in the table at the bottom.
 
 ### `@lezer/highlight` 1.2.3
 
@@ -288,6 +290,7 @@ So you can redo it rather than trust it.
 | Optiboot author and license | `bootloaders/optiboot/optiboot.c` and `README.TXT` inside the installed core |
 | Node.js version and license | the `NODE_VERSION` pin in `container/Dockerfile`; the `LICENSE` file of that same version |
 | Example sketch attribution | the comment blocks quoted in `docs/T2-TEST.md` |
+| CodeMirror / Lezer funding link | `https://github.com/sponsors/marijnh`, fetched live 2026-09-02; the page names CodeMirror and Lezer itself |
 | The rest | a handful of URLs are official project homes stated plainly rather than read from a file: gcc.gnu.org, gnu.org/software/binutils, nongnu.org/avr-libc (printed as a bare host in `optiboot.c`), nodejs.org and github.com/nodejs/node, debian.org, microchip.com, intel.com, github.com/Optiboot/optiboot, github.com/avrdudes/avrdude, github.com/arduino/arduinoOTA |
 
 The setup that makes this reproducible is in the README under
