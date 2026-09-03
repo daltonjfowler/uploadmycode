@@ -1,7 +1,7 @@
 {
   "name": "uploadmycode",
   "short_name": "uploadmycode",
-  "description": "Write, compile, and upload Arduino Uno sketches from a Chromebook.",
+  "description": "Write, compile, and upload Uno sketches from a Chromebook.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -1,9 +1,9 @@
 # PLAN.md — uploadmycode
 
-Browser Arduino IDE for district Chromebooks. Students open a website, write a sketch, click
+Browser IDE for Uno boards, for district Chromebooks. Students open a website, write a sketch, click
 **Compile** (server-side `arduino-cli` running in a Cloudflare Container), click **Upload**
-(browser flashes the Uno over USB via the Web Serial API). No installs on Chromebooks. Arduino
-Uno only. Built and paid for by one teacher; costs must stay small and capped.
+(browser flashes the Uno over USB via the Web Serial API). No installs on Chromebooks. Uno boards
+only. Built and paid for by one teacher; costs must stay small and capped.
 
 This file is the single source of truth for the worker team. Read it fully before touching code.
 
@@ -19,7 +19,7 @@ T0–T5 built, tested, committed, and deployed to https://uploadmycode.com. Rema
 
 | Decision | Value |
 |---|---|
-| Board | Arduino Uno ONLY. FQBN `arduino:avr:uno` hardcoded server-side. No board picker. |
+| Board | Uno ONLY. FQBN `arduino:avr:uno` hardcoded server-side. No board picker. |
 | Hosting | One Cloudflare Worker project: static assets (frontend) + `/api/*` routes + one Container (compile). |
 | Compile | `arduino-cli` (pinned version) inside a Cloudflare Container. Never in the browser, never WASM. |
 | Upload | Web Serial API + STK500v1 (Optiboot bootloader, 115200 baud). Vendored minimal flasher, no heavyweight flashing dependency. |
@@ -42,7 +42,7 @@ Chromebook browser                         Cloudflare
 └───────────┬─────────────┘  {hex|errors} │  avr core + libs preinstalled│
             │ Web Serial (USB)            └──────────────────────────────┘
             ▼
-       Arduino Uno (Optiboot, STK500v1 @ 115200)
+       Uno board (Optiboot, STK500v1 @ 115200)
 ```
 
 - Compile round trip: 1–4 s warm. First compile after idle pays a container cold start (roughly 5–15 s); teacher can hit Compile once before class to warm it.
@@ -70,7 +70,7 @@ Chromebook browser                         Cloudflare
 ## Risk spikes — resolve before or during T0
 
 1. **District Chrome policy may block Web Serial.** Managed Chromebooks can have `DefaultSerialGuardSetting` set to block. This is the go/no-go risk for the whole project. Dalton asks district IT to allow serial for the site origin (or leave the default ask-per-use prompt) and tests on a REAL managed student Chromebook with a REAL Uno before T2 begins. T0 ships `docs/CHROMEBOOK-CHECKLIST.md` for exactly this conversation.
-2. **Clone Unos.** Boards with CH340 USB chips work on ChromeOS without drivers, but verify with the actual classroom hardware. Genuine Uno R3 (VID 0x2341) and CH340 clones (VID 0x1A86) both need to pass the T3 gate.
+2. **Clone Unos.** Boards with CH340 USB chips work on ChromeOS without drivers, but verify with the actual classroom hardware. Genuine Uno R3 boards (VID 0x2341) and CH340 clones (VID 0x1A86) both need to pass the T3 gate.
 3. **Cold start each period.** Measured 16 s on the live container (2026-09-01). If painful, add a teacher "warm up" button (a no-op compile). Do NOT add a scheduled keep-alive ping without Dalton's sign-off — it keeps billing awake.
 
 ## Ground rules for worker sessions (Opus 4.8)
@@ -109,8 +109,8 @@ commit message.
 
 ### T2 — Editor frontend
 Vite + TypeScript in `web/`, built into `public/`. CodeMirror 6 with C++ mode. Features: examples
-dropdown (Blink, Button, AnalogReadSerial, Fade, Servo Sweep — classic Arduino built-in examples,
-verbatim), named sketches autosaved to `localStorage`, new/rename/delete, download/upload `.ino`,
+dropdown (Blink, Button, AnalogReadSerial, Fade, Servo Sweep — the classic public-domain built-in
+example sketches, verbatim), named sketches autosaved to `localStorage`, new/rename/delete, download/upload `.ino`,
 Compile button calling `/api/compile`, error panel that parses `sketch.ino:LINE:COL: error:` and
 highlights the line in the editor. Status states: idle / compiling / success / error / compiler-busy.
 **Gate:** in a real Chrome session: Blink compiles green; a deliberate syntax error shows the message AND highlights the correct editor line; reload restores the sketch from localStorage.

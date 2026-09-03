@@ -1,31 +1,48 @@
 # uploadmycode
 
-Browser Arduino IDE for district Chromebooks. Students write a sketch on a website, the sketch
-compiles on a Cloudflare Container running `arduino-cli`, and the browser flashes the resulting
-hex onto an Arduino Uno over USB with the Web Serial API. No installs on student machines.
+A browser IDE for Uno boards, built for Chromebook classrooms. A student writes a sketch on a
+website, the sketch compiles on a small server container running `arduino-cli`, and the browser
+flashes the resulting hex onto the board over USB with the Web Serial API. Nothing is installed on
+the student machine — no IDE, no driver, no extension, no account.
 
-- Arduino Uno only.
-- Hosted on Cloudflare Workers + Containers (Workers Paid plan, $5/month + small usage).
-- Internal district tool, not a public service.
+It exists because managed Chromebooks cannot run a desktop IDE, and a class of thirty needs the
+same tool on every desk in under a minute.
 
-**Live:** <https://uploadmycode.com> (fallback: <https://uploadmycode.daltonjfowler.workers.dev>)
+- Uno boards only. The board type is hardcoded server-side; there is no board picker.
+- Runs on Cloudflare Workers + Containers. About $5/month plus pennies of usage for one classroom.
+- Written and maintained by one teacher. The code is kept boring on purpose.
 
-**Start here:** [PLAN.md](PLAN.md) — architecture, locked decisions, and the T0–T5 task list for
-worker sessions. One task per session, in order, gate must pass before stopping.
+## What it does
 
-**Running it:** [docs/DEPLOY.md](docs/DEPLOY.md) — fresh-machine deploy, the teacher key, the daily
-routine, adding a library, the IP lock, and keeping the bill small.
+- **Editor** — CodeMirror 6 with C++ highlighting, autocomplete for the common board API, and a
+  library dropdown that inserts the right `#include`.
+- **Compile** — one POST to the server. Compiler errors come back parsed: a clickable row that
+  jumps to the line, and the offending line highlighted in the editor.
+- **Upload** — the browser flashes the board itself over Web Serial (STK500v1 against the Optiboot
+  bootloader, 115200 baud), with a page-by-page progress bar. Upload is only enabled for hex that
+  was built from the exact text on screen.
+- **Serial monitor** — nine baud rates, autoscroll, timestamps, a send box. It hands the port to
+  the flasher when an upload starts and takes it back afterwards, so a student never has to
+  disconnect anything.
+- **Sketches** — named, autosaved to `localStorage`, downloadable and importable as `.ino`. No
+  server-side storage, no student accounts, no PII.
+- **A rolling class phrase** — the teacher sets today's phrase, with an expiry, from a `/teacher`
+  page guarded by a secret. Nobody compiles without it. Students type it once per tab and it dies
+  with the tab.
+- **Cost caps** — one container instance, scale-to-zero, a per-browser rate limit, a global
+  ceiling, a request-size cap and a compile timeout. All of it so a runaway loop cannot run up a
+  bill overnight.
+- **Libraries** — a fixed allowlist baked into the container image, so a compile never touches the
+  network. Servo, LiquidCrystal, LiquidCrystal I2C and Stepper ship by default.
 
-## Daily routine
+## The live site
 
-Nobody can compile without today's class phrase, so the day starts by setting one. Open
-<https://uploadmycode.com/teacher.html>, press **Generate**, pick how long it lasts (1 period, half
-day, or full day), press **Set phrase**, and project the page or write the phrase on the board.
-Then open the editor and click **Compile** once — that wakes the container so the first student pays
-a warm compile instead of a 15-second cold start. Students type the phrase once per tab; it lives in
-`sessionStorage` and is gone when the tab closes. Press **End now** to shut it off early; otherwise
-it expires on its own. Full version, including what each refusal message means:
-[docs/DEPLOY.md](docs/DEPLOY.md).
+<https://uploadmycode.com> is the author's own instance, for one teacher's classes. It is not a
+public service: every compile needs that day's class phrase, so the site will look broken to anyone
+who is not in the room. It is up here as a working reference, not as something to sign up for.
+
+**To use this, run your own copy.** [docs/SETUP.md](docs/SETUP.md) walks a stranger through it end
+to end: the supported Cloudflare path, and how to run just the compile server with Docker.
 
 ## Commands
 
@@ -74,10 +91,36 @@ arduino-cli lib install Stepper@1.1.3
 node container/server.js
 ```
 
+On any platform, building `container/` with Docker gets you the same server and none of that
+setup: see [docs/SETUP.md](docs/SETUP.md), Part B.
+
 ## Docs
 
-- [docs/DEPLOY.md](docs/DEPLOY.md) — deploying, the teacher key, the daily phrase routine, adding a library, `ALLOWED_CIDRS`, cost caps and billing alerts.
-- [docs/T2-TEST.md](docs/T2-TEST.md) — editor click-through (compile, error highlight, autosave, autocomplete toggle).
-- [docs/T3-TEST.md](docs/T3-TEST.md) — flashing a real Uno from Chrome (hardware gate, Dalton runs it); reset-polarity troubleshooting.
-- [docs/T4-TEST.md](docs/T4-TEST.md) — serial monitor with a real Uno, including Upload while connected (hardware gate, Dalton runs it).
-- [docs/CHROMEBOOK-CHECKLIST.md](docs/CHROMEBOOK-CHECKLIST.md) — district IT Web Serial policy questions and the one-Chromebook/one-Uno smoke test. Go/no-go for the whole project.
+- [docs/SETUP.md](docs/SETUP.md) — **run your own copy.** Start here if this repo is new to you.
+- [docs/DEPLOY.md](docs/DEPLOY.md) — the operator manual for the author's live instance: the daily
+  phrase routine, the teacher key, what guards a compile, adding a library, `ALLOWED_CIDRS`, cost
+  caps and billing alerts. Most of it applies to any instance.
+- [PLAN.md](PLAN.md) — architecture, the locked decisions, and the task list the project was built
+  from. Read it before changing anything structural.
+- [docs/CHROMEBOOK-CHECKLIST.md](docs/CHROMEBOOK-CHECKLIST.md) — the Web Serial policy conversation
+  to have with school IT before you rely on any of this, plus a one-Chromebook smoke test.
+- [docs/T2-TEST.md](docs/T2-TEST.md), [docs/T3-TEST.md](docs/T3-TEST.md),
+  [docs/T4-TEST.md](docs/T4-TEST.md) — manual test scripts for the editor, for flashing a real
+  board, and for the serial monitor. The last two need hardware.
+
+## Trademarks and licensing
+
+ARDUINO and UNO are trademarks of Arduino SA. This project is not affiliated with, sponsored by, or
+endorsed by Arduino SA. "Uno" is used here only to describe which board this software is compatible
+with.
+
+This repository contains no Arduino software. The container image downloads Arduino's open-source
+toolchain from official sources at build time — `arduino-cli` (GPLv3), and the AVR core and its
+compiler toolchain (GPL/LGPL) — and runs it as a separate program, over a command line, exactly as
+a user would. Nothing from it is copied into, linked with, or redistributed by this repository. If
+you build the image, you obtain those components directly from their publishers under their own
+licenses.
+
+The editor is [CodeMirror 6](https://codemirror.net), MIT licensed.
+
+This project's own code is MIT licensed — see [LICENSE](LICENSE).

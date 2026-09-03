@@ -1,7 +1,7 @@
 # T4 manual test — the serial monitor, and sharing the board with Upload
 
 **Status: NOT run by the worker session that wrote it, and it cannot be.** The T4 session had no
-Arduino, no USB port and no browser. Nothing below has touched a wire. Dalton runs this; until he
+board, no USB port and no browser. Nothing below has touched a wire. Dalton runs this; until he
 does, T4 is not green.
 
 What *was* run headlessly, and passed:
@@ -25,7 +25,7 @@ flash cannot pass T4 either.
 
 ## What you need
 
-- One Arduino Uno (genuine R3 or a CH340 clone) and its USB cable. Nothing wired to the board.
+- One Uno (genuine R3 or a CH340 clone) and its USB cable. Nothing wired to the board.
 - Google Chrome, normal window, not Incognito.
 - **Close the Arduino IDE** and any other tab with this page open. Two things cannot hold one port.
 

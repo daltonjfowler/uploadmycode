@@ -1,7 +1,7 @@
 # T3 manual test — flashing a real Uno from the browser
 
 **Status: NOT run by the worker session that wrote it, and it cannot be.** The T3 session had no
-Arduino and no browser. What *was* run headlessly, and passed:
+board and no browser. What *was* run headlessly, and passed:
 
 - `npm run typecheck` — clean.
 - `npm test` — 22 tests, including the Intel HEX parser against the real Blink hex the live
@@ -21,7 +21,7 @@ changing any code; the two most likely faults are named there with the exact lin
 
 ## What you need
 
-- One Arduino Uno (genuine R3, or a CH340 clone — test both if the classroom has both) and its USB
+- One Uno (genuine R3, or a CH340 clone — test both if the classroom has both) and its USB
   cable. Nothing else plugged into the board.
 - Google Chrome. Not Edge-in-IE-mode, not Firefox. On a Chromebook, a **managed student**
   Chromebook is the one that matters; a personal one proves less.
@@ -80,7 +80,7 @@ These eleven steps are the T3 gate. Fill in "Actual" as you go.
 | 3 | Click **Compile**. | Status pill goes `Compiling…` then green **`Compiled`**. Output: `Compiled with no errors.` and `Program size: 924 bytes of 32256 (3%).` **Upload is now enabled**, and its tooltip reads "Send this sketch to the Uno over USB." | |
 | 4 | Type a single space at the end of any line. | Upload greys out again the instant you type. The status pill goes back to `Ready`. | |
 | 5 | Press Ctrl+Z to undo the space, then click **Compile** again. | Green `Compiled`, Upload enabled again. | |
-| 6 | Click **Upload**. | Chrome opens its port chooser: a small window titled something like "localhost:5173 wants to connect to a serial port", listing your board — `USB Serial Device (COM4)`, `Arduino Uno`, or `USB-SERIAL CH340`. **Only Arduino and CH340 boards are listed**, so if the list is empty go to [No board in the list](#no-board-in-the-list). | |
+| 6 | Click **Upload**. | Chrome opens its port chooser: a small window titled something like "localhost:5173 wants to connect to a serial port", listing your board — Chrome names it whatever the driver does, so expect something like `USB Serial Device (COM4)`, `Arduino Uno`, or `USB-SERIAL CH340`. **Only boards on the two allowed USB vendor ids are listed**, so if the list is empty go to [No board in the list](#no-board-in-the-list). | |
 | 7 | Click your board, then **Connect**. | Within about two seconds: the RX/TX LEDs on the board flicker, a progress bar appears under "Output" counting `page 1 of 8` … `page 8 of 8`, the status pill reads `Uploading…` and then green **`Uploaded`**, and the output reads `Uploaded 924 bytes in NNN ms (8 pages).` and `The board is running your sketch now.` NNN should be somewhere around 300–1500. | |
 | 8 | Look at the board. | The orange **L** LED next to pin 13 is blinking: one second on, one second off, forever. This is the gate. | |
 | 9 | **Without touching the USB cable**, click in the editor and change **both** `delay(1000);` lines to `delay(100);`. Click **Compile**. | Green `Compiled`, `Program size: 922 bytes of 32256 (3%).` (Two bytes smaller: the shorter constant. Confirmed against the live compiler on 2026-09-01.) Upload is enabled. | |
@@ -100,7 +100,7 @@ one costs a whole period of class time.
 | # | Do this | Expect | Actual |
 |---|---|---|---|
 | B1 | Click **Upload**, and in the port chooser click **Cancel** instead of Connect. | Red status `No board`. Output: "No board chosen. Plug the Uno in and click Upload again — the next list shows every port on the computer, so pick the one the board is on." Nothing hangs; Upload is clickable again. | |
-| B2 | Click **Upload** again, and Cancel again. | The chooser this time lists **every** serial port on the computer, not just Arduinos (on Windows you will see COM ports for other things). After cancelling: "No board chosen. Check the USB cable is plugged into the Uno and into the Chromebook, then click Upload again." | |
+| B2 | Click **Upload** again, and Cancel again. | The chooser this time lists **every** serial port on the computer, not just the boards (on Windows you will see COM ports for other things). After cancelling: "No board chosen. Check the USB cable is plugged into the Uno and into the Chromebook, then click Upload again." | |
 | B3 | Open the Arduino IDE (or any serial terminal) and connect it to the Uno's port. Leave it connected. Back in Chrome, Compile and click **Upload**, pick the board. | Red status `Upload failed` and a message naming the clash: "Could not open the board's port. Either something else is using it — close the Arduino IDE and any other tab with this page open — or the board came unplugged…" **Not** a stack trace, and not a hang. Close the Arduino IDE afterwards. | |
 | B4 | **Unplug the USB cable.** Click **Upload**. | `Upload failed`, with either the B3 message (Chrome cannot open a port whose device is gone) or "The board did not answer. Unplug the board, plug it back in, then try Upload again." Either is fine — both tell you to plug it in. A frozen page is not fine. Plug the board back in afterwards. | |
 | B5 | With the board plugged back in: press and **hold** the board's reset button, then click **Upload** and pick the board, and keep holding reset for ten seconds. | After about three seconds of trying: red `Upload failed`, message exactly "The board did not answer. Unplug the board, plug it back in, then try Upload again." Release reset. | |
@@ -168,7 +168,7 @@ obvious first: it is the small orange **L** LED beside pin 13, not the green ON 
 was doing something else before, and now does nothing at all, the sketch was written to the wrong
 address — tell the lead, and quote the "page N of 8" count you saw.
 
-### "That board is not an Arduino Uno"
+### "That board is not an Uno"
 
 The chip answered with a signature that is not `1E 95 0F`. That is real: it is a Nano/Mega/Leonardo
 or a counterfeit with a different chip. The message names the signature it got — write it down.

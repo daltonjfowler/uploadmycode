@@ -12,7 +12,8 @@ Dalton runs this. Every step says exactly what to click and exactly what should 
 from the lesson, not from a menu), so the steps that used to pick an example now paste the sketch
 text printed at the bottom of this file. The button that opens a `.ino` from disk was renamed
 **Import**, because T3 added an **Upload** button and "Upload" means "send it to the board", the
-way it does in the Arduino IDE. The Upload button itself is tested in `docs/T3-TEST.md`, not here.
+way it does in the Arduino IDE (the desktop program). The Upload button itself is tested in
+`docs/T3-TEST.md`, not here.
 
 ---
 
@@ -69,7 +70,7 @@ Open **http://localhost:5173/** in Chrome. Use a normal (not Incognito) window: 
 
 | # | Do this | Expect | Actual |
 |---|---|---|---|
-| A1 | Look at the page on first load. | Toolbar across the top, editor filling the middle, "Output" panel at the bottom, footer at the very bottom. The sketch dropdown says `sketch`. The editor contains the blank Arduino template: `void setup() {` with `// put your setup code here, to run once:`, then `void loop() {` with `// put your main code here, to run repeatedly:`. There is **no** Examples dropdown. | |
+| A1 | Look at the page on first load. | Toolbar across the top, editor filling the middle, "Output" panel at the bottom, footer at the very bottom. The sketch dropdown says `sketch`. The editor contains the blank sketch template: `void setup() {` with `// put your setup code here, to run once:`, then `void loop() {` with `// put your main code here, to run repeatedly:`. There is **no** Examples dropdown. | |
 | A2 | Click in the editor, press Ctrl+A, then paste the **Blink** sketch from "Sketch text for these steps" at the bottom of this file. | The editor shows the Blink comment block and code, syntax-coloured. The sketch is still called `sketch`. `digitalWrite(LED_BUILTIN, HIGH);` must land on **line 33** — check the gutter; if it does not, the paste picked up an extra blank line and the line numbers below will be off by one. | |
 | A3 | Click **Compile**. | The status pill turns to `Compiling…`, then within a few seconds to a green **`Compiled`**. The output panel reads `Compiled with no errors.` and `Program size: 924 bytes of 32256 (3%).` | |
 | A4 | In the editor, find the line `digitalWrite(LED_BUILTIN, HIGH);` (line 33). Delete the semicolon at the end of it. | The line now ends `digitalWrite(LED_BUILTIN, HIGH)`. | |
@@ -92,7 +93,7 @@ If A3, A5+A6, and A9 all pass, the T2 gate is green.
 | B3 | Reload the page (F5). | The Autocomplete checkbox is still unticked. Typing `digi` still shows nothing. | |
 | B4 | Tick **Autocomplete** back on and type `digi`. | The popup is back. Leave it ticked. | |
 | B5 | Type `for` and accept the `for` snippet. | A full `for (int i = 0; i < count; i++) { }` block is inserted with `count` selected. | |
-| B6 | Click **New**. Accept the suggested name. | A new empty sketch opens containing the blank Arduino template (same text as A1), and it is selected in the Sketch dropdown. | |
+| B6 | Click **New**. Accept the suggested name. | A new empty sketch opens containing the blank sketch template (same text as A1), and it is selected in the Sketch dropdown. | |
 | B7 | Click **Rename**, type `my test`, OK. | The dropdown entry changes to `my test`. Reload: it is still `my test`. | |
 | B8 | Click **Download**. | Chrome downloads `my test.ino`. Open it in Notepad: it is the sketch text. | |
 | B9 | Click **Import**, pick the `my test.ino` you just downloaded. | A new sketch `my test 2` appears and opens with the same code. (Names are never silently overwritten.) | |
@@ -100,7 +101,7 @@ If A3, A5+A6, and A9 all pass, the T2 gate is green.
 | B11 | Click **New**, accept the name, then paste the **Servo Sweep** sketch from the bottom of this file and Compile. | Green `Compiled`, `Program size: 2128 bytes of 32256 (7%).` This is the one step that proves the container's Servo library is reachable — nothing else in the test uses `#include`. | |
 | B12 | Stop the compile server (Ctrl-C in terminal 1) and click **Compile**. | Status reads `Failed` and the output says `Could not reach the compiler. Check the Wi-Fi and try again.` — not a blank page or a stack trace. Restart the server afterwards. | |
 | B13 | Switch ChromeOS/Windows to dark mode (Settings → Appearance), with the page open. | The whole page — toolbar, editor, gutter, output panel, footer — flips to a dark palette and stays readable. Switch back to light and it flips back. No reload needed. | |
-| B14 | Look at the footer. | It reads "Arduino Uno only. Internal district tool." on the left, then a **Teacher** link and a **Made by Dalton Fowler** link on the right. Clicking Made by Dalton Fowler opens `https://daltonjfowler.com` in a **new tab**, leaving the editor open. Teacher goes to `/teacher.html`, which the dev server does serve; its buttons will not work locally, though, because the dev server only proxies `/api/compile` and not the teacher API. Use the live site for the teacher page. | |
+| B14 | Look at the footer. | It reads "Uno boards only. Internal district tool." on the left, then a **Teacher** link and a **Made by Dalton Fowler** link on the right. Clicking Made by Dalton Fowler opens `https://daltonjfowler.com` in a **new tab**, leaving the editor open. Teacher goes to `/teacher.html`, which the dev server does serve; its buttons will not work locally, though, because the dev server only proxies `/api/compile` and not the teacher API. Use the live site for the teacher page. | |
 | B15 | Narrow the window to about half the screen. | The toolbar wraps onto two rows, with **Compile**, **Upload** and the status pill together on one of them. The editor keeps every row the panels below it do not need. Nothing is cut off and the page never scrolls sideways. | |
 | B16 | Press **Ctrl+Enter**. | Same as clicking Compile. | |
 | B17 | Open `http://localhost:5173/serial-test.html`. | The old Web Serial diagnostic page, moved here from the T0 placeholder. The bordered box says whether Web Serial is available, and the **Test Web Serial (pick a port)** button still opens Chrome's port chooser and prints `usbVendorId` / `usbProductId`. This is the page `docs/CHROMEBOOK-CHECKLIST.md` now sends the district to. | |

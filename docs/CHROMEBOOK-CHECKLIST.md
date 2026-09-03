@@ -1,8 +1,8 @@
 # Chromebook + Web Serial checklist
 
 This is the go/no-go check for the whole project. The site compiles sketches on a server, but the
-**browser** is what flashes the Arduino Uno, using the Web Serial API. If managed Chrome policy
-blocks Web Serial on student Chromebooks, nothing else in this project matters.
+**browser** is what flashes the Uno, using the Web Serial API. If managed Chrome policy blocks Web
+Serial on student Chromebooks, nothing else in this project matters.
 
 Do this **before** T2 (editor) and T3 (upload) are worth building out.
 
@@ -11,12 +11,14 @@ There are two parts:
 1. Questions for district IT (below).
 2. A one-Chromebook / one-Uno smoke test that produces a yes or no.
 
-**Site origin to allowlist:** `https://uploadmycode.com`
+**Site origin to allowlist:** `https://uploadmycode.com` — that is the author's instance. If you
+are running your own copy ([SETUP.md](SETUP.md)), substitute your own origin everywhere below.
 
-What the site is, in one paragraph for IT: an internally-built classroom tool for an Arduino unit.
-It is served over HTTPS from Cloudflare. There is no install, no extension, no student account, and
-no student data is stored on the server. The only device permission it ever needs is Web Serial
-access to an Arduino board plugged into the student's USB port, to copy a compiled program onto it.
+What the site is, in one paragraph for IT: an internally-built classroom tool for an electronics
+unit. It is served over HTTPS from Cloudflare. There is no install, no extension, no student
+account, and no student data is stored on the server. The only device permission it ever needs is
+Web Serial access to an Uno board plugged into the student's USB port, to copy a compiled program
+onto it.
 
 ---
 
@@ -44,14 +46,14 @@ Policy reference pages:
 sites may ask, and confirm our origin is not in `SerialBlockedForUrls`. If the district default is
 `2` (deny), add only our origin to `SerialAskForUrls`.
 
-Result: the student clicks Upload, Chrome shows its own port chooser, the student picks the Arduino.
+Result: the student clicks Upload, Chrome shows its own port chooser, the student picks the board.
 Chrome remembers the choice for that site until the profile is cleared. Nothing is granted silently.
 
-**Option B — no prompt, scoped to Arduino boards only.** Everything in Option A, plus our origin in
-`SerialAllowUsbDevicesForUrls`, limited to the vendor IDs of the classroom boards.
+**Option B — no prompt, scoped to the classroom boards only.** Everything in Option A, plus our
+origin in `SerialAllowUsbDevicesForUrls`, limited to the vendor IDs of the classroom boards.
 
-Result: no chooser at all. Faster with 30 students. Access is still limited to Arduino-class USB
-serial chips on our one origin.
+Result: no chooser at all. Faster with 30 students. Access is still limited to the USB serial chips
+on those boards, on our one origin.
 
 Example value (confirm the exact IDs with step 6 of the smoke test before submitting this):
 
@@ -77,8 +79,8 @@ Broader than this project needs.
 
 | Board | Vendor ID | Product ID |
 |---|---|---|
-| Genuine Arduino Uno R3 | `0x2341` = **9025** | `0x0043` = **67** |
-| Arduino.org-era Uno | `0x2A03` = **10755** | `0x0043` = **67** |
+| Genuine Uno R3 | `0x2341` = **9025** | `0x0043` = **67** |
+| Uno from the 0x2A03 era | `0x2A03` = **10755** | `0x0043` = **67** |
 | CH340 clone Uno | `0x1A86` = **6790** | `0x7523` = **29987** |
 
 Confirm against the actual classroom hardware. Step 6 of the smoke test prints the real numbers off
@@ -107,7 +109,7 @@ the board in your hand.
 Run this on a **managed student Chromebook**, signed in as a **student account** in the same OU as
 the class. A teacher account on a teacher device proves nothing about student policy.
 
-**You need:** the Chromebook, one Arduino Uno, one USB cable that carries data (many charge-only
+**You need:** the Chromebook, one Uno, one USB cable that carries data (many charge-only
 cables do not), and about ten minutes.
 
 | # | Step | Expected | Actual |
@@ -117,7 +119,7 @@ cables do not), and about ten minutes.
 | 3 | Read the bordered box on the page. | "Web Serial API: **AVAILABLE** in this browser." | |
 | 4 | Plug the Uno into the Chromebook. | Green power LED on the board is lit. | |
 | 5 | Click the **Test Web Serial (pick a port)** button. | Chrome shows its own port chooser dialog, listing at least one port. | |
-| 6 | Pick the Arduino in the chooser and click Connect. | Page prints `PASS: port chosen.` plus `usbVendorId` and `usbProductId`. **Write these numbers down.** | |
+| 6 | Pick the Uno in the chooser and click Connect. | Page prints `PASS: port chosen.` plus `usbVendorId` and `usbProductId`. **Write these numbers down.** | |
 | 7 | Reload the page and click the button again. | Chrome may skip the chooser or show it again. Either is fine. Note which happened. | |
 | 8 | Open `chrome://version` | Record the ChromeOS and Chrome version numbers. | |
 

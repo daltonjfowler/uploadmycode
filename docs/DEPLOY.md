@@ -1,5 +1,10 @@
 # Deploying and running uploadmycode
 
+> **New here? Read [SETUP.md](SETUP.md) first.** This file is the operator manual for the author's
+> own instance, and it names his URLs throughout. SETUP.md is the one that walks a stranger through
+> standing up their own copy. Come back here afterwards: sections 1 and 3 through 8 apply to any
+> instance, with your own URL substituted.
+
 Everything an owner of this project needs that is not in the code: how to get it onto Cloudflare
 from a bare machine, how the class phrase works day to day, how to add a library, and how to keep
 the bill small and boring.
@@ -79,19 +84,22 @@ A browser opens; approve it for the account that holds the domain. Confirm with:
 npx wrangler whoami
 ```
 
-The account id in `wrangler.jsonc` history is `8a77f2d8ecd25793e3a979cef8ac2646`. If `whoami` shows a
-different account, you are about to deploy to the wrong place — stop.
+Check the account id it prints against the one the live site is deployed to (it is in the
+dashboard URL, and in `npx wrangler deployments list`). If `whoami` shows a different account, you
+are about to deploy to the wrong place — stop.
 
 ### 2.4 Create the KV namespace (only if this is a brand new account)
 
 The namespace already exists for the live project and its id is in `wrangler.jsonc`. On a new
-account:
+account — which includes anyone who cloned this repo, because that id is not theirs:
 
 ```powershell
 npx wrangler kv namespace create CLASS_KV
 ```
 
-Copy the printed id into the `kv_namespaces` block of `wrangler.jsonc`.
+Copy the printed id into the `kv_namespaces` block of `wrangler.jsonc`. See
+[SETUP.md, A4](SETUP.md#a4-make-wranglerjsonc-yours) for the other two things in that file that are
+specific to this account.
 
 ### 2.5 Set the teacher key
 
@@ -420,7 +428,16 @@ from ever touching the network.
        && arduino-cli lib install "Adafruit NeoPixel@${NEOPIXEL_VERSION}" \
    ```
 
-4. `npm run deploy`. The image rebuilds (a few minutes, because the layer changed) and the next
+4. Add it to the editor's Library dropdown, in `web/src/libraries.ts`:
+
+   ```ts
+   { label: "Adafruit NeoPixel", header: "Adafruit_NeoPixel.h", note: "addressable LED strips" },
+   ```
+
+   That list has to stay in step with the Dockerfile by hand; nothing checks it. A header the image
+   does not have still fails, on the server, with avr-gcc's own "No such file or directory".
+
+5. `npm run deploy`. The image rebuilds (a few minutes, because the layer changed) and the next
    compile can `#include` it.
 
 Keep every version pinned. An unpinned library means next year's rebuild is not this year's
@@ -441,10 +458,10 @@ school."
 
 Ask them, in these words:
 
-> I run a small internal website for my Arduino unit. I would like to restrict it so it only works
-> from inside the district network. What are the **public IPv4 and IPv6 egress ranges** (in CIDR
-> notation) that student traffic leaves the district from? I need the ranges as they appear to an
-> outside web server, not the internal 10.x addresses.
+> I run a small internal website for a classroom electronics unit. I would like to restrict it so
+> it only works from inside the district network. What are the **public IPv4 and IPv6 egress
+> ranges** (in CIDR notation) that student traffic leaves the district from? I need the ranges as
+> they appear to an outside web server, not the internal 10.x addresses.
 
 What you are looking for is something like `203.0.113.0/24` or `2001:db8:1234::/48`. Points worth
 raising with them:
@@ -559,6 +576,7 @@ npx wrangler kv key delete --binding CLASS_KV phrase --remote  # end it from the
 
 ## 9. Related docs
 
+- [SETUP.md](SETUP.md) — running your own copy from scratch, for someone who did not build this.
 - [PLAN.md](../PLAN.md) — architecture and the locked decisions.
 - [CHROMEBOOK-CHECKLIST.md](CHROMEBOOK-CHECKLIST.md) — the Web Serial policy conversation with
   district IT. Go/no-go for the whole project.

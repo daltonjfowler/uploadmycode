@@ -3,7 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Browser Arduino IDE for district Chromebooks. Arduino Uno only.",
+  "description": "Browser IDE for Uno boards, built for Chromebook classrooms.",
+  "license": "MIT",
   "scripts": {
     "dev": "wrangler dev",
     "dev:web": "vite web",

@@ -165,7 +165,7 @@ test("reads the signature and refuses a chip that is not an ATmega328P", async (
 		(error) => {
 			assert.ok(error instanceof FlashError);
 			assert.equal(error.kind, "signature");
-			assert.match(error.message, /not an Arduino Uno/);
+			assert.match(error.message, /not an Uno/);
 			assert.match(error.message, /1E 95 87/);
 			return true;
 		},

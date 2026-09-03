@@ -1,5 +1,5 @@
 /**
- * STK500v1, the slice of it that Optiboot on an Arduino Uno actually answers.
+ * STK500v1, the slice of it that Optiboot on an Uno actually answers.
  *
  * Nothing in this file touches the browser. It talks to a `Transport`, which
  * `serial.ts` implements with a real Web Serial port and the tests implement
@@ -203,7 +203,7 @@ async function checkSignature(transport: Transport, timing: Timing): Promise<voi
 	if (!matches) {
 		throw new FlashError(
 			"signature",
-			`That board is not an Arduino Uno. It reported chip ${formatBytes(signature)}, and this page only knows how to program an Uno (${formatBytes(ATMEGA328P_SIGNATURE)}).`,
+			`That board is not an Uno. It reported chip ${formatBytes(signature)}, and this page only knows how to program an Uno (${formatBytes(ATMEGA328P_SIGNATURE)}).`,
 		);
 	}
 }

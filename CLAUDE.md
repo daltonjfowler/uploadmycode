@@ -1,7 +1,14 @@
 # CLAUDE.md — uploadmycode
 
-Classroom tool: browser Arduino IDE for Chromebooks. Compile on a Cloudflare Container
-(`arduino-cli`), flash an Arduino Uno from the browser via Web Serial. Uno only, ever.
+Classroom tool: browser IDE for Uno boards, for Chromebooks. Compile on a Cloudflare Container
+(`arduino-cli`), flash the Uno from the browser via Web Serial. Uno only, ever.
+
+Public repo, MIT licensed. Do not put anything in it that is specific to Dalton's account or
+school: no keys, no phrase values, no district name. `docs/SETUP.md` is the doc a stranger reads;
+`docs/DEPLOY.md` is the operator manual for Dalton's own instance. Keep "Arduino" out of
+user-facing prose — the hardware is "the Uno" or "Uno boards" — but leave real names and
+identifiers alone (`arduino-cli`, `arduino:avr:uno`, `ARDUINO_*` env vars, code identifiers,
+download URLs). See the "Trademarks and licensing" section of README.md.
 
 Rules for every session in this repo:
 
