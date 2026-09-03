@@ -23,6 +23,10 @@
  * Addresses in the load-address command are WORD addresses (one word = two
  * bytes), which is the single easiest thing to get wrong here: a byte address
  * would write the sketch to twice its proper offset.
+ *
+ * Written from Atmel application note AVR061 (the STK500 communication
+ * protocol) and the documented behaviour of Optiboot,
+ * https://github.com/Optiboot/optiboot — no code from either. See CREDITS.md.
  */
 
 const STK_INSYNC = 0x14;

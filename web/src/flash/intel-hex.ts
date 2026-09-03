@@ -28,6 +28,9 @@
  * An avr-gcc sketch for the Uno only ever uses 00 and 01, but the extended
  * records cost ten lines and mean a hex file from anywhere else either works or
  * says plainly that it does not.
+ *
+ * Written from Intel's Hexadecimal Object File Format Specification — no code
+ * from any existing parser. See CREDITS.md.
  */
 
 /** Flash on an ATmega328P minus the Optiboot bootloader, which we must not overwrite. */

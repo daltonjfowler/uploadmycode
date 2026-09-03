@@ -102,6 +102,8 @@ setup: see [docs/SETUP.md](docs/SETUP.md), Part B.
   caps and billing alerts. Most of it applies to any instance.
 - [PLAN.md](PLAN.md) — architecture, the locked decisions, and the task list the project was built
   from. Read it before changing anything structural.
+- [CREDITS.md](CREDITS.md) — every open-source project this tool is built on, with links, verified
+  licenses, and where to support them.
 - [docs/CHROMEBOOK-CHECKLIST.md](docs/CHROMEBOOK-CHECKLIST.md) — the Web Serial policy conversation
   to have with school IT before you rely on any of this, plus a one-Chromebook smoke test.
 - [docs/T2-TEST.md](docs/T2-TEST.md), [docs/T3-TEST.md](docs/T3-TEST.md),
@@ -124,3 +126,11 @@ licenses.
 The editor is [CodeMirror 6](https://codemirror.net), MIT licensed.
 
 This project's own code is MIT licensed — see [LICENSE](LICENSE).
+
+## Credits
+
+This is a thin shell around other people's work. [CREDITS.md](CREDITS.md) lists every open-source
+project it stands on — the compiler toolchain the container downloads, the four classroom
+libraries, CodeMirror, the build tooling, and the protocol documents the flasher was written from —
+with a link and a verified license for each, and a support link wherever the project publishes one.
+None of those projects endorses this one; being credited is not affiliation.

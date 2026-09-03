@@ -366,5 +366,8 @@ Set `ARDUINO_CLI` to an absolute path if the binary is not on `PATH`.
   whoever runs your fleet, not to you. There are questions to ask them and a smoke test that
   produces a yes or a no.
 - [../PLAN.md](../PLAN.md) — architecture and the decisions behind it.
+- [../CREDITS.md](../CREDITS.md) — what the build above actually downloads, and who wrote it:
+  every project this tool stands on, with a link, a verified license, and a support link where
+  there is one.
 - [T2-TEST.md](T2-TEST.md), [T3-TEST.md](T3-TEST.md), [T4-TEST.md](T4-TEST.md) — manual test scripts
   for the editor, for flashing a board, and for the serial monitor.
