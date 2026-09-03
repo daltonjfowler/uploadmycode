@@ -25,7 +25,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-/** Arduino Uno, forever. See PLAN.md. */
+/** Uno boards, forever. See PLAN.md. */
 const FQBN = "arduino:avr:uno";
 /** The container publishes this port; the Worker's Container class targets it. */
 const PORT = Number(process.env.PORT) || 8080;
