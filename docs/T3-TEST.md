@@ -35,7 +35,7 @@ Same as the T2 setup. Both stay open for the whole test.
 **Terminal 1 — the compile server**
 
 ```powershell
-cd C:\Users\Mo Chara\Desktop\uploadmycode
+cd <your clone folder>
 $tools = "$PWD\tools"
 $env:ARDUINO_CLI = "$tools\arduino-cli\arduino-cli.exe"
 $env:ARDUINO_DIRECTORIES_DATA = "$tools\arduino-data"
@@ -49,7 +49,7 @@ Expected, immediately: `{"event":"listening","port":8080,"fqbn":"arduino:avr:uno
 **Terminal 2 — the editor**
 
 ```powershell
-cd C:\Users\Mo Chara\Desktop\uploadmycode
+cd <your clone folder>
 npm run dev:web
 ```
 
