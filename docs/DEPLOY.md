@@ -41,6 +41,7 @@ and a Chromebook that goes back in the cart carries nothing into tomorrow.
 | No class phrase is active. Ask your teacher. | Nothing is set, or it expired. Set one. |
 | Wrong class phrase. Ask your teacher for today's phrase. | Typo, or yesterday's phrase in a tab that was never closed. Retype it. |
 | That is a lot of compiles in one minute. Wait N seconds… | That Chromebook has compiled six times in a minute. Wait. |
+| That is a lot of tidying in one minute. Wait a moment… | That Chromebook has pressed **Auto indent** twelve times in a minute. Their compiles are untouched. |
 | The compiler is very busy right now. Wait a minute… | The whole site is at its ceiling of 120 compiles a minute. Rare; wait. |
 | That sketch is too big to compile. The limit is 100 KB. | They pasted something enormous. |
 | The compiler is busy or starting up. | Cold start, or two compiles landed at once. Wait and retry. |
@@ -195,7 +196,9 @@ is refusing everyone and the Worker log says so.
 ## 4. What actually guards a compile
 
 `POST /api/compile` runs five checks before it will hand anything to the container. The order is
-the design, and it lives in one file, `src/compile-gate.ts`:
+the design, and it lives in one file, `src/compile-gate.ts`. `POST /api/format` — the **Auto
+indent** button — runs the very same five, in the very same order, out of the very same file; only
+step 4 differs, and only in which bucket it spends and what the 429 says (section 4a):
 
 1. **Size.** Over 100 KB → 413. Answered from `Content-Length` before the body is read where
    possible, and re-checked against the real byte count after, so a chunked upload cannot slip past.
@@ -203,10 +206,12 @@ the design, and it lives in one file, `src/compile-gate.ts`:
 3. **Class phrase.** Read from KV, compared in constant time after both sides are normalized.
    Missing or expired → 403 "No class phrase is active"; wrong → 403 "Wrong class phrase". A wrong
    phrase is *only ever* a 403: never counted, never delayed, never a lockout (section 4a).
-4. **Per-client rate limit.** Six compiles a minute for the `x-client-id` the browser sends,
-   counted in the container's Durable Object, with a `Retry-After` header on the 429. It runs
-   after the phrase check on purpose, so wrong guesses can never spend anybody's compiles.
-5. **Global ceiling.** 120 compile requests a minute across everyone → 429. The bill guard.
+4. **Per-client rate limit.** Six compiles — or twelve Auto indents — a minute for the
+   `x-client-id` the browser sends, counted in two separate maps in the container's Durable
+   Object, with a `Retry-After` header on the 429. It runs after the phrase check on purpose, so
+   wrong guesses can never spend anybody's compiles.
+5. **Global ceiling.** 120 requests a minute across everyone, compiles and formats together → 429.
+   The bill guard.
 
 Only after all five is the container touched.
 
@@ -251,7 +256,8 @@ Very little was bought by them anyway:
 | Wrong teacher key | none, per person | 403 after a fixed 300 ms | "Wrong teacher key." |
 | Wrong teacher keys, everywhere | more than 100 in 15 minutes | wrong keys get 429 for 15 minutes — **a correct key still gets in** | "Too many wrong keys from everywhere right now. Try again in N minutes. The right key still works." |
 | Compiles, per client id | 6 per minute | 429 until the window slides | "That is a lot of compiles in one minute. Wait N seconds…" |
-| Compile requests, everyone | 120 per minute | 429 until the window slides | "The compiler is very busy right now. Wait a minute and try again." |
+| **Auto indent (`/api/format`), per client id** | **12 per minute** | 429 until the window slides | "That is a lot of tidying in one minute. Wait a moment and try again." |
+| Requests to either endpoint, everyone | 120 per minute | 429 until the window slides | "The compiler is very busy right now. Wait a minute and try again." |
 
 Every 429 carries `Retry-After` in seconds. There is no `x-lockout` header any more: a 429 from
 `/api/compile` is now always about pace, never about the phrase, so the editor no longer has to
@@ -268,6 +274,17 @@ stuck loop or a page left hammering Ctrl-Enter, not a lock. **The phrase is the 
 ceiling below is what keeps somebody who does that from mattering to the bill. A request with no
 id, or with an id that is not `^[A-Za-z0-9-]{8,64}$`, drops into a shared per-IP "anonymous"
 bucket with the same six a minute. That is where `curl` lands. No student ever does.
+
+**The Auto indent limit.** `POST /api/format` is the toolbar's **Auto indent** button: it sends the
+sketch to the same container, which runs `clang-format` over it and hands the tidied text back. It
+goes through the *same five checks in the same order* as a compile — the 413 and the two phrase 403s
+are word for word identical — with two differences. It spends a **bucket of its own, 12 a minute per
+client id** (`fmt client <id>`, or `fmt anon <ip>` for anything with no usable id), so no amount of
+tidying can ever eat the six compiles a student still needs; and it counts toward the same global
+ceiling below, because that number is about the container's bill and the container does both jobs.
+Twelve rather than six because a format costs milliseconds of clang-format against a compile's
+seconds of avr-gcc, and because Auto indent is a button pressed while thinking rather than when
+finished. `test/format-gate.test.mjs` pins the separation.
 
 **The global ceiling.** One number, `GLOBAL_COMPILE_MAX_PER_MINUTE` in `src/ratelimit.ts`, set
 to 120 a minute and counted after the phrase check. It protects the bill, not the door: it is there
@@ -297,8 +314,9 @@ The numbers live in two files, with tests beside each:
 | What | Where | Tests |
 |---|---|---|
 | 6 compiles/minute/client, 120/minute total, the client-id shape | `src/ratelimit.ts` | `test/ratelimit.test.mjs` |
+| 12 formats/minute/client, and the `fmt ` bucket prefix | `src/ratelimit.ts` | `test/format-gate.test.mjs` |
 | more than 100 wrong teacher keys / 15 minutes | `src/teacher-guard.ts` | `test/teacher-guard.test.mjs` |
-| the order of the five checks | `src/compile-gate.ts` | `test/compile-gate.test.mjs` |
+| the order of the five checks, for both endpoints | `src/compile-gate.ts` | `test/compile-gate.test.mjs`, `test/format-gate.test.mjs` |
 
 ### Optional: a Cloudflare Rate Limiting rule on `/api/teacher/*`
 
@@ -443,6 +461,15 @@ from ever touching the network.
 Keep every version pinned. An unpinned library means next year's rebuild is not this year's
 compiler, and a sketch that worked in September stops working in May for no visible reason.
 
+### Changing what Auto indent does
+
+The style is `container/.clang-format`, copied into the image at `/app/.clang-format` and read by
+`clang-format` on every request. Every setting in it has the reason written next to it; the one to
+leave alone is `ColumnLimit: 0`, which is what stops the button rewrapping lines a student never
+touched. Edit it and `npm run deploy` — the toolchain layers are cached, so that rebuild is quick.
+The tool itself is Debian bookworm's `clang-format` **14.0.6**, installed by apt in the Dockerfile;
+the build log prints `Debian clang-format version 14.0.6` so a version change cannot happen quietly.
+
 ---
 
 ## 6. The optional in-person lock (`ALLOWED_CIDRS`)
@@ -514,9 +541,11 @@ The guardrails, all already in place:
 | Small instance | `wrangler.jsonc` `instance_type` | `basic` (1/4 vCPU, 1 GiB) |
 | Sleeps when idle | `src/worker.ts` `sleepAfter` | 10 minutes |
 | Compile timeout | `container/server.js` | 30 s |
+| Auto indent timeout | `container/server.js` | 10 s, and at most 2 formats at once |
 | Request size cap | `src/worker.ts` | 100 KB |
-| Rate limit, per client | `src/ratelimit.ts` | 6 per minute per `x-client-id` (section 4a) |
-| Global ceiling | `src/ratelimit.ts` | 120 compile requests per minute, everyone together |
+| Rate limit, per client | `src/ratelimit.ts` | 6 compiles per minute per `x-client-id` (section 4a) |
+| Auto indent limit, per client | `src/ratelimit.ts` | 12 per minute per `x-client-id`, its own bucket |
+| Global ceiling | `src/ratelimit.ts` | 120 requests per minute, everyone and both endpoints together |
 | Wrong-key guard | `src/teacher-guard.ts` | more than 100 wrong teacher keys / 15 min (section 4a) |
 | Class phrase | KV + `src/worker.ts` | required on every compile |
 

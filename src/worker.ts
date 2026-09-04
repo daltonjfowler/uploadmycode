@@ -14,6 +14,11 @@
  * for this browser's client id, and the all-of-us bill guard. That file holds
  * the order and the reasons; this one holds the wiring.
  *
+ * POST /api/format is the Auto indent button and goes through the very same
+ * gate, spending a bucket of its own (twelve a minute) so that tidying a sketch
+ * can never leave a student unable to compile it. The same container answers
+ * both; it runs clang-format for this one.
+ *
  * The rule behind both gates: nothing a stranger gets wrong is allowed to cost
  * anybody else anything. The school leaves Cloudflare through one address, so a
  * per-IP penalty is a whole-class outage. A wrong phrase is therefore a plain
@@ -25,7 +30,12 @@
 
 import { Container, getContainer } from "@cloudflare/containers";
 
-import { gateCompile, readActivePhrase, type CompileCounters } from "./compile-gate.ts";
+import {
+	gateCompile,
+	gateFormat,
+	readActivePhrase,
+	type CompileCounters,
+} from "./compile-gate.ts";
 import { constantTimeEquals } from "./constant-time.ts";
 import { httpsRedirect, withSecurityHeaders } from "./headers.ts";
 import { json } from "./http.ts";
@@ -38,6 +48,7 @@ import {
 	type PhraseRecord,
 } from "./phrase.ts";
 import {
+	FORMAT_RATE_LIMIT_MAX,
 	GLOBAL_COMPILE_KEY,
 	GLOBAL_COMPILE_MAX_PER_MINUTE,
 	RATE_LIMIT_WINDOW_MS,
@@ -59,10 +70,11 @@ const MAX_TEACHER_BYTES = 4 * 1024;
  * The arduino-cli compile service. See container/Dockerfile and
  * container/server.js; the wiring lives in wrangler.jsonc.
  *
- * It also holds the two compile counters and the teacher-key guard.
+ * It also holds the three rate counters and the teacher-key guard.
  * max_instances is 1 and every request addresses the same named instance, so
- * this Durable Object is the one place that sees every compile and every wrong
- * key, and can count them for the whole site rather than per isolate.
+ * this Durable Object is the one place that sees every compile, every format
+ * and every wrong key, and can count them for the whole site rather than per
+ * isolate.
  *
  * Reaching this object does NOT start the container: the Container constructor
  * only schedules its own alarms. So a refused compile, and every wrong teacher
@@ -80,7 +92,12 @@ export class CompilerContainer extends Container {
 
 	/** Six a minute per client id. In memory, on purpose: see src/ratelimit.ts. */
 	readonly #clients = new RateLimiter();
-	/** The bill guard, counted across everybody. Same file, same reasons. */
+	/**
+	 * Twelve a minute per client id, for Auto indent. A separate map, so no
+	 * amount of tidying can eat the compiles a student still needs.
+	 */
+	readonly #formatters = new RateLimiter(FORMAT_RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
+	/** The bill guard, counted across everybody and across both jobs. */
 	readonly #everyone = new RateLimiter(GLOBAL_COMPILE_MAX_PER_MINUTE, RATE_LIMIT_WINDOW_MS);
 	/** In memory, on purpose: see src/teacher-guard.ts. */
 	readonly #teacherKeys = new TeacherKeyGuard();
@@ -93,7 +110,16 @@ export class CompilerContainer extends Container {
 		return this.#clients.check(key, Date.now());
 	}
 
-	/** Count one compile attempt against the site-wide ceiling. */
+	/**
+	 * Count one format attempt for one client. `key` is built by
+	 * `formatRateLimitKey`, so it carries the `fmt ` prefix as well as landing
+	 * in a different map from the compiles.
+	 */
+	checkFormatRate(key: string): RateVerdict {
+		return this.#formatters.check(key, Date.now());
+	}
+
+	/** Count one request — compile or format — against the site-wide ceiling. */
 	checkGlobalRate(): RateVerdict {
 		return this.#everyone.check(GLOBAL_COMPILE_KEY, Date.now());
 	}
@@ -231,15 +257,45 @@ async function teacherPhrase(request: Request, env: Env): Promise<Response> {
 	return json(200, { ok: true, phrase, expiresAt });
 }
 
-// ------------------------------------------------------------------ compiling
+// --------------------------------------------------- compiling and formatting
 
 /**
- * Forward a compile to the container and return its answer unchanged.
+ * Hand a body the gate has already cleared to one of the container's routes and
+ * return its answer unchanged.
  *
- * The container's own JSON shape ({ ok, hex } / { ok, stderr }) is the API, so
- * this Worker still never has to know what a sketch or an Intel HEX file is.
- * src/compile-gate.ts has already read and size-checked the body, so what it
- * hands back is what gets forwarded.
+ * The container's own JSON shapes ({ ok, hex } / { ok, stderr } for a compile,
+ * { ok, code } / { ok, error } for a format) are the API, so this Worker still
+ * never has to know what a sketch or an Intel HEX file is.
+ */
+async function forwardToContainer(
+	container: DurableObjectStub<CompilerContainer>,
+	path: "/compile" | "/format",
+	body: ArrayBuffer,
+): Promise<Response> {
+	const proxied = new Request("http://compiler" + path, {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body,
+	});
+
+	try {
+		return await container.fetch(proxied);
+	} catch (error) {
+		// Container over capacity, still booting, or crashed. Students see one
+		// clear sentence; the detail goes to the logs.
+		console.error(
+			JSON.stringify({ message: "compile container unreachable", path, error: String(error) }),
+		);
+		return json(503, {
+			ok: false,
+			error: "The compiler is busy or starting up. Wait a few seconds and try again.",
+		});
+	}
+}
+
+/**
+ * POST /api/compile. src/compile-gate.ts has already read and size-checked the
+ * body, so what it hands back is what gets forwarded.
  */
 async function compile(request: Request, env: Env): Promise<Response> {
 	const container = compilerStub(env);
@@ -251,25 +307,25 @@ async function compile(request: Request, env: Env): Promise<Response> {
 	const verdict = await gateCompile(request, env, counters);
 	if (!verdict.ok) return verdict.response;
 
-	const proxied = new Request("http://compiler/compile", {
-		method: "POST",
-		headers: { "content-type": "application/json" },
-		body: verdict.body,
-	});
+	return await forwardToContainer(container, "/compile", verdict.body);
+}
 
-	try {
-		return await container.fetch(proxied);
-	} catch (error) {
-		// Container over capacity, still booting, or crashed. Students see one
-		// clear sentence; the detail goes to the logs.
-		console.error(
-			JSON.stringify({ message: "compile container unreachable", error: String(error) }),
-		);
-		return json(503, {
-			ok: false,
-			error: "The compiler is busy or starting up. Wait a few seconds and try again.",
-		});
-	}
+/**
+ * POST /api/format — the Auto indent button. Same gate, same order, same
+ * container; the only differences are which per-client counter is spent (the
+ * format one, so tidying never costs a compile) and where it lands.
+ */
+async function format(request: Request, env: Env): Promise<Response> {
+	const container = compilerStub(env);
+	const counters: CompileCounters = {
+		checkClientRate: async (key) => await container.checkFormatRate(key),
+		checkGlobalRate: async () => await container.checkGlobalRate(),
+	};
+
+	const verdict = await gateFormat(request, env, counters);
+	if (!verdict.ok) return verdict.response;
+
+	return await forwardToContainer(container, "/format", verdict.body);
 }
 
 // -------------------------------------------------------------------- routing
@@ -282,6 +338,13 @@ async function handle(request: Request, env: Env): Promise<Response> {
 			return json(405, { ok: false, error: "Use POST for /api/compile." }, { allow: "POST" });
 		}
 		return await compile(request, env);
+	}
+
+	if (url.pathname === "/api/format") {
+		if (request.method !== "POST") {
+			return json(405, { ok: false, error: "Use POST for /api/format." }, { allow: "POST" });
+		}
+		return await format(request, env);
 	}
 
 	// Everything under /api/teacher/ needs the key, including paths that do not

@@ -56,6 +56,14 @@ Open **http://localhost:5173/** in Chrome. Use a normal (not Incognito) window: 
 > Storage → `http://localhost:5173` → delete every `uno-ide.v1.*` key, then reload. Steps 1
 > and 2 below assume a first visit.
 
+> **About Auto indent (step B20).** The button posts to `/api/format`, which the dev server proxies
+> to the same local `container/server.js` on 8080. That server shells out to **clang-format**, which
+> the container has (14.0.6, installed by `container/Dockerfile`) and a Windows dev box almost
+> certainly does not. If clang-format is not on PATH locally the button answers
+> `Auto indent is not available on this server. Tell your teacher.` — that is the tool missing, not
+> a bug. Either put clang-format on PATH, or run B20 against <https://uploadmycode.com> with a
+> phrase set, which is the real test anyway.
+
 > **About the class phrase (added in T5).** In production `/api/compile` goes through the Worker,
 > which refuses any compile that does not carry today's class phrase. The first Compile of a tab
 > therefore shows a **Class phrase** field in the Output panel and sends nothing until it is filled
@@ -108,6 +116,7 @@ If A3, A5+A6, and A9 all pass, the T2 gate is green.
 | B17 | Open `http://localhost:5173/serial-test.html`. | The old Web Serial diagnostic page, moved here from the T0 placeholder. The bordered box says whether Web Serial is available, and the **Test Web Serial (pick a port)** button still opens Chrome's port chooser and prints `usbVendorId` / `usbProductId`. This is the page `docs/CHROMEBOOK-CHECKLIST.md` now sends the district to. | |
 | B18 | **Live site only.** Set a phrase at <https://uploadmycode.com/teacher.html>, then open <https://uploadmycode.com/> in a fresh tab and click **Compile**. | Nothing is sent. A **Class phrase** field appears in the Output panel, the status pill reads `Phrase needed`, and the output says `Type today's class phrase to compile.` Type the phrase, press **Save**, and it compiles green: the field collapses to one small line reading `Class phrase set · Change`, and **Change** re-opens it. Reload the tab: it compiles without asking again and still shows that one line. Close the tab, open a new one: it asks again. Press **End now** on the teacher page and compile: `No class phrase is active. Ask your teacher.`, and the field opens again. | |
 | B19 | Click **New**, accept the name, then open the **Library** dropdown in the toolbar and pick **Servo — hobby servos**. Open it a second time and pick **Servo** again. | The first pick puts `#include <Servo.h>` on **line 1**, a blank line under it and the template below that; the caret sits at the end of that line and the dropdown has snapped back to `Library…`. One **Ctrl+Z** takes the whole line out again. The second pick adds **nothing**: the status pill reads `Already included`, the output panel says `This sketch already has #include <Servo.h> on line 1.`, line 1 is highlighted as the current line, and both go back to `Ready` on their own after a couple of seconds. | |
+| B20 | Wreck the indentation of the sketch on screen: push some lines out with tabs, drag others hard against the left margin, squash `if(x){` together. Click somewhere in the middle of the code, note the line number in the gutter, then press **Auto indent**. Press it a second time. Then press **Ctrl+Z** once. | The first press straightens everything: two spaces per level, no tabs anywhere, braces still on the line that opened them, and every line break exactly where you left it — nothing is rewrapped and no comment moves to a different line. The caret is still on the line number you noted. The pill flashes `Tidied` and the output says `Tidied. Press Ctrl+Z to put it back the way it was.`, then both go back to `Ready` on their own. The **second** press changes nothing and says `Already tidy`. The single **Ctrl+Z** puts the whole mess back in one go — not one line at a time. Upload greys out until you compile again, which is correct: the text changed. | |
 
 ### Checking the hex is kept for the Upload button
 

@@ -49,6 +49,14 @@
 					Autocomplete
 				</label>
 
+				<!-- Next to Compile, but deliberately outside .run-group: that group is
+				     the two buttons that talk to the board plus the pill that reports on
+				     them, and tidying reports nothing. .run-group's margin-left:auto is
+				     what keeps this button hard against Compile all the same. -->
+				<button id="format" type="button" title="Tidy this sketch's indentation. Ctrl+Z undoes it.">
+					Auto indent
+				</button>
+
 				<!-- One group so a wrapping toolbar never splits the two buttons from
 				     the pill that reports on them. -->
 				<div class="run-group">

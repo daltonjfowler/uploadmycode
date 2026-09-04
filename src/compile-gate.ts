@@ -1,5 +1,6 @@
 /**
- * Everything POST /api/compile has to get past before the container is touched.
+ * Everything POST /api/compile and POST /api/format have to get past before the
+ * container is touched.
  *
  * The order is the design, so it is written once, here, and worker.ts just runs
  * the answer:
@@ -7,8 +8,20 @@
  *   1. size          over 100 KB is refused before anything else runs
  *   2. school        the optional ALLOWED_CIDRS lock, off unless the var is set
  *   3. phrase        today's class phrase from KV, compared in constant time
- *   4. per client    six compiles a minute for this browser's client id
- *   5. everybody     the bill guard: 120 compile requests a minute in total
+ *   4. per client    six compiles, or twelve formats, a minute for this browser
+ *   5. everybody     the bill guard: 120 requests a minute in total, both kinds
+ *
+ * Both endpoints run the exact same five checks in the exact same order. Only
+ * two things differ, and they are the only two things `GateKind` decides: which
+ * per-client bucket the attempt is counted into, and which sentence the 429
+ * carries. The size and phrase answers are word for word identical, because a
+ * student who typed the phrase wrong has the same problem whichever button they
+ * pressed.
+ *
+ * Formatting counts into a bucket of its own so that tidying a sketch can never
+ * spend the compiles a student still needs. It counts into the SAME global
+ * ceiling, because that one is about the container's bill and the container
+ * does both jobs.
  *
  * A wrong or missing phrase is a plain 403, every time. It is never counted,
  * never delayed, and never locks anybody out. That is deliberate: the school
@@ -32,10 +45,13 @@ import { ipAllowed, parseCidrList, type Cidr } from "./cidr.ts";
 import { constantTimeEquals } from "./constant-time.ts";
 import { json } from "./http.ts";
 import { activeRecord, normalizePhrase, PHRASE_KEY, type PhraseRecord } from "./phrase.ts";
-import { rateLimitKey, type RateVerdict } from "./ratelimit.ts";
+import { formatRateLimitKey, rateLimitKey, type RateVerdict } from "./ratelimit.ts";
 
 /** Cost cap from PLAN.md. A request this big is not a sketch. */
 export const MAX_COMPILE_BYTES = 100 * 1024;
+
+/** Which of the two jobs is being asked for. */
+export type GateKind = "compile" | "format";
 
 /** The slice of the Worker env this needs. `Env` satisfies it. */
 export interface CompileEnv {
@@ -43,13 +59,41 @@ export interface CompileEnv {
 	CLASS_KV: KVNamespace;
 }
 
-/** The two counters in the Durable Object, as this module wants to call them. */
+/**
+ * The two counters in the Durable Object, as this module wants to call them.
+ *
+ * `checkClientRate` is whichever per-client counter belongs to the job the
+ * caller is gating — the compile one for /api/compile, the format one for
+ * /api/format. worker.ts is where those are wired to the Durable Object, which
+ * is what keeps this file free of any knowledge of it.
+ */
 export interface CompileCounters {
-	/** Six a minute for one client id (or one address, when there is no id). */
+	/** This client's own budget for this kind of request. */
 	checkClientRate(key: string): Promise<RateVerdict>;
-	/** The bill guard, counted across everybody. */
+	/** The bill guard, counted across everybody and across both kinds. */
 	checkGlobalRate(): Promise<RateVerdict>;
 }
+
+/** The bucket name, and the sentence a 429 carries, for each kind. */
+const KINDS: Record<
+	GateKind,
+	{
+		key: (clientId: string | null, ip: string) => string;
+		tooFast: (retryAfterSeconds: number) => string;
+	}
+> = {
+	compile: {
+		key: rateLimitKey,
+		tooFast: (seconds) =>
+			"That is a lot of compiles in one minute. Wait " + seconds + " seconds and click Compile again.",
+	},
+	format: {
+		key: formatRateLimitKey,
+		// No countdown in this one on purpose: twelve a minute is a lot of tidying,
+		// the wait is short, and "wait a moment" is the honest instruction.
+		tooFast: () => "That is a lot of tidying in one minute. Wait a moment and try again.",
+	},
+};
 
 export type GateVerdict =
 	/** Cleared. `body` is the sketch request, already read, ready to forward. */
@@ -111,10 +155,29 @@ function tooLarge(): GateVerdict {
 	);
 }
 
+/** POST /api/compile: the five checks, with the compile bucket and wording. */
 export async function gateCompile(
 	request: Request,
 	env: CompileEnv,
 	counters: CompileCounters,
+): Promise<GateVerdict> {
+	return await gate(request, env, counters, "compile");
+}
+
+/** POST /api/format: the same five checks, with the format bucket and wording. */
+export async function gateFormat(
+	request: Request,
+	env: CompileEnv,
+	counters: CompileCounters,
+): Promise<GateVerdict> {
+	return await gate(request, env, counters, "format");
+}
+
+async function gate(
+	request: Request,
+	env: CompileEnv,
+	counters: CompileCounters,
+	kind: GateKind,
 ): Promise<GateVerdict> {
 	// 1. Size. A declared oversize is answered before a byte is read; the real
 	// byte count is checked after, because a chunked upload declares nothing.
@@ -143,22 +206,17 @@ export async function gateCompile(
 		);
 	}
 
-	// 4. This browser's own six a minute. Only compiles that got past the phrase
-	// are counted, so a class fumbling the phrase never spends its own budget.
+	// 4. This browser's own budget for this kind of request — six compiles a
+	// minute, or twelve formats. Only requests that got past the phrase are
+	// counted, so a class fumbling the phrase never spends its own budget.
 	const client = await counters.checkClientRate(
-		rateLimitKey(request.headers.get("x-client-id"), ip),
+		KINDS[kind].key(request.headers.get("x-client-id"), ip),
 	);
 	if (!client.allowed) {
 		return refuse(
 			json(
 				429,
-				{
-					ok: false,
-					error:
-						"That is a lot of compiles in one minute. Wait " +
-						client.retryAfterSeconds +
-						" seconds and click Compile again.",
-				},
+				{ ok: false, error: KINDS[kind].tooFast(client.retryAfterSeconds) },
 				{ "retry-after": String(client.retryAfterSeconds) },
 			),
 		);

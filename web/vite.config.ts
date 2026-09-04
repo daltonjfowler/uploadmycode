@@ -23,12 +23,21 @@ export default defineConfig({
 	server: {
 		// `npm run dev:web` serves the editor; the compile API comes from the
 		// local container server (see README, "Running the compile server without
-		// Docker"), which listens on 8080 and routes /compile, not /api/compile.
+		// Docker"), which listens on 8080 and routes /compile and /format, not
+		// /api/compile and /api/format. Neither goes through the Worker in dev, so
+		// no class phrase is asked for locally.
 		proxy: {
 			"/api/compile": {
 				target: "http://localhost:8080",
 				changeOrigin: false,
 				rewrite: () => "/compile",
+			},
+			// Auto indent. Needs clang-format on PATH for the local server to
+			// answer; without it the button reports that it is not available.
+			"/api/format": {
+				target: "http://localhost:8080",
+				changeOrigin: false,
+				rewrite: () => "/format",
 			},
 		},
 	},

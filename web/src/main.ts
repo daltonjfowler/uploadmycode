@@ -11,6 +11,7 @@ import { hexProgramBytes, requestCompile } from "./compile.ts";
 import { createEditor, type Editor } from "./editor.ts";
 import { hintFor } from "./error-hints.ts";
 import { errorLines, firstErrorSummary, parseCompileErrors, type CompileError } from "./errors.ts";
+import { formatEdit, requestFormat } from "./format.ts";
 import { HexParseError, parseIntelHex } from "./flash/intel-hex.ts";
 import { findIncludeLine, insertInclude, LIBRARIES } from "./libraries.ts";
 import {
@@ -74,6 +75,7 @@ const importInput = el<HTMLInputElement>("import-input");
 const librarySelect = el<HTMLSelectElement>("library-select");
 const autocompleteToggle = el<HTMLInputElement>("autocomplete-toggle");
 const compileButton = el<HTMLButtonElement>("compile");
+const formatButton = el<HTMLButtonElement>("format");
 const uploadButton = el<HTMLButtonElement>("upload");
 const statusPill = el<HTMLSpanElement>("status");
 const errorList = el<HTMLDivElement>("error-list");
@@ -95,6 +97,7 @@ if (sketches.length === 0) sketches = starterLibrary();
 let currentName = pickCurrentName();
 let saveTimer: number | undefined;
 let compiling = false;
+let formatting = false;
 
 function pickCurrentName(): string {
 	const remembered = loadCurrentName();
@@ -136,7 +139,7 @@ function openSketch(nameToOpen: string): void {
 	persist();
 	clearCompiledHex();
 	editor.setCode(currentSketch().code);
-	refreshUploadButton();
+	refreshRunButtons();
 	setStatus("idle", "Ready");
 	showOutput(IDLE_OUTPUT, "plain");
 	editor.focus();
@@ -225,6 +228,32 @@ function clearErrorRows(): void {
 	errorList.replaceChildren();
 }
 
+// ----------------------------------------------------- the three work buttons
+
+/**
+ * Compile, Auto indent and Upload, decided in one place.
+ *
+ * Any one of the three running switches all three off: they share the class
+ * phrase, the editor's text, and — in Upload's case — the board itself, so two
+ * at once has no sensible meaning. Upload then has one condition of its own on
+ * top: it is only ever legal when the hex on hand was built from the text
+ * currently on screen.
+ *
+ * `uploading`, `compiling` and `formatting` are declared further down; this is
+ * a function declaration, so it is hoisted and every caller runs after them.
+ */
+function refreshRunButtons(): void {
+	const busy = compiling || formatting || uploading;
+	compileButton.disabled = busy;
+	formatButton.disabled = busy;
+
+	const ready = !busy && hasFreshHex(editor.getCode());
+	uploadButton.disabled = !ready;
+	uploadButton.title = ready
+		? "Send this sketch to the Uno over USB."
+		: "Compile first — the board can only be sent a sketch that has just compiled.";
+}
+
 // --------------------------------------------------------------- class phrase
 
 /**
@@ -239,6 +268,9 @@ function renderPhraseRow(asking: boolean): void {
 	phraseInput.value = "";
 }
 
+/** Which button is waiting on the phrase, so Save runs that one and not the other. */
+let phraseWantedFor: "compile" | "format" = "compile";
+
 /**
  * Ask for today's phrase, in the page rather than in a browser dialog.
  *
@@ -246,7 +278,8 @@ function renderPhraseRow(asking: boolean): void {
  * active" and "Wrong class phrase" send a student to two different places, and
  * paraphrasing them here would lose that.
  */
-function askForPhrase(message: string): void {
+function askForPhrase(message: string, wantedFor: "compile" | "format"): void {
+	phraseWantedFor = wantedFor;
 	renderPhraseRow(true);
 	setStatus("error", "Phrase needed");
 	showOutput(message, "error");
@@ -257,6 +290,25 @@ function hidePhraseForm(): void {
 	renderPhraseRow(false);
 }
 
+/**
+ * Today's phrase, or "" after having put the field up and said why.
+ *
+ * Both Compile and Auto indent need it before they send anything, so a class
+ * with no phrase set never wakes the container at all. Pressing either one with
+ * the field already open and filled in means the same thing as pressing Save,
+ * and must not throw away what was typed.
+ */
+function phraseOrAsk(wantedFor: "compile" | "format", askMessage: string): string {
+	let phrase = loadPhrase();
+	if (phrase === "" && !phraseForm.hidden && phraseInput.value.trim() !== "") {
+		phrase = phraseInput.value.trim();
+		savePhrase(phrase);
+		hidePhraseForm();
+	}
+	if (phrase === "") askForPhrase(askMessage, wantedFor);
+	return phrase;
+}
+
 phraseForm.addEventListener("submit", (event) => {
 	event.preventDefault();
 	const typed = phraseInput.value.trim();
@@ -264,7 +316,9 @@ phraseForm.addEventListener("submit", (event) => {
 	// The Worker does the real normalizing; this only has to carry the text.
 	savePhrase(typed);
 	hidePhraseForm();
-	void compileSketch();
+	// Carry on with whatever was interrupted, so a student who pressed Auto
+	// indent is not handed a compile they never asked for.
+	void (phraseWantedFor === "format" ? formatSketch() : compileSketch());
 });
 
 // Nothing is wrong when this one is clicked — the student simply wants to type
@@ -277,29 +331,19 @@ phraseChange.addEventListener("click", () => {
 // ------------------------------------------------------------------- compiling
 
 async function compileSketch(): Promise<void> {
-	if (compiling) return;
+	if (compiling || formatting || uploading) return;
 
-	// First compile of the tab: the phrase is asked for before anything is sent,
-	// so a class with no phrase set never wakes the container at all.
-	let phrase = loadPhrase();
-	// Clicking Compile with the field open and filled in means the same thing as
-	// pressing Start, and must not throw away what was typed.
-	if (phrase === "" && !phraseForm.hidden && phraseInput.value.trim() !== "") {
-		phrase = phraseInput.value.trim();
-		savePhrase(phrase);
-		hidePhraseForm();
-	}
-	if (phrase === "") {
-		askForPhrase("Type today's class phrase to compile. Your teacher has it on the board.");
-		return;
-	}
+	const phrase = phraseOrAsk(
+		"compile",
+		"Type today's class phrase to compile. Your teacher has it on the board.",
+	);
+	if (phrase === "") return;
 
 	compiling = true;
-	compileButton.disabled = true;
 
 	const code = editor.getCode();
 	clearCompiledHex();
-	refreshUploadButton();
+	refreshRunButtons();
 	clearErrorRows();
 	editor.clearErrorLines();
 	statusPill.title = "";
@@ -325,7 +369,7 @@ async function compileSketch(): Promise<void> {
 			// Missing, wrong, or expired. Whichever it was, this tab's copy is no
 			// good, so drop it and ask again with the Worker's own sentence.
 			clearPhrase();
-			askForPhrase(outcome.message);
+			askForPhrase(outcome.message, "compile");
 			return;
 		}
 
@@ -353,8 +397,88 @@ async function compileSketch(): Promise<void> {
 		}
 	} finally {
 		compiling = false;
-		compileButton.disabled = false;
-		refreshUploadButton();
+		refreshRunButtons();
+	}
+}
+
+// ------------------------------------------------------------------ tidying up
+
+/**
+ * Auto indent: hand the sketch to clang-format on the server and put the tidied
+ * version back.
+ *
+ * It goes back in ONE transaction, so a single Ctrl-Z undoes the whole thing —
+ * that is what makes the button safe to press out of curiosity. The caret stays
+ * on the line number it was on, because the line a student is reading is what
+ * they are holding in their head; the column cannot survive re-indenting and is
+ * not promised.
+ *
+ * The compiled hex goes stale the moment the text changes, exactly as it does
+ * for a typed edit, and Upload greys out until the next Compile. That is
+ * correct: the hex really was built from different text.
+ */
+async function formatSketch(): Promise<void> {
+	if (compiling || formatting || uploading) return;
+
+	const phrase = phraseOrAsk(
+		"format",
+		"Type today's class phrase to tidy your sketch. Your teacher has it on the board.",
+	);
+	if (phrase === "") return;
+
+	formatting = true;
+	refreshRunButtons();
+
+	const before = editor.getCode();
+	const caretLine = editor.caretLine();
+	setStatus("compiling", "Tidying…");
+	showOutput("Tidying your sketch on the server.", "plain");
+
+	try {
+		const outcome = await requestFormat(before, phrase);
+
+		if (outcome.kind === "phrase-required") {
+			clearPhrase();
+			askForPhrase(outcome.message, "format");
+			return;
+		}
+
+		if (outcome.kind === "busy") {
+			setStatus("compiler-busy", "Compiler busy");
+			showOutput(outcome.message, "error");
+			return;
+		}
+
+		if (outcome.kind === "service-error") {
+			// 413 and 429 land here, and the server's sentence is shown as written.
+			setStatus("error", "Failed");
+			showOutput(outcome.message, "error");
+			return;
+		}
+
+		// The editor stays typeable while the request is in the air, so check that
+		// the answer still describes what is on screen. Putting a tidy of the older
+		// text back would silently throw away whatever was typed in the meantime.
+		if (editor.getCode() !== before) {
+			showNotice("Not tidied", "You kept typing, so nothing was changed. Press Auto indent again.");
+			return;
+		}
+
+		const edit = formatEdit(before, outcome.code, caretLine);
+		if (edit.code === null) {
+			showNotice("Already tidy", "Already tidy. Nothing needed changing.");
+			editor.focus();
+			return;
+		}
+
+		// One transaction, so one Ctrl-Z takes the whole tidy back out again.
+		editor.replaceCode(edit.code, edit.caretLine);
+		clearErrorRows();
+		showNotice("Tidied", "Tidied. Press Ctrl+Z to put it back the way it was.");
+		editor.focus();
+	} finally {
+		formatting = false;
+		refreshRunButtons();
 	}
 }
 
@@ -376,15 +500,6 @@ let sharedPort: SerialPortLike | null = null;
 let showAllPorts = false;
 let uploading = false;
 
-/** Upload is only legal when the hex on hand was built from the text on screen. */
-function refreshUploadButton(): void {
-	const ready = !uploading && !compiling && hasFreshHex(editor.getCode());
-	uploadButton.disabled = !ready;
-	uploadButton.title = ready
-		? "Send this sketch to the Uno over USB."
-		: "Compile first — the board can only be sent a sketch that has just compiled.";
-}
-
 function showUploadProgress(pagesDone: number, pagesTotal: number): void {
 	uploadProgress.hidden = false;
 	uploadBar.max = pagesTotal;
@@ -400,7 +515,7 @@ function hideUploadProgress(): void {
 }
 
 async function uploadSketch(): Promise<void> {
-	if (uploading || compiling) return;
+	if (uploading || compiling || formatting) return;
 
 	const code = editor.getCode();
 	if (!hasFreshHex(code) || appState.hex === null) {
@@ -436,8 +551,7 @@ async function uploadSketch(): Promise<void> {
 	}
 
 	uploading = true;
-	uploadButton.disabled = true;
-	compileButton.disabled = true;
+	refreshRunButtons();
 	clearErrorRows();
 	statusPill.title = "";
 	setStatus("uploading", "Uploading…");
@@ -495,9 +609,8 @@ async function uploadSketch(): Promise<void> {
 		}
 
 		uploading = false;
-		compileButton.disabled = false;
 		hideUploadProgress();
-		refreshUploadButton();
+		refreshRunButtons();
 		refreshMonitorControls();
 	}
 }
@@ -695,7 +808,7 @@ const editor: Editor = createEditor({
 		persistSoon();
 		// The hex describes the old text now.
 		clearCompiledHex();
-		refreshUploadButton();
+		refreshRunButtons();
 		if (appState.status === "success") setStatus("idle", "Ready");
 	},
 });
@@ -822,6 +935,10 @@ compileButton.addEventListener("click", () => {
 	void compileSketch();
 });
 
+formatButton.addEventListener("click", () => {
+	void formatSketch();
+});
+
 uploadButton.addEventListener("click", () => {
 	void uploadSketch();
 });
@@ -854,7 +971,7 @@ renderSketchList();
 renderLibraryList();
 persist();
 setStatus("idle", "Ready");
-refreshUploadButton();
+refreshRunButtons();
 // A reloaded tab still has its phrase in sessionStorage, so say so in one line
 // instead of leaving a student wondering whether it will be asked for again.
 renderPhraseRow(false);

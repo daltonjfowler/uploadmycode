@@ -1,12 +1,21 @@
 /**
- * A fixed-cost sliding-window rate limiter, kept in memory, used twice.
+ * A fixed-cost sliding-window rate limiter, kept in memory, used three times.
  *
- *   per client   6 compiles a minute, keyed by the browser's own client id
- *   everybody   120 compile requests a minute, all clients together
+ *   per client    6 compiles a minute, keyed by the browser's own client id
+ *   per client   12 formats  a minute, keyed the same way, counted separately
+ *   everybody   120 requests a minute, compiles and formats together
  *
- * Both are about the bill, not security: the class phrase is the lock, these
- * are the fuse. A student working normally never sees either; a stuck loop, a
- * page left hammering Ctrl-Enter, or a script that has the phrase does.
+ * All three are about the bill, not security: the class phrase is the lock,
+ * these are the fuse. A student working normally never sees any of them; a
+ * stuck loop, a page left hammering Ctrl-Enter, or a script that has the phrase
+ * does.
+ *
+ * Formatting gets its own bucket rather than sharing the compile one, so that
+ * tidying a sketch a few times while reading it can never leave a student
+ * unable to compile it. It is allowed twice as often because it costs a
+ * fraction of what a compile costs — clang-format is milliseconds against
+ * avr-gcc's seconds — and it still passes the shared ceiling below, which is
+ * the number that actually protects the bill.
  *
  * Why a client id rather than an IP: a school leaves Cloudflare through ONE
  * public address, so a per-IP budget of six a minute is six a minute for the
@@ -30,12 +39,18 @@
 
 /** Compiles allowed per window, per client id. */
 export const RATE_LIMIT_MAX = 6;
-/** The window, in milliseconds. */
+/**
+ * Formats allowed per window, per client id. Higher than the compile limit
+ * because a format is far cheaper, and because Auto indent is the sort of
+ * button a student presses while thinking rather than when they are finished.
+ */
+export const FORMAT_RATE_LIMIT_MAX = 12;
+/** The window, in milliseconds. Shared by all three limiters. */
 export const RATE_LIMIT_WINDOW_MS = 60_000;
 
 /**
- * The bill guard: compile requests a minute from EVERYONE together, counted
- * after the phrase check.
+ * The bill guard: requests a minute from EVERYONE together — compiles and
+ * formats in the same count — checked after the phrase.
  *
  * This is not a security control — the phrase is — and it is not tuned to any
  * attacker. It is here so that a runaway script, a bug in the page, or a phrase
@@ -84,6 +99,19 @@ export function rateLimitKey(clientId: string | null | undefined, ip: string): s
 		return "client " + clientId;
 	}
 	return "anon " + (ip === "" ? "unknown" : ip);
+}
+
+/**
+ * What a format is counted into: the same bucket name, behind `fmt `.
+ *
+ * Formats already go to their own RateLimiter, so the prefix is belt as well as
+ * braces — but it is the belt that shows up in a log line, and it means the two
+ * key spaces still cannot collide if the two limiters are ever merged.
+ */
+export const FORMAT_KEY_PREFIX = "fmt ";
+
+export function formatRateLimitKey(clientId: string | null | undefined, ip: string): string {
+	return FORMAT_KEY_PREFIX + rateLimitKey(clientId, ip);
 }
 
 export class RateLimiter {

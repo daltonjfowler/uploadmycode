@@ -1,0 +1,70 @@
+# The style the Auto indent button uses on a student's sketch.
+#
+# container/Dockerfile copies this to /app; container/server.js names it
+# explicitly (`--style=file:/app/.clang-format`), so it is used no matter what
+# directory the process happens to be started from.
+#
+# Every line below is a decision about what a fourteen-year-old's sketch should
+# look like, so every line below has a reason written next to it. Anything not
+# named here is clang-format's LLVM default and was not worth an opinion.
+---
+Language: Cpp
+BasedOnStyle: LLVM
+
+# Two spaces, never a tab. Every Arduino example a student will ever read is
+# indented this way, so their own sketch should come out matching the code on
+# the lesson handout instead of arguing with it.
+IndentWidth: 2
+TabWidth: 2
+UseTab: Never
+ContinuationIndentWidth: 2
+
+# No reflow, and this is the important one. With a column limit, clang-format
+# rewraps long lines, so pressing Auto indent would move code the student never
+# touched and bury the one thing that actually changed. 0 switches that off
+# entirely: line breaks stay exactly where they were typed and only the
+# whitespace in front of them is corrected. Auto indent then does what its name
+# says and nothing else, which is what makes it safe to press without thinking.
+ColumnLimit: 0
+
+# `void setup() {` — the brace stays on the line that opened it, the way the
+# Arduino IDE writes it and the way every example sketch is written.
+BreakBeforeBraces: Attach
+
+# Short things keep the shape the student gave them. An `if` written across two
+# lines stays across two lines rather than being folded up into one, because
+# the folded version is not what they wrote and not what the next lesson shows.
+# Only a genuinely empty body is allowed to collapse.
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortBlocksOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+
+# A comment a student parked at the end of a line stays at the end of that line.
+# Aligning trailing comments would shove `// turn the LED on` half a screen to
+# the right to line up with a comment ten lines away.
+AlignTrailingComments: false
+ReflowComments: false
+
+# Leave `#include <Servo.h>` exactly where the Library button put it. Reordering
+# a student's includes is a change nobody asked for and one they cannot see the
+# reason for.
+SortIncludes: false
+
+# `if (x)` not `if(x)`; `int *p` not `int* p` — the second is what the Arduino
+# reference uses.
+SpaceBeforeParens: ControlStatements
+PointerAlignment: Right
+
+# Blank lines are how a student separates the parts of their sketch. Keep them,
+# but collapse a run of five down to one.
+MaxEmptyLinesToKeep: 1
+KeepEmptyLinesAtTheStartOfBlocks: false
+
+# Indent the body of each case so a switch reads as a ladder rather than a wall.
+IndentCaseLabels: true
+
+# Never move the `#` of a preprocessor line. A student looking for their
+# `#define` should find it hard against the left margin where they left it.
+IndentPPDirectives: None

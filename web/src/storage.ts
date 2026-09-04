@@ -154,7 +154,7 @@ export function saveMonitorBaud(baudRate: number): void {
  * localStorage, not sessionStorage: a student who reloads or opens a second tab
  * should keep the same budget rather than quietly getting a fresh one. If
  * storage is blocked the id lives for this page load only, which still gives
- * that machine its own six a minute for the lesson.
+ * that machine its own compile and Auto indent budgets for the lesson.
  */
 let clientId: string | null = null;
 

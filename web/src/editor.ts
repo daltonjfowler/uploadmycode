@@ -214,6 +214,8 @@ export interface Editor {
 	clearErrorLines(): void;
 	/** Put the caret on a line and scroll to it. */
 	goToLine(line: number, column: number): void;
+	/** The 1-based line the caret is on right now. */
+	caretLine(): number;
 	setAutocomplete(enabled: boolean): void;
 	focus(): void;
 }
@@ -283,6 +285,10 @@ export function createEditor(options: EditorOptions): Editor {
 		getCode: () => view.state.doc.toString(),
 
 		goToLine,
+
+		// `head` rather than `from`: with a selection dragged upwards, the end the
+		// student is actually looking at is the one they dragged to.
+		caretLine: () => view.state.doc.lineAt(view.state.selection.main.head).number,
 
 		setCode(code) {
 			view.dispatch({

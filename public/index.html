@@ -11,7 +11,7 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="manifest" href="/manifest.webmanifest">
     <meta name="theme-color" content="#1F9FA5">
-  <script type="module" crossorigin src="/assets/index-D31Wlf_b.js"></script>
+  <script type="module" crossorigin src="/assets/index-BrZ-5TOW.js"></script>
   <link rel="stylesheet" crossorigin href="/assets/index-C_DHC_uf.css">
 </head>
 	<body>
@@ -50,6 +50,14 @@
 					<input id="autocomplete-toggle" type="checkbox" checked />
 					Autocomplete
 				</label>
+
+				<!-- Next to Compile, but deliberately outside .run-group: that group is
+				     the two buttons that talk to the board plus the pill that reports on
+				     them, and tidying reports nothing. .run-group's margin-left:auto is
+				     what keeps this button hard against Compile all the same. -->
+				<button id="format" type="button" title="Tidy this sketch's indentation. Ctrl+Z undoes it.">
+					Auto indent
+				</button>
 
 				<!-- One group so a wrapping toolbar never splits the two buttons from
 				     the pill that reports on them. -->

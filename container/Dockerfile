@@ -1,6 +1,7 @@
-# uploadmycode compile service: Debian + arduino-cli + the AVR toolchain, serving
-# container/server.js. Everything is version-pinned and checksum-verified so a
-# rebuild next year produces the same compiler the class used today.
+# uploadmycode compile service: Debian + arduino-cli + the AVR toolchain, plus
+# clang-format for the Auto indent button, serving container/server.js.
+# Everything is version-pinned and checksum-verified so a rebuild next year
+# produces the same compiler the class used today.
 #
 # Cloudflare Containers run linux/amd64 only, hence the explicit --platform.
 # Build context is ./container (see wrangler.jsonc image_build_context).
@@ -73,6 +74,26 @@ RUN arduino-cli core update-index \
 	&& arduino-cli core list \
 	&& arduino-cli lib list
 
+# --- clang-format (the Auto indent button) ----------------------------------
+# Debian bookworm's own package, which is why there is no checksum here: apt
+# already verifies the archive signature, and the base image is pinned by digest
+# above, so this resolves to the same build every time.
+#
+# The version that lands is **clang-format 14.0.6** — the build log line reads
+# exactly `Debian clang-format version 14.0.6`, from package
+# clang-format 1:14.0-55.7~deb12u1 depending on clang-format-14 1:14.0.6-12.
+# `clang-format --version` runs below so a rebuild that ever produces something
+# else says so in the build log, instead of quietly restyling every student's
+# sketch a different way one morning.
+#
+# It sits here, after the toolchain, on purpose: adding it to the apt block at
+# the top would throw away the Node, arduino-cli and AVR-core layers on every
+# rebuild for the sake of a 30 MB package.
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends clang-format \
+	&& rm -rf /var/lib/apt/lists/* \
+	&& clang-format --version
+
 # --- the user the server runs as (T5) ---------------------------------------
 # Everything above needs root to install into /usr/local and /opt. Nothing below
 # does. The compile server takes untrusted text from students and hands it to
@@ -104,9 +125,11 @@ RUN mkdir -p /tmp/warmup/sketch \
 # --- the server -------------------------------------------------------------
 WORKDIR /app
 # package.json only marks server.js as an ES module. It has no dependencies, so
-# there is no npm install step. Copied last so editing server.js does not
-# invalidate the toolchain or warm-up layers above.
-COPY --chown=uploader:uploader package.json server.js /app/
+# there is no npm install step. .clang-format is the Auto indent style and is
+# read from /app at request time, not baked into the binary. Copied last so
+# editing any of the three does not invalidate the toolchain or warm-up layers
+# above.
+COPY --chown=uploader:uploader package.json server.js .clang-format /app/
 
 ENV PORT=8080
 EXPOSE 8080
