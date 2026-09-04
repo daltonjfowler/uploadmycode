@@ -63,6 +63,8 @@ npm run deploy      # npm run build, then wrangler deploy (needs Docker running)
 
 `container/server.js` is the same file the image runs, and it runs directly on Windows. Useful for
 frontend work: `npm run dev:web` proxies `/api/compile` to it. Nothing here is committed: `tools/`
+(`/api/format` proxies here too; Auto indent needs `clang-format` on PATH locally — without it only
+formatting fails, compiles are unaffected.)
 is gitignored, and the versions must match the pins at the top of `container/Dockerfile`.
 
 ```powershell
