@@ -32,27 +32,27 @@ function ruleForLine(gccLine) {
 test("the missing semicolon from the T2 gate", () => {
 	assert.equal(
 		hintForLine("sketch.ino:34:3: error: expected ';' before 'delay'"),
-		"Every statement ends with a semicolon — check the line above.",
+		"Every statement ends with a semicolon. Check the line above.",
 	);
 	// The same error when the next thing is the end of the block.
 	assert.equal(
 		hintForLine("sketch.ino:36:1: error: expected ';' before '}' token"),
-		"Every statement ends with a semicolon — check the line above.",
+		"Every statement ends with a semicolon. Check the line above.",
 	);
 });
 
 test("unclosed brackets name the pair that is open", () => {
 	assert.equal(
 		hintForLine("sketch.ino:35:1: error: expected '}' at end of input"),
-		"Every { needs a matching } — one of your blocks is never closed.",
+		"Every { needs a matching }. One of your blocks is never closed.",
 	);
 	assert.equal(
 		hintForLine("sketch.ino:33:34: error: expected ')' before ';' token"),
-		"Every ( needs a matching ) — count the brackets on this line.",
+		"Every ( needs a matching ). Count the brackets on this line.",
 	);
 	assert.equal(
 		hintForLine("sketch.ino:12:18: error: expected ']' before ';' token"),
-		"Every [ needs a matching ] — check the square brackets here.",
+		"Every [ needs a matching ]. Check the square brackets here.",
 	);
 });
 
@@ -89,7 +89,7 @@ test("a wrong-case name says the right spelling outright", () => {
 test("an unknown name that is not a case mistake gets the general hint", () => {
 	assert.equal(
 		hintForLine("sketch.ino:11:3: error: 'ledPin' was not declared in this scope"),
-		"The name is unknown here — check spelling and capital letters (code cares about case).",
+		"The name is unknown here. Check spelling and capital letters (code cares about case).",
 	);
 });
 
@@ -113,7 +113,7 @@ test("first match wins, and the narrow rules sit above the wide ones", () => {
 test("an unknown type points at spelling and at the Library menu", () => {
 	assert.equal(
 		hintForLine("sketch.ino:11:1: error: 'Servoo' does not name a type"),
-		"This type is unknown — check the spelling, or add its library from the Library menu.",
+		"This type is unknown. Check the spelling, or add its library from the Library menu.",
 	);
 });
 
@@ -127,22 +127,22 @@ test("a header that is not there", () => {
 test("the same thing declared twice", () => {
 	assert.equal(
 		hintForLine("sketch.ino:14:6: error: redefinition of 'void setup()'"),
-		"This name is made twice in the sketch — delete one of the two copies.",
+		"This name is made twice in the sketch. Delete one of the two copies.",
 	);
 });
 
 test("wrong things inside the parentheses", () => {
 	assert.equal(
 		hintForLine("sketch.ino:18:19: error: no matching function for call to 'Servo::attach()'"),
-		"Check inside the parentheses — the number or kind of things does not fit.",
+		"Check inside the parentheses. The number or kind of things does not fit.",
 	);
 	assert.equal(
 		hintForLine("sketch.ino:33:35: error: too many arguments to function 'void delay(long unsigned int)'"),
-		"There are too many things inside the parentheses — take one out.",
+		"There are too many things inside the parentheses. Take one out.",
 	);
 	assert.equal(
 		hintForLine("sketch.ino:33:29: error: too few arguments to function 'void digitalWrite(uint8_t, uint8_t)'"),
-		"Something is missing inside the parentheses — add what it needs.",
+		"Something is missing inside the parentheses. Add what it needs.",
 	);
 });
 
@@ -180,7 +180,7 @@ test("a comment that never closes, and a stray hash", () => {
 	);
 	assert.equal(
 		hintForLine("sketch.ino:2:1: error: expected unqualified-id before '{' token"),
-		"Something extra is here — look for a spare brace, semicolon or keyword.",
+		"Something extra is here. Look for a spare brace, semicolon or keyword.",
 	);
 });
 

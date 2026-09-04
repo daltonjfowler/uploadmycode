@@ -58,9 +58,9 @@ const EXPECTED_CLOSER = /^expected '([)\]}])'/;
 
 /** The three matching-pair hints, one per closing bracket. */
 const PAIR_HINTS: Record<string, string> = {
-	")": "Every ( needs a matching ) — count the brackets on this line.",
-	"}": "Every { needs a matching } — one of your blocks is never closed.",
-	"]": "Every [ needs a matching ] — check the square brackets here.",
+	")": "Every ( needs a matching ). Count the brackets on this line.",
+	"}": "Every { needs a matching }. One of your blocks is never closed.",
+	"]": "Every [ needs a matching ]. Check the square brackets here.",
 };
 
 /** Said by two different diagnostics, so it is written once. */
@@ -97,10 +97,10 @@ export const HINT_RULES: readonly HintRule[] = [
 	rule(
 		"not-declared",
 		NOT_DECLARED,
-		"The name is unknown here — check spelling and capital letters (code cares about case).",
+		"The name is unknown here. Check spelling and capital letters (code cares about case).",
 	),
 
-	rule("missing-semicolon", /^expected ';'/, "Every statement ends with a semicolon — check the line above."),
+	rule("missing-semicolon", /^expected ';'/, "Every statement ends with a semicolon. Check the line above."),
 	rule("extra-closing-brace", /^expected declaration before '\}'/, "There is one closing brace too many."),
 	{
 		id: "unclosed-pair",
@@ -112,13 +112,13 @@ export const HINT_RULES: readonly HintRule[] = [
 	rule(
 		"expected-unqualified-id",
 		/^expected unqualified-id/,
-		"Something extra is here — look for a spare brace, semicolon or keyword.",
+		"Something extra is here. Look for a spare brace, semicolon or keyword.",
 	),
 
 	rule(
 		"unknown-type",
 		/does not name a type/,
-		"This type is unknown — check the spelling, or add its library from the Library menu.",
+		"This type is unknown. Check the spelling, or add its library from the Library menu.",
 	),
 	// The header name is quoted in the message; the hint does not repeat it,
 	// because the message is right above the hint on screen.
@@ -131,22 +131,22 @@ export const HINT_RULES: readonly HintRule[] = [
 	rule(
 		"redefinition",
 		/^redefinition of /,
-		"This name is made twice in the sketch — delete one of the two copies.",
+		"This name is made twice in the sketch. Delete one of the two copies.",
 	),
 	rule(
 		"no-matching-function",
 		/^no matching function for call to/,
-		"Check inside the parentheses — the number or kind of things does not fit.",
+		"Check inside the parentheses. The number or kind of things does not fit.",
 	),
 	rule(
 		"too-many-arguments",
 		/^too many arguments to function/,
-		"There are too many things inside the parentheses — take one out.",
+		"There are too many things inside the parentheses. Take one out.",
 	),
 	rule(
 		"too-few-arguments",
 		/^too few arguments to function/,
-		"Something is missing inside the parentheses — add what it needs.",
+		"Something is missing inside the parentheses. Add what it needs.",
 	),
 	// The linker quotes with a backtick and closes with an apostrophe. This one
 	// is reported against main.cpp rather than sketch.ino, so it rarely reaches
@@ -167,7 +167,7 @@ export const HINT_RULES: readonly HintRule[] = [
 	rule(
 		"stray-character",
 		/^stray '.+' in program/,
-		"There is a character here the compiler cannot read — delete it and retype.",
+		"There is a character here the compiler cannot read. Delete it and retype.",
 	),
 ];
 

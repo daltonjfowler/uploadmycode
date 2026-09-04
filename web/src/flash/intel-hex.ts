@@ -109,7 +109,7 @@ export function parseIntelHex(text: string): Uint8Array {
 
 	if (!sawEndRecord) {
 		throw new HexParseError(
-			"The hex file has no end-of-file record. It was probably cut short — compile again.",
+			"The hex file has no end-of-file record. It was probably cut short. Compile again.",
 		);
 	}
 	if (endOfImage === 0) {
@@ -158,7 +158,7 @@ function decodeRecord(line: string, lineNumber: number): Uint8Array {
 	for (const byte of bytes) sum = (sum + byte) & 0xff;
 	if (sum !== 0) {
 		throw new HexParseError(
-			`Line ${lineNumber}: the checksum does not match. The hex file is damaged — compile again.`,
+			`Line ${lineNumber}: the checksum does not match. The hex file is damaged. Compile again.`,
 		);
 	}
 

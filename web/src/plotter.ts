@@ -452,6 +452,6 @@ function round(value: number, decimals: number): number {
  * jittering around 100 does not make the legend jump between three widths.
  */
 export function formatValue(value: number, decimals: number): string {
-	if (!Number.isFinite(value)) return "—";
+	if (!Number.isFinite(value)) return "-";
 	return value.toFixed(decimals);
 }

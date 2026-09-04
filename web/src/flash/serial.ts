@@ -55,7 +55,7 @@ export function isWebSerialAvailable(): boolean {
 
 /** Thrown when the browser cannot do this at all. Shown with a link to the test page. */
 export const NO_WEB_SERIAL_MESSAGE =
-	"This browser cannot talk to USB devices. Use Google Chrome. If you are already in Chrome on a school Chromebook, the district may be blocking serial ports — open the Web Serial test page below and show your teacher what it says.";
+	"This browser cannot talk to USB devices. Use Google Chrome. If you are already in Chrome on a school Chromebook, the district may be blocking serial ports. Open the Web Serial test page below and show your teacher what it says.";
 
 // ------------------------------------------------------------------ choosing a port
 
@@ -111,7 +111,7 @@ export async function requestPort(
 			"no-port",
 			showAll
 				? `No board chosen. Check the USB cable is plugged into the Uno and into the Chromebook, then ${retry}.`
-				: `No board chosen. Plug the Uno in and ${retry} — the next list shows every port on the computer, so pick the one the board is on.`,
+				: `No board chosen. Plug the Uno in and ${retry}. The next list shows every port on the computer, so pick the one the board is on.`,
 		);
 	}
 }
@@ -286,8 +286,8 @@ export function describeOpenFailure(
 		// Chrome gives the same NetworkError for "someone else has it" and for
 		// "the board is not there any more", so the message has to cover both.
 		return monitor
-			? "Could not open the board's port. Either something else is using it — close the Arduino IDE and any other tab with this page open — or the board came unplugged. Plug it back in, then click Connect again."
-			: "Could not open the board's port. Either something else is using it — close the Arduino IDE and any other tab with this page open — or the board came unplugged. Plug it back in, then try Upload again.";
+			? "Could not open the board's port. Either something else is using it. Close the Arduino IDE and any other tab with this page open. Or the board came unplugged. Plug it back in, then click Connect again."
+			: "Could not open the board's port. Either something else is using it. Close the Arduino IDE and any other tab with this page open. Or the board came unplugged. Plug it back in, then try Upload again.";
 	}
 	return monitor
 		? `Could not open the board's port (${errorText(cause)}). Close anything else that might be using it, then click Connect again.`

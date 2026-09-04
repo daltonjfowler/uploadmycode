@@ -318,7 +318,7 @@ test("formatValue writes one width, and says so when there is nothing to say", (
 	assert.equal(formatValue(1, 2), "1.00");
 	assert.equal(formatValue(-3.456, 1), "-3.5");
 	assert.equal(formatValue(512, 0), "512");
-	assert.equal(formatValue(Number.NaN, 0), "—");
+	assert.equal(formatValue(Number.NaN, 0), "-");
 });
 
 // ------------------------------------------ the real stream, through the monitor

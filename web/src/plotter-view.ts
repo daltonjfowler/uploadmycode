@@ -297,7 +297,7 @@ export function createPlotView(canvas: HTMLCanvasElement, data: PlotData): PlotV
 
 		for (let s = 0; s < series.length; s += 1) {
 			const entry = series[s];
-			const reading = entry.buffer.length === 0 ? "—" : formatValue(entry.buffer.last(), decimals);
+			const reading = entry.buffer.length === 0 ? "-" : formatValue(entry.buffer.last(), decimals);
 			const text = `${entry.label}  ${reading}`;
 			const entryWidth = SWATCH + 4 + ctx.measureText(text).width;
 			if (x + entryWidth > width - 2) break;

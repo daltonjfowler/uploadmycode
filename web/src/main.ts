@@ -256,7 +256,7 @@ function refreshRunButtons(): void {
 	uploadButton.disabled = !ready;
 	uploadButton.title = ready
 		? "Send this sketch to the Uno over USB."
-		: "Compile first — the board can only be sent a sketch that has just compiled.";
+		: "Compile first. The board can only be sent a sketch that has just compiled.";
 }
 
 // --------------------------------------------------------------- class phrase
@@ -996,7 +996,7 @@ function renderLibraryList(): void {
 	placeholder.disabled = true;
 	librarySelect.replaceChildren(
 		placeholder,
-		...LIBRARIES.map((library) => new Option(`${library.label} — ${library.note}`, library.header)),
+		...LIBRARIES.map((library) => new Option(`${library.label} - ${library.note}`, library.header)),
 	);
 }
 
@@ -1114,7 +1114,7 @@ refreshMonitorControls();
 const bootWarnings: string[] = [];
 if (isStorageBroken()) {
 	bootWarnings.push(
-		"This browser is not letting the page save sketches. Your work will be lost when you close the tab — download the .ino before you leave.",
+		"This browser is not letting the page save sketches. Your work will be lost when you close the tab. Download the .ino before you leave.",
 	);
 }
 if (!isWebSerialAvailable()) {
