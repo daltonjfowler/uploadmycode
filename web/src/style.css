@@ -437,9 +437,10 @@ button.link {
 .error-list {
 	display: flex;
 	flex-direction: column;
-	overflow: auto;
+	/* No scrolling of its own: .output is the one scroll container for the whole
+	   panel, so the rows, the hints and the raw compiler text move as one page
+	   under a single scrollbar. */
 	flex: 0 0 auto;
-	max-height: 12rem;
 }
 
 .error-list:not(:empty) {
@@ -496,7 +497,7 @@ button.link {
 .output-text {
 	margin: 0;
 	padding: 0.5rem 0.75rem;
-	overflow: auto;
+	/* Scrolls with .output, never by itself: see .error-list. */
 	flex: 1 1 auto;
 	/* A long error list must not squeeze the message down to nothing: the first
 	   line of it always survives. */
