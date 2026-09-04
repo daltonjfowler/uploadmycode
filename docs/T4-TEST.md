@@ -94,7 +94,68 @@ None of these is the gate, but each one is a hand in the air during a lesson.
 
 ---
 
+## Part D — the serial plotter
+
+**Status: also not run by the session that wrote it, and for the same reason — no board, no USB
+port, no browser.** What was run headlessly: `npm run typecheck` clean, `npm test` clean (183 tests,
+19 of them the plotter's), `npm run build` clean. Those cover the parser, the ring buffer and the
+autoscale arithmetic against a fake port; they cover **nothing** about pixels, about
+`devicePixelRatio` on a real Chromebook screen, or about whether a graph updating twenty times a
+second stays smooth while the editor is open. That is this part.
+
+Run Part A first, at least as far as A5, so the board is granted and Upload works. Then paste the
+**Plotter** sketch from the bottom of this file.
+
+### What you need on top of Part A
+
+- Ideally a **10k potentiometer**: outer legs to 5V and GND, wiper to **A0**. Everything below works
+  without one — an unconnected A0 floats and a finger on the pin swings it — but a pot is what makes
+  "turn it and watch the line follow" convincing to a room of students.
+- A jumper wire, to tie A0 to GND for step D6.
+
+| # | Do this | Expect | Actual |
+|---|---|---|---|
+| D1 | Open the Serial Monitor panel. Look at the controls row. | Between **Baud** and **Autoscroll** there is a two-part switch: **Text** (filled in, it is the one you are on) and **📈 Plot**. Nothing else has moved. | |
+| D2 | Paste the **Plotter** sketch, **Compile**, **Upload**, then **Connect** the monitor. | The text view fills with one bare number a line, about twenty a second — roughly 300–400 with a pot in the middle, or jumping around if A0 is floating. | |
+| D3 | Click **📈 Plot**. | The text is replaced by a graph in the same box — the panel does **not** change height and the editor above does not move. A coloured line traces left to right, gridlines with round numbers down the left edge, and a legend along the top reading **Series 1** and the current value. **The connection is not touched**: the state pill still says green *Connected at 9600 baud*, and no port chooser appears. | |
+| D4 | Turn the potentiometer slowly from one end to the other (or wave a finger over the A0 pin). | The line follows in real time, and the number in the legend follows with it. Sweeping the full range, the axis settles on **0 at the bottom and 1250 at the top**, with gridlines every 250. Small movements make the axis zoom in — the gridlines re-label themselves to whatever range the line is actually using. That zooming is autoscale working, not a glitch. | |
+| D5 | Hold the pot still for ten seconds. | The axis tightens right down around the value — a range of only a few counts — and the wobble of the last digit becomes visible. | |
+| D6 | Jumper **A0 to GND** and leave it. | The line goes dead flat. The axis reads **-1 at the bottom, 1 at the top**, and the flat line sits exactly in the middle rather than being pinned to an edge or making the graph vanish. Take the jumper out again. | |
+| D7 | Click **Text**, then **📈 Plot** again. | Both views are complete: the text has every line, including the ones from while the graph was up, and the graph still has its history. **Nothing reconnects, nothing is cleared, no chooser appears.** Autoscroll and Timestamps are only on the Text view; Pause is only on the Plot view. | |
+| D8 | **The pause check.** On the Plot view, click **⏸️ Pause**, then turn the pot right round twice over about ten seconds, then click **▶️ Resume**. | While paused the picture is frozen solid — the line does not move and the legend number does not change. On Resume the graph catches up *including the two turns you did while it was paused*: they are in the trace, not a gap. The buffer keeps filling while the display is frozen. | |
+| D9 | While paused, resize the browser window. | The graph stays frozen. (It may look slightly soft until you press Resume; that is the held picture being stretched, and it is correct.) | |
+| D10 | Click **🗑️ Clear monitor**. | The graph empties to a bare grid reading *Waiting for numbers*, the text view empties too, and if it was paused it goes back to running. New points start arriving immediately. One button clears both views. | |
+| D11 | **The upload check.** Leave the **Plot** view up and streaming. Paste the **Two lines** sketch, **Compile**, then **Upload**. | Everything from A10 still happens — paused for upload, no chooser, progress bar, resumed at 9600 — and the graph is still the graph the whole way through: it freezes while the board is being flashed and picks up again afterwards. **The history from before the upload is still on the graph**, with the new data drawn on the end of it. Then: **two** lines in two colours, and the legend reads **raw** and **smooth** with a live value for each. | |
+| D12 | Turn the pot sharply back and forth. | The **raw** line jumps immediately; the **smooth** line lags behind and rounds the corners off. Both share one vertical axis, so the lag is actually visible. This is the picture the whole feature exists for. | |
+| D13 | Switch the Chromebook (or Windows) to **dark mode** with the graph on screen. | The graph repaints itself dark: dark background, faint gridlines, and the two series in lighter versions of the same two colours. Both lines stay clearly readable, and the tick and legend text stays legible. Switch back. | |
+| D14 | Click **📈 Plot**, then reload the page (F5), then open the panel. | It comes back on the **Plot** view, because that is how you left it — the same way the panel remembers open/closed and the baud rate. The graph starts empty; nothing survives a reload. | |
+| D15 | Paste the **Counter** sketch from Part A back in, compile, upload, and watch the plot view. | `count: 1`, `count: 2` … plots as a rising line labelled **count** in the legend — the `label: value` form works with the space in it. The `counter ready` line does **not** appear on the graph, and neither do your own sent lines; switch to Text and they are all still there. Text stays text. | |
+| D16 | *(Optional, load check.)* Change `delay(50)` to `delay(1)` in the Plotter sketch, upload, and leave the plot view up for two minutes. | The page stays responsive, the editor still types smoothly, and Chrome's memory does not climb: the plot keeps the last **500 points** per line and drops the rest, exactly as the text view keeps 2000 lines. Put the delay back afterwards. | |
+
+If D3, D8 and D11 all behave — the toggle does not disturb the connection, Pause really freezes
+while still recording, and an upload mid-plot keeps both the handover and the history — **the
+plotter is green.**
+
+### Plotter notes worth knowing before a lesson
+
+- **What gets plotted.** A line is plotted only if *everything* on it is a number. `450`,
+  `450 460`, `450,460`, `raw:450 smooth:460` and `raw: 450` are all data. `sensor ready` and
+  `you said: hi` are not, and stay in the text view only. A half-and-half line like
+  `temp: 23.5 is warm` is treated as a sentence, not a reading.
+- **Four lines maximum.** A sketch printing five or more numbers a line has the first four plotted
+  and the rest ignored, rather than the line being thrown away.
+- **The x axis is samples, not seconds.** 500 points across the width, however fast they arrive.
+  A sketch with `delay(50)` fills that in 25 seconds; one with `delay(1)` fills it in half a second.
+
+---
+
 ## When it does not work
+
+### The graph stays empty but the text view is scrolling
+
+The lines are not all-numbers. Look at the Text view: anything other than bare numbers, or
+`name:number` pairs, on the line — a unit, a word, a stray `%` — makes the whole line text. Have the
+sketch print the number and nothing else, or use `Serial.print("raw:")` before it.
 
 ### The counter never appears, but the upload worked
 
@@ -186,5 +247,56 @@ void loop() {
   }
 
   delay(500);
+}
+```
+
+### Plotter (step D2)
+
+One number a line, twenty times a second. Byte size not recorded: the session that wrote this had
+no container to compile against.
+
+```cpp
+// Serial plotter test sketch. Reads A0 twenty times a second and prints the
+// number on a line by itself — nothing else, so every line is a point on the
+// graph. With a 10k pot on A0 (outer legs to 5V and GND, wiper to A0) turning
+// it sweeps the line from 0 to 1023. With nothing wired, A0 floats and a
+// finger near the pin is enough to move it.
+void setup() {
+  Serial.begin(9600);
+}
+
+void loop() {
+  Serial.println(analogRead(A0));
+  delay(50);
+}
+```
+
+### Two lines (step D11)
+
+Two labelled series on one graph — the form the legend gets its names from.
+
+```cpp
+// Two series on one graph: the raw reading, and a smoothed version that lags
+// behind it. The "raw:" and "smooth:" labels are what the plotter's legend
+// prints; the space before "smooth" is what separates the two values.
+int smooth = 0;
+
+void setup() {
+  Serial.begin(9600);
+  smooth = analogRead(A0);
+}
+
+void loop() {
+  int raw = analogRead(A0);
+  // Nine parts of the old value to one part of the new one, which is enough
+  // lag to see across the room.
+  smooth = (smooth * 9 + raw) / 10;
+
+  Serial.print("raw:");
+  Serial.print(raw);
+  Serial.print(" smooth:");
+  Serial.println(smooth);
+
+  delay(50);
 }
 ```

@@ -129,21 +129,38 @@
 							<select id="monitor-baud" aria-label="Baud rate"></select>
 						</label>
 
-						<label class="check">
+						<!-- Two views of one connection. Switching between them never
+						     touches the port: both are fed by the same stream. -->
+						<div class="view-toggle" role="group" aria-label="Monitor view">
+							<button id="monitor-view-text" type="button" aria-pressed="true">Text</button>
+							<button id="monitor-view-plot" type="button" aria-pressed="false">📈 Plot</button>
+						</div>
+
+						<!-- Text view only: neither means anything on a graph, so main.ts
+						     hides both of these labels while the plot is showing. -->
+						<label id="monitor-autoscroll-field" class="check">
 							<input id="monitor-autoscroll" type="checkbox" checked />
 							Autoscroll
 						</label>
 
-						<label class="check">
+						<label id="monitor-timestamps-field" class="check">
 							<input id="monitor-timestamps" type="checkbox" />
 							Timestamps
 						</label>
+
+						<!-- Plot view only. Freezes the picture; the samples keep arriving. -->
+						<button id="monitor-plot-pause" type="button" hidden>⏸️ Pause</button>
 
 						<span class="grow"></span>
 						<button id="monitor-clear" type="button">🗑️ Clear monitor</button>
 					</div>
 
 					<pre id="monitor-output" class="monitor-output" tabindex="0"></pre>
+
+					<div id="monitor-plot" class="monitor-plot" hidden>
+						<canvas id="monitor-plot-canvas" role="img"
+							aria-label="Live graph of the numbers the board is printing"></canvas>
+					</div>
 
 					<form id="monitor-send" class="monitor-send">
 						<input

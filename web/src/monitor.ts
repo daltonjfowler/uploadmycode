@@ -90,6 +90,16 @@ export interface MonitorPort {
 export interface MonitorOptions {
 	/** The line buffer changed. Cheap and frequent — schedule a redraw, do not draw. */
 	onChange?: () => void;
+	/**
+	 * One finished line, as it is added. The serial plotter reads the stream
+	 * through this: same connection, same bytes, same decoder, one line at a
+	 * time — so switching the panel between Text and Plot cannot reconnect
+	 * anything or disagree with what the text view shows.
+	 *
+	 * Called for sent lines and the monitor's own notices too; `kind` says
+	 * which, and the plotter only wants `"in"`.
+	 */
+	onLine?: (line: MonitorLine) => void;
 	/** The state changed. Rare — relabel the buttons here. */
 	onState?: (state: MonitorState) => void;
 	/** Clock, so the tests can pin timestamps. */
@@ -102,6 +112,7 @@ export interface MonitorOptions {
 
 export class SerialMonitor {
 	private readonly onChange: () => void;
+	private readonly onLine: (line: MonitorLine) => void;
 	private readonly onState: (state: MonitorState) => void;
 	private readonly now: () => number;
 	private readonly maxLines: number;
@@ -129,6 +140,7 @@ export class SerialMonitor {
 
 	constructor(options: MonitorOptions = {}) {
 		this.onChange = options.onChange ?? (() => {});
+		this.onLine = options.onLine ?? (() => {});
 		this.onState = options.onState ?? (() => {});
 		this.now = options.now ?? ((): number => Date.now());
 		this.maxLines = options.maxLines ?? MAX_LINES;
@@ -298,11 +310,20 @@ export class SerialMonitor {
 	}
 
 	private pushLine(kind: LineKind, text: string, at: number = this.now()): void {
-		this.lines.push({ at, kind, text });
+		const line: MonitorLine = { at, kind, text };
+		this.lines.push(line);
 		if (this.lines.length > this.maxLines) {
 			const extra = this.lines.length - this.maxLines;
 			this.lines.splice(0, extra);
 			this.dropped += extra;
+		}
+		// Told after the buffer is settled, so a listener that reads back the
+		// text sees the same thing the panel will draw. A throwing listener must
+		// not cost the monitor its line, so it is fenced off.
+		try {
+			this.onLine(line);
+		} catch {
+			// A broken listener is the listener's problem, not the board's.
 		}
 		this.bump();
 	}

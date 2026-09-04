@@ -31,6 +31,7 @@ const CURRENT_KEY = "uno-ide.v1.current";
 const AUTOCOMPLETE_KEY = "uno-ide.v1.autocomplete";
 const MONITOR_OPEN_KEY = "uno-ide.v1.monitor-open";
 const MONITOR_BAUD_KEY = "uno-ide.v1.monitor-baud";
+const MONITOR_VIEW_KEY = "uno-ide.v1.monitor-view";
 const CLIENT_ID_KEY = "uno-ide.v1.client-id";
 
 /** Name given to the sketch created on a first visit. */
@@ -138,6 +139,22 @@ export function loadMonitorBaud(): number | null {
 
 export function saveMonitorBaud(baudRate: number): void {
 	writeKey(MONITOR_BAUD_KEY, String(baudRate));
+}
+
+/** Whether the monitor panel shows the text or the graph. */
+export type MonitorView = "text" | "plot";
+
+/**
+ * Which of the two views the panel was left on. Default text: it is what a
+ * student who has never pressed Plot is expecting, and a graph of a sketch
+ * that prints words is an empty rectangle.
+ */
+export function loadMonitorView(): MonitorView {
+	return readKey(MONITOR_VIEW_KEY) === "plot" ? "plot" : "text";
+}
+
+export function saveMonitorView(view: MonitorView): void {
+	writeKey(MONITOR_VIEW_KEY, view);
 }
 
 /**

@@ -25,6 +25,8 @@ import {
 } from "./flash/serial.ts";
 import { FlashError, PAGE_SIZE, uploadImage } from "./flash/stk500v1.ts";
 import { clearPhrase, loadPhrase, savePhrase } from "./phrase.ts";
+import { parsePlotLine, PlotData } from "./plotter.ts";
+import { createPlotView } from "./plotter-view.ts";
 import {
 	BAUD_RATES,
 	DEFAULT_BAUD_RATE,
@@ -42,14 +44,17 @@ import {
 	loadCurrentName,
 	loadMonitorBaud,
 	loadMonitorOpen,
+	loadMonitorView,
 	loadSketches,
 	saveAutocompleteEnabled,
 	saveCurrentName,
 	saveMonitorBaud,
 	saveMonitorOpen,
+	saveMonitorView,
 	saveSketches,
 	starterLibrary,
 	uniqueName,
+	type MonitorView,
 	type Sketch,
 } from "./storage.ts";
 
@@ -630,13 +635,50 @@ const monitorInput = el<HTMLInputElement>("monitor-input");
 const monitorSendButton = el<HTMLButtonElement>("monitor-send-button");
 const monitorEndingSelect = el<HTMLSelectElement>("monitor-ending");
 
+// The plot view's own widgets.
+const monitorViewTextButton = el<HTMLButtonElement>("monitor-view-text");
+const monitorViewPlotButton = el<HTMLButtonElement>("monitor-view-plot");
+const monitorAutoscrollField = el<HTMLLabelElement>("monitor-autoscroll-field");
+const monitorTimestampsField = el<HTMLLabelElement>("monitor-timestamps-field");
+const monitorPlotPanel = el<HTMLDivElement>("monitor-plot");
+const monitorPlotCanvas = el<HTMLCanvasElement>("monitor-plot-canvas");
+const monitorPlotPause = el<HTMLButtonElement>("monitor-plot-pause");
+
 let monitorRenderQueued = false;
 /** Set while the code moves the scrollbar, so that move is not read as the student scrolling. */
 let monitorScrollingItself = false;
 let monitorConnecting = false;
 
+/**
+ * The graph. The buffers are filled from the monitor's own line callback, so
+ * the plot is a second view of one connection rather than a second reader:
+ * there is nothing to reconnect when the toggle is pressed, and nothing that
+ * can disagree with the text.
+ */
+const plotData = new PlotData();
+const plotView = createPlotView(monitorPlotCanvas, plotData);
+let monitorView: MonitorView = "text";
+/**
+ * Pause freezes the picture and nothing else — the samples keep arriving and
+ * keep going into the ring, so resuming shows what happened while it was
+ * frozen rather than a gap. That is what makes it usable for "hold still and
+ * read the number off the graph".
+ */
+let plotPaused = false;
+
 const monitor = new SerialMonitor({
 	onChange: scheduleMonitorRender,
+	onLine(line) {
+		// Only what the board said. Sent lines and the monitor's own notices are
+		// not readings, however numeric they look.
+		if (line.kind !== "in") return;
+		const values = parsePlotLine(line.text);
+		if (values === null) return;
+		// Always into the buffer, even while paused — Pause holds the picture,
+		// not the recording. The view drops the redraw when it is frozen.
+		plotData.ingest(values);
+		plotView.requestDraw();
+	},
 	onState(state) {
 		// A monitor that lost the board is holding a dead SerialPort; the next
 		// Upload should look the board up again instead of reusing it. A pause
@@ -661,12 +703,57 @@ function scheduleMonitorRender(): void {
 }
 
 function renderMonitor(): void {
-	if (monitorBody.hidden) return;
+	// Nothing to draw when the panel is shut, and nothing to draw when the graph
+	// is up: a hidden <pre> has no scroll height, so autoscroll would be working
+	// off zeroes. The text is rebuilt from the buffer on the way back anyway.
+	if (monitorBody.hidden || monitorView !== "text") return;
 	monitorOutput.textContent = monitor.text({ timestamps: monitorTimestamps.checked });
 	if (monitorAutoscroll.checked) {
 		monitorScrollingItself = true;
 		monitorOutput.scrollTop = monitorOutput.scrollHeight;
 	}
+}
+
+/**
+ * Show one of the two views. Everything else — the connection, the line
+ * buffer, the plot buffers, the message box — is untouched, which is the whole
+ * promise of the toggle: a student can flip to the graph and back mid-lesson
+ * without losing a line.
+ */
+function setMonitorView(view: MonitorView, remember: boolean): void {
+	monitorView = view;
+	const plotting = view === "plot";
+
+	monitorOutput.hidden = plotting;
+	monitorPlotPanel.hidden = !plotting;
+
+	// Autoscroll and Timestamps are about a scrolling wall of text and mean
+	// nothing on a graph; Pause is the reverse.
+	monitorAutoscrollField.hidden = plotting;
+	monitorTimestampsField.hidden = plotting;
+	monitorPlotPause.hidden = !plotting;
+
+	monitorViewTextButton.setAttribute("aria-pressed", plotting ? "false" : "true");
+	monitorViewPlotButton.setAttribute("aria-pressed", plotting ? "true" : "false");
+
+	if (remember) saveMonitorView(view);
+
+	// The canvas only has a size once it is on screen, so this order matters:
+	// unhide first, then let the view measure itself.
+	plotView.setVisible(plotting && !monitorBody.hidden);
+	if (plotting) plotView.requestDraw();
+	else renderMonitor();
+}
+
+/** Pause and Resume. Only the picture stops; `plotData` keeps filling. */
+function setPlotPaused(paused: boolean): void {
+	plotPaused = paused;
+	monitorPlotPause.textContent = paused ? "▶️ Resume" : "⏸️ Pause";
+	monitorPlotPause.setAttribute("aria-pressed", paused ? "true" : "false");
+	monitorPlotPause.title = paused
+		? "Start following the numbers again. Nothing was missed while it was paused."
+		: "Hold the graph still so you can read it. The numbers keep being recorded.";
+	plotView.setFrozen(paused);
 }
 
 function refreshMonitorControls(): void {
@@ -696,6 +783,9 @@ function setMonitorOpen(open: boolean, remember: boolean): void {
 	monitorShowButton.textContent = open ? "🔍 Hide" : "🔍 Show";
 	monitorShowButton.setAttribute("aria-expanded", open ? "true" : "false");
 	if (remember) saveMonitorOpen(open);
+	// A collapsed panel must not cost a frame per line: the canvas stops
+	// drawing entirely until it is back on screen.
+	plotView.setVisible(open && monitorView === "plot");
 	if (open) renderMonitor();
 }
 
@@ -783,8 +873,23 @@ monitorOutput.addEventListener("scroll", () => {
 	monitorAutoscroll.checked = fromBottom < 8;
 });
 
+monitorViewTextButton.addEventListener("click", () => setMonitorView("text", true));
+monitorViewPlotButton.addEventListener("click", () => setMonitorView("plot", true));
+
+monitorPlotPause.addEventListener("click", () => setPlotPaused(!plotPaused));
+
+// One Clear for the panel, whichever view is up: a student who wipes the
+// monitor means "start again", and leaving half the history behind on the other
+// view is the kind of surprise that costs a lesson five minutes.
+//
+// Clearing also un-pauses, because a frozen picture of samples that no longer
+// exist is worse than either — pressing Clear and watching nothing happen is
+// how a student decides the button is broken.
 el<HTMLButtonElement>("monitor-clear").addEventListener("click", () => {
 	monitor.clear();
+	plotData.clear();
+	setPlotPaused(false);
+	plotView.requestDraw();
 	renderMonitor();
 });
 
@@ -997,6 +1102,11 @@ monitorEndingSelect.replaceChildren(
 monitor.notice(
 	"Click Connect and pick the board. Whatever the sketch prints with Serial.println shows up here.",
 );
+// The view goes on before the panel opens: setMonitorOpen is what finally tells
+// the canvas whether it is on screen, and it can only be right once it knows
+// which of the two views it is opening onto.
+setPlotPaused(false);
+setMonitorView(loadMonitorView(), false);
 setMonitorOpen(loadMonitorOpen(), false);
 refreshMonitorControls();
 

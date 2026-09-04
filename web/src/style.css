@@ -41,6 +41,29 @@
 	--tok-preproc: #116329;
 	--tok-constant: #0550ae;
 	--tok-punct: #57606a;
+
+	/*
+	 * The four serial-plotter lines, read by plotter-view.ts through
+	 * getComputedStyle at draw time — which is why they are declared here and
+	 * not in the canvas code, and why flipping the system theme changes the
+	 * graph with no JavaScript knowing the colours.
+	 *
+	 * Blue, red, green, purple: the same four hues the syntax highlighting above
+	 * already uses, so the page keeps one palette, and four hues far enough
+	 * apart to stay tellable apart on a line 1.5px wide. Red and green are the
+	 * hard pair for a colourblind student, so they are deliberately 1 and 3 —
+	 * two series (the common case) are never that pair — and the legend prints
+	 * every series' name and current value, so colour is never the only way to
+	 * tell which line is which.
+	 *
+	 * These are the light-theme values, picked for contrast on white.
+	 */
+	--plot-1: #1a63c8;
+	--plot-2: #b3261e;
+	--plot-3: #1a7f37;
+	--plot-4: #8250df;
+	/* Fainter than --border: a gridline should be behind the data, not beside it. */
+	--plot-grid: #e6e9ee;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -71,6 +94,15 @@
 		--tok-preproc: #7ee787;
 		--tok-constant: #79c0ff;
 		--tok-punct: #9198a1;
+
+		/* The same four hues lifted for a #0d1117 background. The light values
+		   are far too dark to read here, which is the whole reason the plotter
+		   reads them from CSS instead of holding its own list. */
+		--plot-1: #58a6ff;
+		--plot-2: #ff7b72;
+		--plot-3: #3fb950;
+		--plot-4: #d2a8ff;
+		--plot-grid: #21262d;
 	}
 }
 
@@ -540,6 +572,55 @@ button.link {
 	font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
 	font-size: 0.8rem;
 	color: var(--fg);
+}
+
+/* Text | Plot. One segmented control rather than two loose buttons, so it reads
+   as "which of these two", and the pressed one is the accent-filled half. The
+   state lives in aria-pressed and nowhere else — the styling follows the thing
+   a screen reader is already being told. */
+.view-toggle {
+	display: inline-flex;
+	gap: 0;
+}
+
+.view-toggle button {
+	border-radius: 0;
+	white-space: nowrap;
+}
+
+.view-toggle button:first-child {
+	border-radius: 5px 0 0 5px;
+}
+
+.view-toggle button:last-child {
+	border-radius: 0 5px 5px 0;
+	margin-left: -1px; /* one shared border down the middle, not two */
+}
+
+.view-toggle button[aria-pressed="true"] {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: var(--accent-fg);
+	font-weight: 600;
+	position: relative; /* over the neighbour, so its border does not cut the fill */
+}
+
+/* The graph sits in exactly the box the text view vacated — same height, same
+   borders — so switching views never moves the editor above it by a pixel. */
+.monitor-plot {
+	height: clamp(4rem, 22vh, 14rem);
+	background: var(--editor-bg);
+	border-top: 1px solid var(--border);
+	border-bottom: 1px solid var(--border);
+}
+
+/* The canvas has no intrinsic size worth having: CSS decides the box and
+   plotter-view.ts matches the backing store to it times devicePixelRatio.
+   display: block kills the inline-element descender gap under it. */
+.monitor-plot canvas {
+	display: block;
+	width: 100%;
+	height: 100%;
 }
 
 .monitor-send {
