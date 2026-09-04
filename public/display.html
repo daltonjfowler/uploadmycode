@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex" />
+		<meta name="color-scheme" content="light dark" />
+		<title>uploadmycode - phrase</title>
+		<!--
+			The projector window. /teacher.html opens it with a Pop out button and
+			the teacher drags it onto the projector screen; it shows today's phrase
+			and nothing else, as large as the window allows.
+
+			Static, like teacher.html: no build step, no imports, no dependencies.
+			Its script is a plain file, display.js, and not an inline block, because
+			the site's Content-Security-Policy allows no inline script at all.
+
+			It reads the teacher key out of the same localStorage entry teacher.js
+			writes, which works because this page is served from the same origin.
+			It never asks for the key and never writes one: key entry lives on the
+			teacher page alone. All it does is GET /api/teacher/phrase every five
+			seconds, which the Worker never rate limits for a correct key.
+		-->
+		<style>
+			:root {
+				color-scheme: light dark;
+				--ok: #1a7f37;
+				--line: #d5dae0;
+				/*
+					How many characters the phrase on screen has. display.js sets it
+					on the phrase element, and the type size below is derived from
+					it, which is what makes one word and five words each fill the
+					window instead of one of them being lost across the room.
+				*/
+				--chars: 12;
+			}
+			@media (prefers-color-scheme: dark) {
+				:root {
+					--ok: #3fb950;
+					--line: #30363d;
+				}
+			}
+			html,
+			body {
+				height: 100%;
+			}
+			body {
+				margin: 0;
+				display: flex;
+				flex-direction: column;
+				background: Canvas;
+				color: CanvasText;
+				font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+				text-align: center;
+				overflow: hidden;
+				/* The whole page is the fullscreen button. */
+				cursor: pointer;
+			}
+			#stage {
+				flex: 1 1 auto;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				gap: 1.5vh;
+				padding: 2vh 3vw;
+				min-width: 0;
+			}
+			#phrase {
+				margin: 0;
+				max-width: 100%;
+				font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+				font-weight: 700;
+				line-height: 1.05;
+				/*
+					A monospace character is about 0.6em wide; 0.63 leaves a little
+					air at the ends. The height term keeps a short phrase from
+					growing taller than the window.
+				*/
+				font-size: min(calc(94vw / (var(--chars) * 0.63)), 34vh);
+				word-break: break-word;
+			}
+			/* Nothing live: still huge, so the back row can read it, but quieter. */
+			body[data-state="none"] #phrase {
+				opacity: 0.55;
+			}
+			/*
+				No usable key. One calm sentence in the page font: blowing a
+				sentence up to phrase size would read as an alarm, and it is not.
+			*/
+			body[data-state="nokey"] #phrase {
+				font-family: inherit;
+				font-weight: 400;
+				font-size: clamp(1.1rem, 3.4vw, 2rem);
+				opacity: 0.8;
+			}
+			#sub {
+				margin: 0;
+				font-size: clamp(0.9rem, 2.2vw, 1.5rem);
+				opacity: 0.7;
+			}
+			body[data-state="live"] #sub {
+				color: var(--ok);
+				opacity: 0.9;
+			}
+			#foot {
+				flex: 0 0 auto;
+				display: flex;
+				justify-content: center;
+				gap: 1.25rem;
+				padding: 0.5rem 1rem 0.7rem;
+				border-top: 1px solid var(--line);
+				font-size: 0.8rem;
+				opacity: 0.55;
+			}
+			/* On the projector the hint has done its job and would only be noise. */
+			body[data-fullscreen="yes"] #hint {
+				display: none;
+			}
+			/* And nothing should draw a line across a projected screen. */
+			body[data-fullscreen="yes"] #foot {
+				border-top: 0;
+			}
+			#net:empty {
+				display: none;
+			}
+		</style>
+	    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#1F9FA5">
+</head>
+	<body data-state="start" data-fullscreen="no">
+		<main id="stage">
+			<p id="phrase"></p>
+			<p id="sub"></p>
+		</main>
+		<footer id="foot">
+			<span id="hint">Click to go fullscreen</span>
+			<span id="net"></span>
+		</footer>
+
+		<script src="/display.js" defer></script>
+	</body>
+</html>

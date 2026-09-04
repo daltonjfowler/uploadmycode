@@ -134,6 +134,30 @@ same moment.
 
 ---
 
+## Part C — the pop-out phrase display
+
+Added later than T2, and it lives here because this is where the browser steps are. **Run every one
+of these on the live site**, not on `npm run dev:web`: the dev server proxies `/api/compile` and
+`/api/format` only, so the teacher API and `/display` need the real Worker.
+
+Open <https://uploadmycode.com/teacher.html> and make sure the key is remembered on this machine
+(**Remember on this machine**). The pop-out reads that same saved key; it never asks for one.
+
+| # | Do this | Expect | Actual |
+|---|---|---|---|
+| C1 | Set a phrase with **1 period (90 minutes)**, then press **Pop out**. | A small window (about 1000 by 420) opens, tab titled `uploadmycode - phrase`. It shows the phrase alone, in huge monospace, with `Expires in 89 min.` in green under it and `Click to go fullscreen` in small grey type at the bottom. The teacher page says `Phrase window opened. Drag it onto the projector screen.` | |
+| C2 | Leave both windows open. On the teacher page, press **Generate**, pick **1 minute (testing)** and press **Set phrase**. Watch the pop-out. | Within 5 seconds the pop-out swaps to the new phrase by itself, and the line under it counts down in seconds (`Expires in 41 s.`). No clicking, no reload. | |
+| C3 | Keep watching that 1 minute phrase until the countdown runs out. | At zero the pop-out flips itself to `no phrase set` (dimmer, still huge) with `That phrase has expired. Students cannot compile.` under it. Within another 5 seconds that second line settles to `Students cannot compile right now.`, which is the server agreeing. | |
+| C4 | Set a fresh 90 minute phrase, then press **End now** on the teacher page. | Within 5 seconds, with no clicking, the pop-out reads `no phrase set` and `Students cannot compile right now.` | |
+| C5 | Click anywhere in the pop-out window. | It fills the whole screen, and the `Click to go fullscreen` hint disappears. Click again: back to a window, hint back. **Esc** leaves fullscreen the same way. | |
+| C6 | Drag the pop-out onto the projector screen and click it there. | It fills the projector, the phrase readable from the back of the room. The laptop screen still has the teacher page on it. | |
+| C7 | Turn Wi-Fi off for about ten seconds, watching the pop-out. | The phrase stays on screen (it does not blank), and a small `reconnecting...` appears at the bottom. Turn Wi-Fi back on: within 5 seconds `reconnecting...` goes away on its own. | |
+| C8 | On the teacher page press **Forget key on this device**, then reload the pop-out window (F5). | The pop-out shows one calm sentence, `Open the teacher page on this computer first.`, in normal page type. **There is no key box on it** and there must never be one. Press **Remember on this machine** again on the teacher page and reload the pop-out: it shows the phrase again. | |
+| C9 | Block pop-ups for the site (Chrome address bar, the blocked-pop-up icon, or Settings → Privacy → Site settings → Pop-ups), then press **Pop out**. | No window opens and the teacher page says, in red: `Your browser blocked the pop-out. Allow pop-ups for this site and try again.` Allow pop-ups again afterwards. | |
+| C10 | With the pop-out open, switch the machine between light and dark mode (as in B13). | The pop-out follows: background and text both flip and the phrase stays readable. No reload. | |
+
+---
+
 ## What was already verified headlessly
 
 Run these two yourself if you want to see them again; both exit 0.

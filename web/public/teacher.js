@@ -219,6 +219,23 @@
 		});
 	});
 
+	/**
+	 * The projector window: /display, which shows the phrase and nothing else.
+	 *
+	 * Opened from a click, so no pop-up blocker should mind; if one does,
+	 * window.open hands back null and the teacher gets told which setting to
+	 * change. The window reads the teacher key out of localStorage itself, so
+	 * "Remember on this machine" has to have been pressed once on this machine.
+	 */
+	document.getElementById("popout").addEventListener("click", function () {
+		var opened = window.open("/display", "umc-phrase-display", "width=1000,height=420");
+		if (!opened) {
+			say("Your browser blocked the pop-out. Allow pop-ups for this site and try again.", "error");
+			return;
+		}
+		say("Phrase window opened. Drag it onto the projector screen.", "ok");
+	});
+
 	// Enter in either field is the obvious action for that field.
 	phraseInput.addEventListener("keydown", function (event) {
 		if (event.key === "Enter") document.getElementById("set").click();

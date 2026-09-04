@@ -23,7 +23,9 @@ Five things, about a minute, before the first student compiles.
 2. Press **Generate**, or type your own phrase.
 3. Pick how long it lasts: 1 period (90 min), half day (4 h), or full day (8 h).
 4. Press **Set phrase**. The phrase appears in large type with a countdown. Project that, or write
-   it on the board.
+   it on the board. Press **Pop out** for a small window holding nothing but the phrase, drag it
+   onto the projector screen, and click it once to fill that screen; it keeps itself up to date and
+   flips to "no phrase set" on its own when the phrase ends.
 5. Open the editor and click **Compile** once. That wakes the container, so the first student pays
    a warm compile (about 1 s) instead of a cold start (about 15 s).
 
