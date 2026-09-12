@@ -10,7 +10,7 @@ Two things to be clear about up front.
   separate program. The flasher and the hex parser in `web/src/flash/` were written from public
   protocol documents; the documents are credited below as references, not as code.
 - **Nobody listed here endorses this project.** Being credited is not affiliation, sponsorship or
-  approval. ARDUINO and UNO are trademarks of Arduino SA; see
+  approval. Arduino® and the Arduino logo are trademarks or registered trademarks of Arduino S.r.l.; see
   [README.md, "Trademarks and licensing"](README.md#trademarks-and-licensing).
 
 Every version below, and nearly every URL, was read out of a local file — a `package.json` in
