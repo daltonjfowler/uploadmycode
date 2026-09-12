@@ -88,7 +88,7 @@ export class CompilerContainer extends Container {
 	 * short enough that an idle evening bills nothing. Memory is billed while
 	 * the instance is awake, so do not make this generous.
 	 */
-	override sleepAfter = "10m";
+	override sleepAfter = "5m";
 
 	/** Six a minute per client id. In memory, on purpose: see src/ratelimit.ts. */
 	readonly #clients = new RateLimiter();

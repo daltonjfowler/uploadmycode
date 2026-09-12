@@ -541,7 +541,7 @@ The guardrails, all already in place:
 |---|---|---|
 | One container instance | `wrangler.jsonc` `max_instances` | 1 |
 | Small instance | `wrangler.jsonc` `instance_type` | `basic` (1/4 vCPU, 1 GiB) |
-| Sleeps when idle | `src/worker.ts` `sleepAfter` | 10 minutes |
+| Sleeps when idle | `src/worker.ts` `sleepAfter` | 5 minutes |
 | Compile timeout | `container/server.js` | 30 s |
 | Auto indent timeout | `container/server.js` | 10 s, and at most 2 formats at once |
 | Request size cap | `src/worker.ts` | 100 KB |
@@ -552,7 +552,7 @@ The guardrails, all already in place:
 | Class phrase | KV + `src/worker.ts` | required on every compile |
 
 Memory and disk are billed while the instance is **awake**, CPU only while it is **working**. That
-is why `sleepAfter` is 10 minutes and not an hour, and why there is no scheduled keep-alive ping.
+is why `sleepAfter` is 5 minutes and not an hour, and why there is no scheduled keep-alive ping.
 Do not add one: it would keep the instance awake, and therefore billing, all night. Warming up by
 hand before class (step 5 of the daily routine) does the same job for the cost of one compile.
 
