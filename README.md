@@ -12,6 +12,12 @@ same tool on every desk in under a minute.
 - Runs on Cloudflare Workers + Containers. About $5/month plus pennies of usage for one classroom.
 - Written and maintained by one teacher. The code is kept boring on purpose.
 
+## Screenshot
+
+<img src="docs/screenshot-editor.png" width="800" alt="The editor page at Chromebook size: sketch toolbar with New, Rename, Delete, Download, Import and a library dropdown; Compile and Upload buttons; a CodeMirror editor holding the default setup and loop sketch; an output panel; and a collapsed serial monitor">
+
+The editor page at Chromebook resolution (1366x768), before any sketch is compiled. Compile and Upload sit top right, the output panel and serial monitor sit below the editor.
+
 ## What it does
 
 - **Editor** — CodeMirror 6 with C++ highlighting, autocomplete for the common board API, and a
@@ -114,9 +120,11 @@ setup: see [docs/SETUP.md](docs/SETUP.md), Part B.
 
 ## Trademarks and licensing
 
-ARDUINO and UNO are trademarks of Arduino SA. This project is not affiliated with, sponsored by, or
-endorsed by Arduino SA. "Uno" is used here only to describe which board this software is compatible
-with.
+Arduino® and the Arduino logo are trademarks or registered trademarks of Arduino S.r.l. This project
+is an independent tool written by a teacher. It is not affiliated with, sponsored by, or endorsed by
+Arduino S.r.l., and it is not an Arduino product. "Uno" is used here only in the referential sense
+that Arduino's trademark policy allows, to describe which boards this software is compatible with.
+The project name, the site and the code do not use the Arduino name or logo.
 
 This repository contains no Arduino software. The container image downloads Arduino's open-source
 toolchain from official sources at build time — `arduino-cli` (GPLv3), and the AVR core and its
