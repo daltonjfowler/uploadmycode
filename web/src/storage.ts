@@ -33,6 +33,10 @@ const MONITOR_OPEN_KEY = "uno-ide.v1.monitor-open";
 const MONITOR_BAUD_KEY = "uno-ide.v1.monitor-baud";
 const MONITOR_VIEW_KEY = "uno-ide.v1.monitor-view";
 const CLIENT_ID_KEY = "uno-ide.v1.client-id";
+const PANEL_HEIGHT_KEYS = {
+	output: "uno-ide.v1.output-height",
+	monitor: "uno-ide.v1.monitor-height",
+} as const;
 
 /** Name given to the sketch created on a first visit. */
 export const DEFAULT_SKETCH_NAME = "sketch";
@@ -63,6 +67,14 @@ function writeKey(key: string, value: string): void {
 		window.localStorage.setItem(key, value);
 	} catch {
 		// Quota exceeded or storage blocked. Keep going with what is in memory.
+		storageBroken = true;
+	}
+}
+
+function removeKey(key: string): void {
+	try {
+		window.localStorage.removeItem(key);
+	} catch {
 		storageBroken = true;
 	}
 }
@@ -155,6 +167,40 @@ export function loadMonitorView(): MonitorView {
 
 export function saveMonitorView(view: MonitorView): void {
 	writeKey(MONITOR_VIEW_KEY, view);
+}
+
+/** The two panels a student can drag a handle on. */
+export type ResizablePanelId = "output" | "monitor";
+
+/**
+ * A panel height the student dragged to, in CSS pixels, or null for "never
+ * dragged, use the automatic size".
+ *
+ * Pixels, not a fraction of the window: a panel is sized to hold a number of
+ * lines of text, and lines do not get shorter when the window does. What keeps
+ * a height chosen on a big monitor from swallowing a Chromebook is the clamp in
+ * resize.ts, which every restore goes through — never the stored number itself,
+ * which is kept exactly as it was so the panel comes back to full size on the
+ * big screen again.
+ *
+ * Anything unparseable or absurd reads as null. A hand-edited key should cost a
+ * student their panel size, not their editor.
+ */
+export function loadPanelHeight(panel: ResizablePanelId): number | null {
+	const raw = readKey(PANEL_HEIGHT_KEYS[panel]);
+	if (!raw) return null;
+	const parsed = Number.parseFloat(raw);
+	if (!Number.isFinite(parsed) || parsed <= 0) return null;
+	return parsed;
+}
+
+export function savePanelHeight(panel: ResizablePanelId, height: number): void {
+	writeKey(PANEL_HEIGHT_KEYS[panel], String(Math.round(height)));
+}
+
+/** Double-click on a handle: the panel goes back to being the stylesheet's. */
+export function clearPanelHeight(panel: ResizablePanelId): void {
+	removeKey(PANEL_HEIGHT_KEYS[panel]);
 }
 
 /**

@@ -10,6 +10,12 @@
  * it that flexes, and every other row is as tall as its own content and no
  * taller. Panels scroll inside themselves; the page as a whole only scrolls
  * when even those minimums do not fit.
+ *
+ * Two of those rows can be dragged: a .resize-handle above the Output panel and
+ * another above the Serial Monitor write --output-height and
+ * --monitor-log-height, and the var() fallbacks below are what those panels are
+ * worth when nobody has dragged anything. The editor, being the only flexing
+ * row, is what gives up or takes back the difference. See src/resize.ts.
  */
 
 :root {
@@ -160,8 +166,72 @@ body {
 .toolbar,
 .output,
 .monitor,
-.footer {
+.footer,
+.resize-handle {
 	flex: 0 0 auto;
+}
+
+/* ------------------------------------------------------------ resize handles */
+
+/*
+ * The grab bar between two rows. Ten pixels tall so it can be caught with a
+ * mouse, a finger or a stylus, but drawn as almost nothing: the panel's colour,
+ * the hairline that would have been the panel's own border-top, and one short
+ * dash in the middle to say it is grabbable.
+ *
+ * touch-action: none is not optional. Without it Chrome claims a vertical drag
+ * for scrolling and the pointermove events stop arriving mid-drag.
+ */
+.resize-handle {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 10px;
+	background: var(--panel);
+	border-top: 1px solid var(--border);
+	cursor: row-resize;
+	touch-action: none;
+}
+
+.resize-handle::after {
+	content: "";
+	width: 2.5rem;
+	height: 2px;
+	border-radius: 1px;
+	background: var(--border);
+}
+
+/* Under the pointer, under the keyboard focus, or being dragged: the dash picks
+   up the accent, so the affordance answers before the drag starts. */
+.resize-handle:hover::after,
+.resize-handle:focus-visible::after,
+.resize-handle[data-dragging]::after {
+	background: var(--accent);
+}
+
+/* The handle already drew that hairline, so the panel under it must not draw a
+   second one ten pixels lower. When the monitor's handle is hidden — the panel
+   is collapsed — the monitor keeps its own border and the rule does not match. */
+.resize-handle:not([hidden]) + .output,
+.resize-handle:not([hidden]) + .monitor {
+	border-top: none;
+}
+
+/* While a handle is being dragged the pointer is usually nowhere near it, so
+   the cursor and the no-selecting have to be set on the whole page. */
+body.resizing {
+	cursor: row-resize;
+	user-select: none;
+}
+
+/* A fingertip is about 9mm across and a mouse pointer is one pixel. Touchscreen
+   Chromebooks and phones get a taller bar; the dash it draws stays 2px, so it
+   looks the same and is simply easier to land on. The floors in resize.ts are
+   what stop a fat-fingered drag from burying the editor either way. */
+@media (pointer: coarse) {
+	.resize-handle {
+		height: 14px;
+	}
 }
 
 /* ------------------------------------------------------------------ toolbar */
@@ -328,11 +398,17 @@ button.link {
 /* As tall as its content and never taller than 28vh, which leaves room for the
    serial monitor underneath on a 768px Chromebook. Idle, that content is one
    head strip and one line of text: the progress bar and the phrase field are
-   display: none until they have something to say. */
+   display: none until they have something to say.
+   Once the handle above has been dragged, --output-height is that pixel height
+   and it is set on both properties: a max-height beats a height in CSS, so
+   leaving the 28vh cap in place would quietly overrule the student. The cap is
+   a default, and a default loses to a choice. resize.ts is what stops that
+   choice from ever going past the editor's own floor. */
 .output {
 	display: flex;
 	flex-direction: column;
-	max-height: 28vh;
+	height: var(--output-height, auto);
+	max-height: var(--output-height, 28vh);
 	overflow: auto;
 	background: var(--panel);
 	border-top: 1px solid var(--border);
@@ -559,11 +635,14 @@ button.link {
 
 /* Enough to read a handful of lines, never enough to push the editor off the
    screen: 22vh is about nine lines on a Chromebook and ten on a phone, with a
-   4rem floor for a short window and a 14rem ceiling for a tall one. */
+   4rem floor for a short window and a 14rem ceiling for a tall one.
+   --monitor-log-height is what the monitor's handle writes, and it is set on
+   .monitor so this box and the graph that replaces it are always the same
+   height. The clamp is only the size before anyone has dragged. */
 .monitor-output {
 	margin: 0;
 	padding: 0.5rem 0.75rem;
-	height: clamp(4rem, 22vh, 14rem);
+	height: var(--monitor-log-height, clamp(4rem, 22vh, 14rem));
 	overflow: auto;
 	background: var(--editor-bg);
 	border-top: 1px solid var(--border);
@@ -609,7 +688,7 @@ button.link {
 /* The graph sits in exactly the box the text view vacated — same height, same
    borders — so switching views never moves the editor above it by a pixel. */
 .monitor-plot {
-	height: clamp(4rem, 22vh, 14rem);
+	height: var(--monitor-log-height, clamp(4rem, 22vh, 14rem));
 	background: var(--editor-bg);
 	border-top: 1px solid var(--border);
 	border-bottom: 1px solid var(--border);

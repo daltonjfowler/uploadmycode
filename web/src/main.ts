@@ -34,10 +34,12 @@ import {
 	SerialMonitor,
 	type LineEnding,
 } from "./monitor.ts";
+import { createPanelResize, MONITOR_LOG_MIN_REM, OUTPUT_MIN_REM } from "./resize.ts";
 import { appState, clearCompiledHex, hasFreshHex, setCompiledHex, type Status } from "./state.ts";
 import {
 	BLANK_SKETCH,
 	cleanName,
+	clearPanelHeight,
 	DEFAULT_SKETCH_NAME,
 	isStorageBroken,
 	loadAutocompleteEnabled,
@@ -45,12 +47,14 @@ import {
 	loadMonitorBaud,
 	loadMonitorOpen,
 	loadMonitorView,
+	loadPanelHeight,
 	loadSketches,
 	saveAutocompleteEnabled,
 	saveCurrentName,
 	saveMonitorBaud,
 	saveMonitorOpen,
 	saveMonitorView,
+	savePanelHeight,
 	saveSketches,
 	starterLibrary,
 	uniqueName,
@@ -75,6 +79,9 @@ function el<T extends HTMLElement>(id: string): T {
 	return found as T;
 }
 
+const editorHost = el<HTMLElement>("editor");
+const outputPanel = el<HTMLElement>("output");
+const outputResizeHandle = el<HTMLElement>("output-resize");
 const sketchSelect = el<HTMLSelectElement>("sketch-select");
 const importInput = el<HTMLInputElement>("import-input");
 const librarySelect = el<HTMLSelectElement>("library-select");
@@ -622,6 +629,8 @@ async function uploadSketch(): Promise<void> {
 
 // ------------------------------------------------------------ serial monitor
 
+const monitorPanel = el<HTMLElement>("monitor");
+const monitorResizeHandle = el<HTMLElement>("monitor-resize");
 const monitorStatePill = el<HTMLSpanElement>("monitor-state");
 const monitorShowButton = el<HTMLButtonElement>("monitor-show");
 const monitorBody = el<HTMLDivElement>("monitor-body");
@@ -780,6 +789,8 @@ function refreshMonitorControls(): void {
 
 function setMonitorOpen(open: boolean, remember: boolean): void {
 	monitorBody.hidden = !open;
+	// Nothing to resize behind a collapsed panel, so the handle goes with it.
+	monitorResizeHandle.hidden = !open;
 	monitorShowButton.textContent = open ? "🔍 Hide" : "🔍 Show";
 	monitorShowButton.setAttribute("aria-expanded", open ? "true" : "false");
 	if (remember) saveMonitorOpen(open);
@@ -787,6 +798,10 @@ function setMonitorOpen(open: boolean, remember: boolean): void {
 	// drawing entirely until it is back on screen.
 	plotView.setVisible(open && monitorView === "plot");
 	if (open) renderMonitor();
+	// Opening the monitor takes rows off the editor and closing gives them back,
+	// so whatever heights were dragged have to be measured against the column
+	// that exists now.
+	reclampPanels();
 }
 
 function selectedBaud(): number {
@@ -905,7 +920,7 @@ monitorSendForm.addEventListener("submit", (event) => {
 // ---------------------------------------------------------------- the editor
 
 const editor: Editor = createEditor({
-	parent: el<HTMLElement>("editor"),
+	parent: editorHost,
 	doc: currentSketch().code,
 	autocomplete: loadAutocompleteEnabled(),
 	onChange(code) {
@@ -917,6 +932,70 @@ const editor: Editor = createEditor({
 		if (appState.status === "success") setStatus("idle", "Ready");
 	},
 });
+
+// ----------------------------------------------------------- panel resizing
+
+/*
+ * Two handles, one model: each one writes a pixel height for the box below it,
+ * and the editor — the only flexing row in the column — pays for it or is paid
+ * back. resize.ts holds the clamping and the pointer handling; this is the part
+ * that says which boxes, and where the numbers are kept.
+ *
+ * The Output handle sizes the whole .output section. The Serial Monitor handle
+ * sizes the monitor's log box rather than the whole section, because the
+ * control rows and the message box are chrome a student needs at every size —
+ * the section still grows and shrinks pixel for pixel with the drag, since that
+ * chrome does not change height.
+ */
+const outputResize = createPanelResize({
+	handle: outputResizeHandle,
+	styleTarget: outputPanel,
+	property: "--output-height",
+	measure: () => outputPanel.offsetHeight,
+	editor: editorHost,
+	minRem: OUTPUT_MIN_REM,
+	onChange(height) {
+		if (height === null) clearPanelHeight("output");
+		else savePanelHeight("output", height);
+	},
+	onResized() {
+		// The editor changed size, and CodeMirror handles that itself. Nothing
+		// below this panel moved, so there is nothing else to tell.
+	},
+});
+
+const monitorResize = createPanelResize({
+	handle: monitorResizeHandle,
+	// The property goes on the section, so the text box and the graph that
+	// replaces it inherit the same height and switching views never jumps.
+	styleTarget: monitorPanel,
+	property: "--monitor-log-height",
+	measure: () => (monitorView === "plot" ? monitorPlotPanel : monitorOutput).offsetHeight,
+	editor: editorHost,
+	minRem: MONITOR_LOG_MIN_REM,
+	onChange(height) {
+		if (height === null) clearPanelHeight("monitor");
+		else savePanelHeight("monitor", height);
+	},
+	onResized() {
+		// The graph learns its new box from its own ResizeObserver; this is for the
+		// text view, which has to chase the bottom again now that the box is a
+		// different number of lines tall. Both coalesce to one frame.
+		scheduleMonitorRender();
+	},
+});
+
+/** Both panels against the column as it is right now. Output first: it is above
+ *  the monitor, so what it takes decides what is left for the monitor to take. */
+function reclampPanels(): void {
+	outputResize.reclamp();
+	monitorResize.reclamp();
+}
+
+// A window that got shorter, a Chromebook rotated, the on-screen keyboard
+// opening: a height that was fine a moment ago may now be burying the editor.
+// The stored wish is left alone, so growing the window puts the panel back.
+window.addEventListener("resize", reclampPanels);
 
 // ------------------------------------------------------------------- toolbar
 
@@ -1109,6 +1188,13 @@ setPlotPaused(false);
 setMonitorView(loadMonitorView(), false);
 setMonitorOpen(loadMonitorOpen(), false);
 refreshMonitorControls();
+
+// Panel heights go on last, once every other row is the size it is going to be:
+// the clamp inside each restore is measured against the column on screen, which
+// is how a height dragged on a big monitor comes back smaller on a Chromebook
+// instead of swallowing it. The number itself is kept as it was saved.
+outputResize.restore(loadPanelHeight("output"));
+monitorResize.restore(loadPanelHeight("monitor"));
 
 // Two things a student needs to hear before they hit a wall, not after.
 const bootWarnings: string[] = [];

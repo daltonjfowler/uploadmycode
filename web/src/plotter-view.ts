@@ -79,7 +79,17 @@ export function createPlotView(canvas: HTMLCanvasElement, data: PlotData): PlotV
 	darkQuery.addEventListener("change", onThemeChange);
 
 	// The panel is inside a flex column, so it resizes without the window
-	// resizing — but the window resizing is the common case and the cheap one.
+	// resizing: dragging the monitor's handle changes this canvas's box while the
+	// window stands still, and so does opening the panel or switching views. The
+	// observer catches all of those, because it watches the box itself rather
+	// than guessing at the things that might have moved it.
+	const observer = new ResizeObserver(() => requestDraw());
+	observer.observe(canvas);
+
+	// The window listener stays for the case the observer cannot see: dragging
+	// the tab to a screen with a different devicePixelRatio leaves the CSS box
+	// exactly as it was while the backing store needs rebuilding at the new
+	// ratio. Both land in the same coalesced frame, so the pair costs one draw.
 	const onResize = (): void => requestDraw();
 	window.addEventListener("resize", onResize);
 
@@ -120,6 +130,7 @@ export function createPlotView(canvas: HTMLCanvasElement, data: PlotData): PlotV
 		setVisible(false);
 		darkQuery.removeEventListener("change", onThemeChange);
 		window.removeEventListener("resize", onResize);
+		observer.disconnect();
 	}
 
 	/**

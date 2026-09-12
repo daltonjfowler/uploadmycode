@@ -72,7 +72,22 @@
 
 			<main id="editor" class="editor"></main>
 
-			<section class="output" aria-label="Compiler output">
+			<!-- Drag to trade height between the editor above and the Output panel
+			     below. A separator, not a button: it has a value (how tall the panel
+			     is) rather than an action, and the arrow keys move it. src/resize.ts
+			     keeps the ARIA values in step with what is on screen. -->
+			<div
+				id="output-resize"
+				class="resize-handle"
+				role="separator"
+				aria-orientation="horizontal"
+				aria-label="Resize the Output panel"
+				aria-controls="output"
+				tabindex="0"
+				title="Drag to resize. Double-click to reset. Arrow keys also work."
+			></div>
+
+			<section id="output" class="output" aria-label="Compiler output">
 				<div class="output-head">
 					<h2>Output</h2>
 					<a id="serial-help" class="serial-help" href="/serial-test.html" target="_blank" rel="noopener" hidden
@@ -110,7 +125,22 @@
 				<pre id="output-text" class="output-text">Click Compile to check your sketch.</pre>
 			</section>
 
-			<section class="monitor" aria-label="Serial monitor">
+			<!-- The monitor's own handle. Hidden while the panel is collapsed: with
+			     no log on screen there is nothing to make taller. main.ts unhides it
+			     from setMonitorOpen. -->
+			<div
+				id="monitor-resize"
+				class="resize-handle"
+				role="separator"
+				aria-orientation="horizontal"
+				aria-label="Resize the Serial Monitor"
+				aria-controls="monitor-body"
+				tabindex="0"
+				title="Drag to resize. Double-click to reset. Arrow keys also work."
+				hidden
+			></div>
+
+			<section id="monitor" class="monitor" aria-label="Serial monitor">
 				<div class="output-head">
 					<h2>Serial Monitor</h2>
 					<span id="monitor-state" class="monitor-state" data-state="disconnected" role="status"
