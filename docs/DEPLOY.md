@@ -561,7 +561,9 @@ sit in a separate Durable Object, `Counters`, with no container attached — and
 there. Two reasons. The September 2026 bill itself was the stop path: the
 server ran as PID 1 in the image and Linux ignores an unhandled SIGTERM for PID 1, so the
 platform's idle stop never landed and a started container never slept until a deploy replaced it
-(proven by observation on 2026-09-13: fifteen minutes of zero traffic, instance stayed up). The
+(the September 2026 awake-hours on the bill are the evidence; note that wrangler's
+"instances" column is NOT awake state, it shows a provisioned slot, so verify sleep by latency: a
+compile after a quiet 6+ minutes must cold-start at 4+ seconds). The
 explicit SIGTERM handler in container/server.js fixes that. Separately, as hardening: the container
 base class renews the sleep timer in its constructor and on proxied requests, so counters kept
 beside the container would let a cold-start touch from junk traffic

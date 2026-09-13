@@ -72,11 +72,14 @@ const MAX_TEACHER_BYTES = 4 * 1024;
  * container/server.js; the wiring lives in wrangler.jsonc.
  *
  * Container concerns ONLY. Nothing that a stranger can reach for free may be
- * added here. Two reasons, one proven, one hygiene. Proven (2026-09-13, by
- * observation): the September bill came from the STOP path, not this object.
+ * added here. Two reasons, one evidenced, one hygiene. Evidenced: the
+ * September 2026 bill (real awake GiB-hours) came from the STOP path.
  * server.js runs as PID 1 in the image, and Linux ignores an unhandled SIGTERM
- * for PID 1, so the platform's idle stop never landed and a started container
- * never slept (15 min of zero traffic, instance stayed up). The explicit
+ * for PID 1, so the platform's idle stop could not land. Post-fix, sleep is
+ * proven by latency: a compile after a quiet gap cold-starts (~5.5 s), even
+ * with junk requests ongoing. Do NOT trust wrangler's "instances" column for
+ * awake state; it reports a provisioned slot. Cold-vs-warm latency and the
+ * bill are the ground truth. The explicit
  * SIGTERM handler in container/server.js is that fix. Hygiene: the base class
  * renews the sleepAfter clock in its constructor and on every proxied request,
  * so counters must not share this object; a cold-start touch from junk traffic
