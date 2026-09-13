@@ -28,10 +28,12 @@
  * out. A request with no usable id falls back to a per-IP bucket, which is
  * right for curl and for anything that is not the editor.
  *
- * Both limiters live inside the CompilerContainer Durable Object, which is a
- * single instance (max_instances is 1, one named container), so every compile
- * is counted in one place. If the Durable Object is evicted the counts reset —
- * acceptable for a fuse, and it is why nothing here writes to storage.
+ * Both limiters live inside the Counters Durable Object, a single named
+ * instance, so every compile is counted in one place. Deliberately not the
+ * compile container's object: touching that one restarts its sleep clock, so
+ * counting junk there kept the container awake and billing. If the Durable
+ * Object is evicted the counts reset — acceptable for a fuse, and it is why
+ * nothing here writes to storage.
  *
  * Pure apart from the clock, which is always passed in. `test/ratelimit.test.mjs`
  * runs it directly under `node --test`.

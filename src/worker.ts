@@ -29,6 +29,7 @@
  */
 
 import { Container, getContainer } from "@cloudflare/containers";
+import { DurableObject } from "cloudflare:workers";
 
 import {
 	gateCompile,
@@ -70,15 +71,18 @@ const MAX_TEACHER_BYTES = 4 * 1024;
  * The arduino-cli compile service. See container/Dockerfile and
  * container/server.js; the wiring lives in wrangler.jsonc.
  *
- * It also holds the three rate counters and the teacher-key guard.
- * max_instances is 1 and every request addresses the same named instance, so
- * this Durable Object is the one place that sees every compile, every format
- * and every wrong key, and can count them for the whole site rather than per
- * isolate.
- *
- * Reaching this object does NOT start the container: the Container constructor
- * only schedules its own alarms. So a refused compile, and every wrong teacher
- * key, cost a Durable Object call and no container compute.
+ * Container concerns ONLY. Nothing that a stranger can reach for free may be
+ * added here. Two reasons, one proven, one hygiene. Proven (2026-09-13, by
+ * observation): the September bill came from the STOP path, not this object.
+ * server.js runs as PID 1 in the image, and Linux ignores an unhandled SIGTERM
+ * for PID 1, so the platform's idle stop never landed and a started container
+ * never slept (15 min of zero traffic, instance stayed up). The explicit
+ * SIGTERM handler in container/server.js is that fix. Hygiene: the base class
+ * renews the sleepAfter clock in its constructor and on every proxied request,
+ * so counters must not share this object; a cold-start touch from junk traffic
+ * background junk then held it awake for hours, billing provisioned memory the
+ * whole time. They now live in `Counters` below, which has no container
+ * attached and therefore no sleep clock to renew. Keep it that way.
  */
 export class CompilerContainer extends Container {
 	/** Matches EXPOSE / PORT in the Dockerfile. */
@@ -90,6 +94,32 @@ export class CompilerContainer extends Container {
 	 */
 	override sleepAfter = "5m";
 
+	override onError(error: unknown): Response {
+		console.error(
+			JSON.stringify({ message: "container error", error: String(error) }),
+		);
+		return json(503, {
+			ok: false,
+			error: "The compiler is busy or starting up. Wait a few seconds and try again.",
+		});
+	}
+}
+
+/**
+ * Every counter on the site: the three rate limiters and the teacher-key guard.
+ *
+ * A plain Durable Object with NO container. Every request names the same
+ * instance ("counters"), so these count for the whole site rather than per
+ * Worker isolate — the same property the compile container used to provide,
+ * without the side effect that made it expensive. Reaching this object costs a
+ * Durable Object call and nothing else: no container is started, no memory is
+ * provisioned, and the compiler's sleep clock is not touched. That last part is
+ * the reason this class exists; see the note on CompilerContainer above.
+ *
+ * Nothing here is written to storage. If this object is evicted the counts
+ * reset, which is the right trade for a fuse.
+ */
+export class Counters extends DurableObject<Env> {
 	/** Six a minute per client id. In memory, on purpose: see src/ratelimit.ts. */
 	readonly #clients = new RateLimiter();
 	/**
@@ -133,16 +163,6 @@ export class CompilerContainer extends Container {
 	recordWrongTeacherKey(): GuardVerdict {
 		return this.#teacherKeys.recordFailure(Date.now());
 	}
-
-	override onError(error: unknown): Response {
-		console.error(
-			JSON.stringify({ message: "container error", error: String(error) }),
-		);
-		return json(503, {
-			ok: false,
-			error: "The compiler is busy or starting up. Wait a few seconds and try again.",
-		});
-	}
 }
 
 function sleep(ms: number): Promise<void> {
@@ -150,13 +170,20 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * The one Durable Object: the compiler, and the counters that guard it.
- *
- * max_instances is 1 and every request names the same instance, so the rate
- * limiters and the teacher guard inside it count for the whole site.
+ * The compile container. Only ever called where a request is actually being
+ * forwarded to it, because reaching it renews its sleep timer: see the note on
+ * CompilerContainer.
  */
 function compilerStub(env: Env): DurableObjectStub<CompilerContainer> {
 	return getContainer(env.COMPILER, "compiler");
+}
+
+/**
+ * The counters, all of them, in the one named instance every request shares.
+ * Cheap to reach and safe to reach: no container hangs off this object.
+ */
+function countersStub(env: Env): DurableObjectStub<Counters> {
+	return env.COUNTERS.get(env.COUNTERS.idFromName("counters"));
 }
 
 // ---------------------------------------------------------------- teacher key
@@ -186,7 +213,7 @@ async function teacherAuthorized(request: Request, env: Env): Promise<boolean> {
 async function teacherGate(request: Request, env: Env): Promise<Response | null> {
 	if (await teacherAuthorized(request, env)) return null;
 
-	const guard = await compilerStub(env).recordWrongTeacherKey();
+	const guard = await countersStub(env).recordWrongTeacherKey();
 	await sleep(TEACHER_REJECT_DELAY_MS);
 	if (guard.locked) {
 		return json(
@@ -298,16 +325,17 @@ async function forwardToContainer(
  * body, so what it hands back is what gets forwarded.
  */
 async function compile(request: Request, env: Env): Promise<Response> {
-	const container = compilerStub(env);
+	const tally = countersStub(env);
 	const counters: CompileCounters = {
-		checkClientRate: async (key) => await container.checkClientRate(key),
-		checkGlobalRate: async () => await container.checkGlobalRate(),
+		checkClientRate: async (key) => await tally.checkClientRate(key),
+		checkGlobalRate: async () => await tally.checkGlobalRate(),
 	};
 
 	const verdict = await gateCompile(request, env, counters);
 	if (!verdict.ok) return verdict.response;
 
-	return await forwardToContainer(container, "/compile", verdict.body);
+	// Only now is the container touched — and only now is its sleep timer renewed.
+	return await forwardToContainer(compilerStub(env), "/compile", verdict.body);
 }
 
 /**
@@ -316,16 +344,17 @@ async function compile(request: Request, env: Env): Promise<Response> {
  * format one, so tidying never costs a compile) and where it lands.
  */
 async function format(request: Request, env: Env): Promise<Response> {
-	const container = compilerStub(env);
+	const tally = countersStub(env);
 	const counters: CompileCounters = {
-		checkClientRate: async (key) => await container.checkFormatRate(key),
-		checkGlobalRate: async () => await container.checkGlobalRate(),
+		checkClientRate: async (key) => await tally.checkFormatRate(key),
+		checkGlobalRate: async () => await tally.checkGlobalRate(),
 	};
 
 	const verdict = await gateFormat(request, env, counters);
 	if (!verdict.ok) return verdict.response;
 
-	return await forwardToContainer(container, "/format", verdict.body);
+	// Same rule as a compile: the container is reached only once the gate is clear.
+	return await forwardToContainer(compilerStub(env), "/format", verdict.body);
 }
 
 // -------------------------------------------------------------------- routing

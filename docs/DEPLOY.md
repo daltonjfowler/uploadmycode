@@ -209,7 +209,7 @@ step 4 differs, and only in which bucket it spends and what the 429 says (sectio
    Missing or expired → 403 "No class phrase is active"; wrong → 403 "Wrong class phrase". A wrong
    phrase is *only ever* a 403: never counted, never delayed, never a lockout (section 4a).
 4. **Per-client rate limit.** Six compiles — or twelve Auto indents — a minute for the
-   `x-client-id` the browser sends, counted in two separate maps in the container's Durable
+   `x-client-id` the browser sends, counted in two separate maps in the `Counters` Durable
    Object, with a `Retry-After` header on the 429. It runs after the phrase check on purpose, so
    wrong guesses can never spend anybody's compiles.
 5. **Global ceiling.** 120 requests a minute across everyone, compiles and formats together → 429.
@@ -306,10 +306,10 @@ reach.
 `/teacher.html`. Nothing else can put the room in a bad state: there is no lockout to wait out and
 no counter that needs forgiving.
 
-All of it is counted in the compile container's Durable Object — the single instance every request
-already passes through — which makes the counts site-wide rather than per Worker isolate. Nothing
-is written to storage: if that object is ever evicted the counts reset, which is an acceptable
-trade for a fuse.
+All of it is counted in the `Counters` Durable Object — one named instance every request shares —
+which makes the counts site-wide rather than per Worker isolate. It is deliberately *not* the
+compile container's object; section 7 explains why that mattered to the bill. Nothing is written to
+storage: if that object is ever evicted the counts reset, which is an acceptable trade for a fuse.
 
 The numbers live in two files, with tests beside each:
 
@@ -555,6 +555,20 @@ Memory and disk are billed while the instance is **awake**, CPU only while it is
 is why `sleepAfter` is 5 minutes and not an hour, and why there is no scheduled keep-alive ping.
 Do not add one: it would keep the instance awake, and therefore billing, all night. Warming up by
 hand before class (step 5 of the daily routine) does the same job for the cost of one compile.
+
+**Why the counters live in their own Durable Object.** The rate limiters and the teacher-key guard
+sit in a separate Durable Object, `Counters`, with no container attached — and they must stay
+there. Two reasons. The September 2026 bill itself was the stop path: the
+server ran as PID 1 in the image and Linux ignores an unhandled SIGTERM for PID 1, so the
+platform's idle stop never landed and a started container never slept until a deploy replaced it
+(proven by observation on 2026-09-13: fifteen minutes of zero traffic, instance stayed up). The
+explicit SIGTERM handler in container/server.js fixes that. Separately, as hardening: the container
+base class renews the sleep timer in its constructor and on proxied requests, so counters kept
+beside the container would let a cold-start touch from junk traffic
+held it awake for hours afterwards (12 September: about ten billed awake-hours for eight real
+compiles). Junk requests now reach `Counters` and cost one Durable Object call each; only a request
+that has passed all five checks in section 4 ever touches the container. Never move a counter, or
+anything else a stranger can reach for free, into `CompilerContainer`.
 
 ### Reading the dashboard
 

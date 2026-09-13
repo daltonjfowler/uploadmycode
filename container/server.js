@@ -565,3 +565,17 @@ const server = createServer((req, res) => {
 server.listen(PORT, "0.0.0.0", () => {
 	console.log(JSON.stringify({ event: "listening", port: PORT, fqbn: FQBN }));
 });
+
+// THE September 2026 bill fix. This process is PID 1 in the container, and
+// Linux ignores an unhandled SIGTERM for PID 1, so without this handler the
+// platform's idle stop never landed and a started instance billed until a
+// deploy replaced it. Handled, the signal works. The 2-second cutoff below is
+// a decision, said out loud: a platform stop (deploy, eviction) may cut an
+// in-flight compile at most 2 s before it would finish; the idle path never
+// stops mid-compile, because in-flight requests defer expiry upstream.
+process.on("SIGTERM", () => {
+	console.log(JSON.stringify({ event: "shutdown", signal: "SIGTERM" }));
+	server.close(() => process.exit(0));
+	// Do not wait on a slow keep-alive socket to drain.
+	setTimeout(() => process.exit(0), 2000).unref();
+});

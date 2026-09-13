@@ -29,10 +29,12 @@
  * bill, and it keeps the 300 ms rejection delay from being a free way to hold
  * Worker requests open.
  *
- * Like the rate limiter it lives in the CompilerContainer Durable Object, the
- * single instance every request already passes through, so the count is
- * site-wide rather than per isolate. Nothing is written to storage: if the
- * object is evicted the count resets, the same trade the rate limiter makes.
+ * Like the rate limiter it lives in the Counters Durable Object, one named
+ * instance every request shares, so the count is site-wide rather than per
+ * isolate. Not the compile container's object: a wrong key from a stranger
+ * would otherwise renew the container's sleep timer and hold it awake, and
+ * billing, on junk traffic. Nothing is written to storage: if the object is
+ * evicted the count resets, the same trade the rate limiter makes.
  *
  * Pure apart from the clock, which is always passed in.
  * `test/teacher-guard.test.mjs` runs it directly under `node --test`.

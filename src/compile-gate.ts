@@ -36,9 +36,11 @@
  * spend anyone's compile budget. Only a compile that was actually going to run
  * is counted, whether it then succeeds or fails to compile.
  *
- * The counters live in the compile container's Durable Object and are passed in
- * (`CompileCounters`) rather than reached for, so `test/compile-gate.test.mjs`
- * can run this whole ordering under `node --test` with fakes.
+ * The counters live in the `Counters` Durable Object — deliberately not the
+ * compile container's, whose sleep clock restarts on every touch — and are
+ * passed in (`CompileCounters`) rather than reached for, so
+ * `test/compile-gate.test.mjs` can run this whole ordering under `node --test`
+ * with fakes.
  */
 
 import { ipAllowed, parseCidrList, type Cidr } from "./cidr.ts";
@@ -60,7 +62,8 @@ export interface CompileEnv {
 }
 
 /**
- * The two counters in the Durable Object, as this module wants to call them.
+ * The two counters in the `Counters` Durable Object, as this module wants to
+ * call them.
  *
  * `checkClientRate` is whichever per-client counter belongs to the job the
  * caller is gating — the compile one for /api/compile, the format one for

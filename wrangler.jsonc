@@ -58,8 +58,8 @@
   },
 
   // The arduino-cli compile service. One container, wrapped in a Durable Object
-  // so the Worker can address it. All three blocks below describe the same
-  // class and must agree on "CompilerContainer".
+  // so the Worker can address it. This block, the COMPILER binding and the "v1"
+  // migration all describe the same class and must agree on "CompilerContainer".
   "containers": [
     {
       "class_name": "CompilerContainer",
@@ -79,6 +79,16 @@
       {
         "name": "COMPILER",
         "class_name": "CompilerContainer"
+      },
+      // The rate limiters and the teacher-key guard, in a Durable Object of
+      // their own with NO container attached. They are counted here rather
+      // than in CompilerContainer because the Container base class renews its
+      // sleep timer on every touch of its object, so counting a wrong teacher
+      // key there would keep the compiler awake, and billing, on junk traffic.
+      // See src/worker.ts and docs/DEPLOY.md section 7.
+      {
+        "name": "COUNTERS",
+        "class_name": "Counters"
       }
     ]
   },
@@ -87,6 +97,10 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["CompilerContainer"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["Counters"]
     }
   ]
 }
