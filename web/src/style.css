@@ -34,7 +34,12 @@
 	--danger: #b3261e;
 	--warn: #8a6100;
 	--selection: #b6dcff;
-	--active-line: #f2f5f9;
+	/* Translucent, not #f2f5f9. The selection is drawn in a layer at z-index -1,
+	   behind .cm-content, while the active line paints its background on the line
+	   itself (z-index 0). An opaque active line therefore hides the selection on
+	   the caret's line — which is almost always the line you are selecting. rgba
+	   lets the selection layer show through. */
+	--active-line: rgba(20, 24, 29, 0.05);
 	--bracket: #d8e6f5;
 	--error-line: #fdeceb;
 
@@ -87,7 +92,7 @@
 		--danger: #f85149;
 		--warn: #d29922;
 		--selection: #23405e;
-		--active-line: #161b22;
+		--active-line: rgba(230, 237, 243, 0.05); /* translucent; see the light-mode note on why */
 		--bracket: #26374a;
 		--error-line: #2d1618;
 

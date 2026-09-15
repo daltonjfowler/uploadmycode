@@ -90,8 +90,15 @@ const editorTheme = EditorView.theme({
 	},
 	".cm-content": { caretColor: "var(--fg)", paddingBottom: "40vh" },
 	".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--fg)" },
-	"&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": {
-		backgroundColor: "var(--selection)",
+	// CodeMirror's own base theme paints the focused selection with a
+	// six-class selector (`&light.cm-focused > .cm-scroller > .cm-selectionLayer
+	// .cm-selectionBackground`), whose default colours are #d7d4f0 on light and
+	// #233 on dark. Both are nearly invisible against our editor background, and
+	// that high-specificity rule beat the plain `.cm-selectionBackground` this
+	// theme used to set, so a dragged selection showed nothing. `!important`
+	// (matched by the same layer path) makes --selection win in every state.
+	"&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": {
+		backgroundColor: "var(--selection) !important",
 	},
 	".cm-gutters": {
 		backgroundColor: "var(--gutter-bg)",
