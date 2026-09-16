@@ -34,7 +34,7 @@ export const LIBRARIES: readonly Library[] = [
 	{ label: "LiquidCrystal", header: "LiquidCrystal.h", note: "pin-wired character LCDs" },
 	{ label: "LiquidCrystal I2C", header: "LiquidCrystal_I2C.h", note: "I2C backpack LCDs" },
 	{ label: "Stepper", header: "Stepper.h", note: "stepper motors" },
-	{ label: "Arduino SensorKit", header: "Arduino_SensorKit.h", note: "Grove sensor kit: temp, pressure, motion, OLED" },
+	{ label: "Arduino SensorKit", header: "Arduino_SensorKit.h", note: "Grove sensor kit" },
 	// Bundled with the AVR core — installed by `core install`, not by a lib line.
 	{ label: "Wire", header: "Wire.h", note: "I2C bus" },
 	{ label: "SPI", header: "SPI.h", note: "SPI bus" },
