@@ -2,11 +2,17 @@
  * The libraries the Library dropdown offers, and the one function that puts an
  * `#include` into a sketch.
  *
- * THIS LIST MUST STAY IN SYNC WITH `container/Dockerfile`. The first four are
- * its `arduino-cli lib install` lines, one entry each; the last four ship inside
+ * THIS LIST MUST STAY IN SYNC WITH `container/Dockerfile`. The first five are
+ * installed by its `arduino-cli lib install` lines; the last four ship inside
  * the AVR core (`arduino:avr`) itself and so have no install line. Adding a
  * library is two edits and nothing else: an install line in the Dockerfile with
  * an exact version, and an entry here.
+ *
+ * The one mismatch is deliberate: the Dockerfile also installs Arduino SensorKit's
+ * two dependencies (DHT20 and the LIS3DHTR accelerometer), which are NOT listed
+ * here. Students never include those headers directly — the kit's own
+ * `Arduino_SensorKit.h` pulls them in — so offering them in the dropdown would
+ * only confuse. They still need pinned install lines in the Dockerfile.
  *
  * Nothing here checks anything. A header the image does not have still fails,
  * on the server, with avr-gcc's own "No such file or directory" — this list is a
@@ -28,6 +34,7 @@ export const LIBRARIES: readonly Library[] = [
 	{ label: "LiquidCrystal", header: "LiquidCrystal.h", note: "pin-wired character LCDs" },
 	{ label: "LiquidCrystal I2C", header: "LiquidCrystal_I2C.h", note: "I2C backpack LCDs" },
 	{ label: "Stepper", header: "Stepper.h", note: "stepper motors" },
+	{ label: "Arduino SensorKit", header: "Arduino_SensorKit.h", note: "Grove sensor kit: temp, pressure, motion, OLED" },
 	// Bundled with the AVR core — installed by `core install`, not by a lib line.
 	{ label: "Wire", header: "Wire.h", note: "I2C bus" },
 	{ label: "SPI", header: "SPI.h", note: "SPI bus" },

@@ -23,6 +23,14 @@ ARG SERVO_VERSION=1.3.0
 ARG LIQUIDCRYSTAL_VERSION=1.0.7
 ARG LCD_I2C_VERSION=1.1.2
 ARG STEPPER_VERSION=1.1.3
+# Arduino SensorKit (Seeed Grove kit) and its two declared dependencies. Students
+# include only Arduino_SensorKit.h; DHT20 (temp/humidity) and the LIS3DHTR
+# accelerometer are pulled in through the kit's own headers, so they are pinned
+# here but not offered in the Library dropdown. BMP280 pressure is bundled inside
+# the kit itself and needs no separate library.
+ARG DHT20_VERSION=0.3.3
+ARG LIS3DHTR_VERSION=1.2.4
+ARG SENSORKIT_VERSION=1.4.0
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -70,6 +78,9 @@ RUN arduino-cli core update-index \
 	&& arduino-cli lib install "LiquidCrystal@${LIQUIDCRYSTAL_VERSION}" \
 	&& arduino-cli lib install "LiquidCrystal I2C@${LCD_I2C_VERSION}" \
 	&& arduino-cli lib install "Stepper@${STEPPER_VERSION}" \
+	&& arduino-cli lib install "DHT20@${DHT20_VERSION}" \
+	&& arduino-cli lib install "Grove-3-Axis-Digital-Accelerometer-2g-to-16g-LIS3DHTR@${LIS3DHTR_VERSION}" \
+	&& arduino-cli lib install "Arduino_Sensorkit@${SENSORKIT_VERSION}" \
 	&& rm -rf /opt/arduino/downloads \
 	&& arduino-cli core list \
 	&& arduino-cli lib list
