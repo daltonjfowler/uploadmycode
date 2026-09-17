@@ -127,20 +127,42 @@ USER uploader
 # --- warm-up compiles -------------------------------------------------------
 # server.js reuses one build directory per bucket (BUILD_ROOT/general and
 # BUILD_ROOT/sensorkit) so a compile keeps the previous one's compiled library
-# objects. These two compiles fill those exact directories at build time, so the
+# objects. These compiles fill those exact directories at build time, so the
 # first student after a container cold start reuses them instead of building cold.
 #
 # The paths, the sketch folder name and the build/output layout must match what
 # server.js uses, or the reuse is lost. general warms the AVR core with a Blink;
 # sensorkit warms the whole Arduino SensorKit stack — its bundled U8g2 is the
 # slow half of a SensorKit compile and the reason this bucket exists.
+#
+# EACH BUCKET IS COMPILED TWICE, with a different sketch the second time, and
+# that is the part that actually fixes the classroom symptom. Measured with
+# arduino-cli 1.5.1: a build directory that has seen only ONE sketch rebuilds
+# every library object the first time a different sketch arrives — 154 objects,
+# 11.8 s on a fast dev box, far past COMPILE_TIMEOUT_MS on a quarter of a vCPU —
+# and only the compile after that reuses them (2.4 s). With one warm-up compile
+# in the image, the first student of the day was that rebuild and saw "Compile
+# timed out"; their second attempt worked, which is how the bug announced
+# itself. Two compiles leave the directory settled, so the first student is
+# already on the cheap path. The second sketch is the editor's own starting
+# template, which is what a fresh sketch really looks like.
 RUN for b in general sensorkit; do mkdir -p "$BUILD_ROOT/$b/sketch"; done \
 	&& printf 'void setup() { pinMode(LED_BUILTIN, OUTPUT); }\nvoid loop() { digitalWrite(LED_BUILTIN, HIGH); delay(1000); digitalWrite(LED_BUILTIN, LOW); delay(1000); }\n' \
 		> "$BUILD_ROOT/general/sketch/sketch.ino" \
 	&& arduino-cli compile --fqbn arduino:avr:uno \
 		--build-path "$BUILD_ROOT/general/build" --output-dir "$BUILD_ROOT/general/out" \
 		"$BUILD_ROOT/general/sketch" \
+	&& printf 'void setup() {\n  // put your setup code here, to run once:\n\n}\n\nvoid loop() {\n  // put your main code here, to run repeatedly:\n\n}\n' \
+		> "$BUILD_ROOT/general/sketch/sketch.ino" \
+	&& arduino-cli compile --fqbn arduino:avr:uno \
+		--build-path "$BUILD_ROOT/general/build" --output-dir "$BUILD_ROOT/general/out" \
+		"$BUILD_ROOT/general/sketch" \
 	&& printf '#include "Arduino_SensorKit.h"\nvoid setup() { Environment_I2C.begin(); Pressure.begin(); Accelerometer.begin(); Oled.begin(); }\nvoid loop() { Serial.println(Accelerometer.readX()); }\n' \
+		> "$BUILD_ROOT/sensorkit/sketch/sketch.ino" \
+	&& arduino-cli compile --fqbn arduino:avr:uno \
+		--build-path "$BUILD_ROOT/sensorkit/build" --output-dir "$BUILD_ROOT/sensorkit/out" \
+		"$BUILD_ROOT/sensorkit/sketch" \
+	&& printf '#include <Arduino_SensorKit.h>\n\nvoid setup() {\n  // put your setup code here, to run once:\n\n}\n\nvoid loop() {\n  // put your main code here, to run repeatedly:\n\n}\n' \
 		> "$BUILD_ROOT/sensorkit/sketch/sketch.ino" \
 	&& arduino-cli compile --fqbn arduino:avr:uno \
 		--build-path "$BUILD_ROOT/sensorkit/build" --output-dir "$BUILD_ROOT/sensorkit/out" \

@@ -542,7 +542,7 @@ The guardrails, all already in place:
 | One container instance | `wrangler.jsonc` `max_instances` | 1 |
 | Small instance | `wrangler.jsonc` `instance_type` | `basic` (1/4 vCPU, 1 GiB) |
 | Sleeps when idle | `src/worker.ts` `sleepAfter` | 5 minutes |
-| Compile timeout | `container/server.js` | 30 s |
+| Compile timeout | `container/server.js` | 60 s |
 | Auto indent timeout | `container/server.js` | 10 s, and at most 2 formats at once |
 | Request size cap | `src/worker.ts` | 100 KB |
 | Rate limit, per client | `src/ratelimit.ts` | 6 compiles per minute per `x-client-id` (section 4a) |

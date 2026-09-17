@@ -149,7 +149,7 @@ npm run deploy
 
 That is `vite build web` (frontend into `public/`) followed by `wrangler deploy` (Worker, static
 assets, and a build of the container image). **The first deploy takes several minutes** — it builds
-the whole image: Debian, Node, `arduino-cli`, the AVR core, the libraries, and a warm-up compile.
+the whole image: Debian, Node, `arduino-cli`, the AVR core, the libraries, and the warm-up compiles.
 Later deploys reuse cached layers and take about a minute if the Dockerfile has not changed.
 
 Wrangler prints the deployed URL when it finishes. That is your site.
@@ -225,7 +225,7 @@ included allowance.
 
 The guardrails that keep it that way are all already on: one container instance, `basic` size,
 scale-to-zero after 10 minutes idle, 6 compiles a minute per browser, a 120/minute global ceiling, a
-100 KB request cap and a 30-second compile timeout. **Do not add a scheduled ping to keep the
+100 KB request cap and a 60-second compile timeout. **Do not add a scheduled ping to keep the
 container warm** — memory is billed the whole time the instance is awake, so a keep-alive bills all
 night. Warming it by hand before class costs one compile.
 
@@ -262,9 +262,11 @@ docker run --rm -p 8080:8080 uno-compiler
 `--platform linux/amd64` is not optional in the Dockerfile — the AVR toolchain binaries are x86_64.
 On an Apple Silicon Mac it will run under emulation and compiles will be slower.
 
-The build downloads pinned, checksum-verified copies of Node, `arduino-cli`, the AVR core and four
-libraries, then does a warm-up compile so the first real request is not paying for the core.
-Expect several minutes the first time.
+The build downloads pinned, checksum-verified copies of Node, `arduino-cli`, the AVR core and the
+allowlisted libraries, then compiles each build bucket twice so the first real request is not paying
+for the core or for the libraries. Twice, not once: a build directory that has seen only one sketch
+rebuilds every library object the first time a different sketch arrives, which is what used to make
+the first SensorKit compile of the day time out. Expect several minutes the first time.
 
 On start it prints one line:
 
@@ -300,7 +302,7 @@ Other details worth knowing:
 - The board is fixed: `arduino-cli compile --fqbn arduino:avr:uno`. There is no board parameter.
 - One compile runs at a time, per container. Requests queue in-process; the toolchain saturates a
   quarter vCPU on its own.
-- A compile is killed at 30 seconds and comes back as `ok:false`.
+- A compile is killed at 60 seconds and comes back as `ok:false`.
 - Server-side temp paths are stripped out of error text before it is returned, so a student sees
   `sketch.ino:34:3`, not a path from inside the container.
 - The process runs as an unprivileged user (`uploader`, uid 10001), not root.

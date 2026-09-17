@@ -342,6 +342,21 @@ phraseChange.addEventListener("click", () => {
 
 // ------------------------------------------------------------------- compiling
 
+/**
+ * How long the compile took, as a sentence fragment: "4.2 seconds".
+ *
+ * Measured in the page, from the click to the answer, which is deliberately the
+ * whole wait and not just avr-gcc: waking a sleeping compiler and queueing
+ * behind another student are part of what the student sat through, and a number
+ * that left them out would disagree with the clock on the wall. One decimal up
+ * to ten seconds, whole seconds after that — nobody needs a tenth of a minute.
+ */
+function elapsedSince(startedAt: number): string {
+	const seconds = (performance.now() - startedAt) / 1000;
+	const shown = seconds < 10 ? seconds.toFixed(1) : String(Math.round(seconds));
+	return `${shown} second${shown === "1.0" ? "" : "s"}`;
+}
+
 async function compileSketch(): Promise<void> {
 	if (compiling || formatting || uploading) return;
 
@@ -360,8 +375,9 @@ async function compileSketch(): Promise<void> {
 	editor.clearErrorLines();
 	statusPill.title = "";
 	setStatus("compiling", "Compiling…");
-	showOutput("Compiling on the server. The first compile after a quiet spell can take 15 seconds.", "plain");
+	showOutput("Compiling on the server. The first compile after a quiet spell can take half a minute.", "plain");
 
+	const startedAt = performance.now();
 	try {
 		const outcome = await requestCompile(code, phrase);
 
@@ -371,7 +387,7 @@ async function compileSketch(): Promise<void> {
 			const percent = Math.round((bytes / UNO_FLASH_BYTES) * 100);
 			setStatus("success", "Compiled");
 			showOutput(
-				`Compiled with no errors.\nProgram size: ${bytes} bytes of ${UNO_FLASH_BYTES} (${percent}%).`,
+				`Compiled with no errors.\nProgram size: ${bytes} bytes of ${UNO_FLASH_BYTES} (${percent}%).\nTook ${elapsedSince(startedAt)}.`,
 				"success",
 			);
 			return;
@@ -401,7 +417,10 @@ async function compileSketch(): Promise<void> {
 		const errors = parseCompileErrors(outcome.stderr);
 		setStatus("error", "Errors");
 		showErrorRows(errors);
-		showOutput(outcome.stderr.trim() || "Compile failed.", "error");
+		showOutput(
+			`${outcome.stderr.trim() || "Compile failed."}\n\nTook ${elapsedSince(startedAt)}.`,
+			"error",
+		);
 		if (errors.length > 0) {
 			editor.showErrorLines(errorLines(errors));
 			const summary = firstErrorSummary(errors);

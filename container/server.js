@@ -51,7 +51,18 @@ const CLANG_FORMAT = process.env.CLANG_FORMAT || "clang-format";
  * container/.clang-format on a dev box.
  */
 const CLANG_FORMAT_STYLE = fileURLToPath(new URL("./.clang-format", import.meta.url));
-const COMPILE_TIMEOUT_MS = 30_000;
+/**
+ * How long one arduino-cli run may take before it is killed.
+ *
+ * 60 s, not 30: the number has to cover the worst honest compile, not the usual
+ * one. A settled build directory answers a SensorKit sketch in a couple of
+ * seconds of CPU, but the first compile after a container cold start also pays
+ * for reading the toolchain and the cached objects off a cold disk on a quarter
+ * of a vCPU. At 30 s that compile was killed and the student was told their
+ * sketch had timed out when nothing was wrong with it. A slow answer is a worse
+ * lesson than a fast one and a better one than a false failure.
+ */
+const COMPILE_TIMEOUT_MS = 60_000;
 /** Formatting is whitespace work. If it has not finished by now it never will. */
 const FORMAT_TIMEOUT_MS = 10_000;
 /** A sketch that reaches this is not a sketch. The Worker caps request size too. */
@@ -99,10 +110,31 @@ const TEMP_ROOT = (() => {
  * the expensive one has to be protected.
  *
  * The Dockerfile pre-compiles into these same paths as the runtime user, so the
- * first real compile after a container cold start is already warm. Set BUILD_ROOT
- * to a persistent image path; a dev box can leave it unset and build under temp.
+ * first real compile after a container cold start is already warm. It compiles
+ * TWICE per bucket, and that second compile is not belt and braces: measured
+ * with arduino-cli 1.5.1, a build directory that has only ever seen one sketch
+ * rebuilds every library object the first time a different sketch arrives (154
+ * objects, 11.6 s -> 11.8 s on a dev box), and only from the compile after that
+ * does it reuse them (2.4 s). One warm-up compile therefore left the first
+ * student to pay the whole rebuild; two leave the directory settled. Set
+ * BUILD_ROOT to a persistent image path; a dev box can leave it unset and build
+ * under temp.
+ *
+ * Resolved the same way TEMP_ROOT is, and for the same reason: a BUILD_ROOT
+ * handed in as a Windows 8.3 short name (C:\Users\MOCHAR~1\...) is echoed by
+ * avr-gcc in its long form, the two spellings do not match, and stripTempPaths()
+ * then leaves the server's file system in front of a student's error. If the
+ * directory does not exist yet the configured spelling is kept, which is the
+ * container's case: /opt/arduino/build is in the image and needs no expanding.
  */
-const BUILD_ROOT = process.env.BUILD_ROOT || path.join(TEMP_ROOT, "uno-ide-build");
+const BUILD_ROOT = (() => {
+	const configured = process.env.BUILD_ROOT || path.join(TEMP_ROOT, "uno-ide-build");
+	try {
+		return realpathSync.native(configured);
+	} catch {
+		return configured;
+	}
+})();
 
 // ---------------------------------------------------------------- compile queue
 
