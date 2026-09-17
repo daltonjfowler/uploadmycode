@@ -195,6 +195,44 @@
 		say("Key forgotten on this device.", "ok");
 	});
 
+	/**
+	 * The same tidy-up the Worker does before it compares two phrases, so
+	 * "Blue Robot Pancake" and "blue robot pancake" count as the same one.
+	 */
+	function normalize(text) {
+		return text.trim().toLowerCase().replace(/\s+/g, " ");
+	}
+
+	/** "2:35 PM", or "" if the clock value makes no sense. */
+	function clockTime(unixMs) {
+		if (typeof unixMs !== "number" || !isFinite(unixMs)) return "";
+		try {
+			return new Date(unixMs).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+		} catch (error) {
+			return "";
+		}
+	}
+
+	/**
+	 * Ask before taking a live phrase away from whoever is using it.
+	 *
+	 * There is ONE phrase for the whole site and one teacher key, so a second
+	 * teacher pressing Set replaces the first teacher's phrase instantly and
+	 * their students are refused mid-lesson with "Wrong class phrase". Nothing
+	 * on this page used to say so. Now it does, with the phrase and the time it
+	 * was going to end, because those are what tell you whose class it is.
+	 */
+	function confirmReplace(live) {
+		var ends = clockTime(live.expiresAt);
+		return window.confirm(
+			"A class phrase is already live: " +
+				live.phrase +
+				(ends === "" ? "" : "\nIt was set to end at " + ends + ".") +
+				"\n\nAnother class may be using it right now. Replacing it stops their compiles " +
+				"until they are told the new phrase.\n\nReplace it?"
+		);
+	}
+
 	document.getElementById("set").addEventListener("click", function () {
 		var phrase = phraseInput.value.trim();
 		if (phrase === "") {
@@ -202,8 +240,47 @@
 			return;
 		}
 		var ttl = Number(durationSelect.value);
-		call("POST", { phrase: phrase, ttlSeconds: ttl }).then(function (result) {
-			handle(result, "Phrase is live. Write it on the board.");
+
+		function put() {
+			call("POST", { phrase: phrase, ttlSeconds: ttl }).then(function (result) {
+				handle(result, "Phrase is live. Write it on the board.");
+			});
+		}
+
+		// Ask the server rather than trusting what this page last drew: the other
+		// teacher may have set theirs twenty minutes ago, in another room.
+		say("Checking whether a phrase is already live...", "plain");
+		call("GET", null).then(function (current) {
+			if (current.status === 403 || current.status === 429) {
+				// The key is the problem. Say so, and do not send a POST that would
+				// only be refused for the same reason.
+				handle(current, "Up to date.");
+				return;
+			}
+			if (current.status !== 200) {
+				// Could not check. The teacher decides, rather than this page either
+				// blocking them or quietly stomping somebody.
+				if (
+					window.confirm(
+						"Could not check whether a phrase is already live.\n\nSet this one anyway?"
+					)
+				) {
+					put();
+				} else {
+					say("Nothing changed.", "plain");
+				}
+				return;
+			}
+
+			show(current.body);
+			var live = current.body && current.body.phrase ? current.body : null;
+			// Setting the phrase that is already live is a renewal, not a takeover:
+			// nobody loses access, so there is nothing to warn about.
+			if (live && normalize(live.phrase) !== normalize(phrase) && !confirmReplace(live)) {
+				say("Left the phrase that was already live. Nothing changed.", "plain");
+				return;
+			}
+			put();
 		});
 	});
 

@@ -26,6 +26,14 @@ Five things, about a minute, before the first student compiles.
    it on the board. Press **Pop out** for a small window holding nothing but the phrase, drag it
    onto the projector screen, and click it once to fill that screen; it keeps itself up to date and
    flips to "no phrase set" on its own when the phrase ends.
+
+   **If a phrase is already live, Set phrase asks first.** There is one phrase for the whole site
+   and one teacher key, so two teachers setting a code in two rooms are setting the same one: the
+   second replaces the first, and the first room's students are refused with "Wrong class phrase"
+   on their next compile until somebody tells them the new one. The confirmation names the live
+   phrase and the time it was going to end so you can tell whose class it is. Re-setting the phrase
+   that is already live is a renewal and asks nothing. Two rooms at once, today, is simplest with
+   one shared phrase.
 5. Open the editor and click **Compile** once. That wakes the container, so the first student pays
    a warm compile (about 1 s) instead of a cold start (about 15 s).
 
