@@ -48,10 +48,15 @@ import {
 	PHRASE_KEY,
 	type PhraseRecord,
 } from "./phrase.ts";
+import { CompileQueue, isUsableToken } from "./queue.ts";
 import {
 	FORMAT_RATE_LIMIT_MAX,
 	GLOBAL_COMPILE_KEY,
 	GLOBAL_COMPILE_MAX_PER_MINUTE,
+	GLOBAL_QUEUE_POLL_KEY,
+	GLOBAL_QUEUE_POLL_MAX_PER_MINUTE,
+	QUEUE_POLL_MAX,
+	queuePollKey,
 	RATE_LIMIT_WINDOW_MS,
 	RateLimiter,
 	type RateVerdict,
@@ -134,6 +139,18 @@ export class Counters extends DurableObject<Env> {
 	readonly #everyone = new RateLimiter(GLOBAL_COMPILE_MAX_PER_MINUTE, RATE_LIMIT_WINDOW_MS);
 	/** In memory, on purpose: see src/teacher-guard.ts. */
 	readonly #teacherKeys = new TeacherKeyGuard();
+	/**
+	 * Sixty queue-position polls a minute per client, and a ceiling for
+	 * everybody, both in their own maps. See src/ratelimit.ts for why polls are
+	 * never counted against the compiles.
+	 */
+	readonly #pollers = new RateLimiter(QUEUE_POLL_MAX, RATE_LIMIT_WINDOW_MS);
+	readonly #everyonePolling = new RateLimiter(
+		GLOBAL_QUEUE_POLL_MAX_PER_MINUTE,
+		RATE_LIMIT_WINDOW_MS,
+	);
+	/** Who is waiting for the compiler right now. See src/queue.ts. */
+	readonly #queue = new CompileQueue();
 
 	/**
 	 * Count one compile attempt for one client. `key` is built by
@@ -155,6 +172,39 @@ export class Counters extends DurableObject<Env> {
 	/** Count one request — compile or format — against the site-wide ceiling. */
 	checkGlobalRate(): RateVerdict {
 		return this.#everyone.check(GLOBAL_COMPILE_KEY, Date.now());
+	}
+
+	/** Count one queue-position poll for one client. */
+	checkQueuePollRate(key: string): RateVerdict {
+		return this.#pollers.check(key, Date.now());
+	}
+
+	/** Count one queue-position poll against the site-wide poll ceiling. */
+	checkGlobalQueuePollRate(): RateVerdict {
+		return this.#everyonePolling.check(GLOBAL_QUEUE_POLL_KEY, Date.now());
+	}
+
+	/**
+	 * Join the compile queue. Returns how many compiles are already ahead, which
+	 * is what the log line reports; the page asks for its own position later.
+	 */
+	enterCompileQueue(token: string): number {
+		return this.#queue.enter(token, Date.now());
+	}
+
+	/** Leave the compile queue. Always called, whatever the compile did. */
+	leaveCompileQueue(token: string): void {
+		this.#queue.leave(token);
+	}
+
+	/**
+	 * How many compiles are ahead of this one, and how long the whole line is.
+	 * `position` is null when the token is not waiting — finished, never here, or
+	 * forgotten because this object was evicted.
+	 */
+	compileQueueStatus(token: string): { position: number | null; depth: number } {
+		const now = Date.now();
+		return { position: this.#queue.positionOf(token, now), depth: this.#queue.depth(now) };
 	}
 
 	/**
@@ -337,8 +387,79 @@ async function compile(request: Request, env: Env): Promise<Response> {
 	const verdict = await gateCompile(request, env, counters);
 	if (!verdict.ok) return verdict.response;
 
-	// Only now is the container touched — and only now is its sleep timer renewed.
-	return await forwardToContainer(compilerStub(env), "/compile", verdict.body);
+	// The page mints a token per compile and polls /api/queue with it while it
+	// waits. Tracking it is best-effort in both directions: a request without a
+	// usable token compiles exactly as it always did, and a counters call that
+	// fails must never cost somebody their compile.
+	const token = request.headers.get("x-compile-token");
+	const tracked = isUsableToken(token);
+	if (tracked) {
+		try {
+			const ahead = await tally.enterCompileQueue(token);
+			if (ahead > 0) console.log(JSON.stringify({ event: "compile-queued", ahead }));
+		} catch (error) {
+			console.error(JSON.stringify({ message: "queue enter failed", error: String(error) }));
+		}
+	}
+
+	try {
+		// Only now is the container touched — and only now is its sleep timer renewed.
+		return await forwardToContainer(compilerStub(env), "/compile", verdict.body);
+	} finally {
+		if (tracked) {
+			// Leaving the line is the half that must not be skipped: a token left
+			// behind would sit in front of every later student until it aged out.
+			try {
+				await tally.leaveCompileQueue(token);
+			} catch (error) {
+				console.error(JSON.stringify({ message: "queue leave failed", error: String(error) }));
+			}
+		}
+	}
+}
+
+/**
+ * GET /api/queue?token=… — "how many sketches are ahead of mine?"
+ *
+ * The one endpoint here that asks for no class phrase. Three reasons, in order
+ * of how much they matter: it reads a number and changes nothing; requiring the
+ * phrase would mean a KV read every three seconds for every waiting Chromebook,
+ * which costs more than the thing being reported; and a student whose phrase has
+ * just expired should still see why their compile is slow rather than a puzzle.
+ * What it gives away is how busy one classroom's compiler is.
+ *
+ * It never touches the container, so polling cannot keep the compiler awake or
+ * add a penny to the bill beyond the Durable Object call itself. Both fuses are
+ * per client id and site-wide — NEVER per IP: the school leaves Cloudflare
+ * through one address, so a per-IP limit here would be one student silencing
+ * the whole room. See src/ratelimit.ts.
+ */
+async function queuePosition(request: Request, env: Env): Promise<Response> {
+	const token = new URL(request.url).searchParams.get("token");
+	if (!isUsableToken(token)) {
+		return json(400, { ok: false, error: "Ask with a token from a compile." });
+	}
+
+	const tally = countersStub(env);
+	const ip = request.headers.get("cf-connecting-ip") ?? "";
+
+	const client = await tally.checkQueuePollRate(
+		queuePollKey(request.headers.get("x-client-id"), ip),
+	);
+	const everyone = client.allowed ? await tally.checkGlobalQueuePollRate() : client;
+	if (!client.allowed || !everyone.allowed) {
+		const seconds = client.allowed ? everyone.retryAfterSeconds : client.retryAfterSeconds;
+		// The page stops asking and keeps waiting quietly. Nothing a student does
+		// with this endpoint can touch the compile that is already in the line.
+		return json(
+			429,
+			{ ok: false, error: "Too many queue checks. The compile itself is unaffected." },
+			{ "retry-after": String(seconds) },
+		);
+	}
+
+	const status = await tally.compileQueueStatus(token);
+	return json(200, { ok: true, position: status.position, depth: status.depth });
 }
 
 /**
@@ -377,6 +498,13 @@ async function handle(request: Request, env: Env): Promise<Response> {
 			return json(405, { ok: false, error: "Use POST for /api/format." }, { allow: "POST" });
 		}
 		return await format(request, env);
+	}
+
+	if (url.pathname === "/api/queue") {
+		if (request.method !== "GET") {
+			return json(405, { ok: false, error: "Use GET for /api/queue." }, { allow: "GET" });
+		}
+		return await queuePosition(request, env);
 	}
 
 	// Everything under /api/teacher/ needs the key, including paths that do not

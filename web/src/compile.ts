@@ -11,7 +11,7 @@
  * Everything else — a dropped connection, an HTML error page, a shape we do not
  * recognise — becomes one "service" outcome with a sentence a student can read.
  *
- * Every compile carries two headers:
+ * Every compile carries three headers:
  *
  *   x-class-phrase  today's class phrase. A 403 means it is missing, wrong or
  *                   expired, and the Worker's sentence is shown word for word
@@ -22,6 +22,10 @@
  *   x-client-id     this browser's id from storage.ts, which is how the Worker
  *                   gives every Chromebook its own six compiles a minute
  *                   instead of six for the school.
+ *   x-compile-token a fresh token for this one press of Compile, which is what
+ *                   lets the page ask GET /api/queue how many sketches are
+ *                   ahead of it while it waits. Tracking it is best-effort at
+ *                   both ends: a compile sent without one still compiles.
  *
  * An HTTP 429 is therefore always about pace, never about the phrase: either
  * this browser has compiled six times in a minute or the whole site is at its
@@ -40,8 +44,47 @@ export type CompileOutcome =
 
 /** Same path in dev (Vite proxies it to the local server) and in production. */
 const COMPILE_URL = "/api/compile";
+/** Where "how many sketches are ahead of mine?" is answered. */
+const QUEUE_URL = "/api/queue";
 
-export async function requestCompile(code: string, phrase: string): Promise<CompileOutcome> {
+/**
+ * A fresh token for one compile, sent as `x-compile-token` and then used to ask
+ * about the queue. It identifies one press of the button and nothing else: it
+ * is not stored, not reused, and says nothing about who is compiling.
+ */
+export function newCompileToken(): string {
+	if (typeof crypto?.randomUUID === "function") return crypto.randomUUID();
+	// Older Chrome without randomUUID. Any short printable token will do; this
+	// only has to be unlikely to collide with another Chromebook's press.
+	return `t-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+/**
+ * How many compiles are ahead of this one. 0 means it is being compiled now.
+ *
+ * Null for every unhappy answer there is — not waiting any more, refused, the
+ * network hiccuped, a shape we do not recognise — because this is decoration on
+ * a wait that is happening anyway. It must never turn into an error a student
+ * has to read.
+ */
+export async function requestQueuePosition(token: string): Promise<number | null> {
+	try {
+		const response = await fetch(`${QUEUE_URL}?token=${encodeURIComponent(token)}`, {
+			headers: { "x-client-id": loadClientId() },
+		});
+		if (!response.ok) return null;
+		const body = (await response.json()) as { position?: unknown };
+		return typeof body.position === "number" ? body.position : null;
+	} catch {
+		return null;
+	}
+}
+
+export async function requestCompile(
+	code: string,
+	phrase: string,
+	token: string,
+): Promise<CompileOutcome> {
 	let response: Response;
 	try {
 		response = await fetch(COMPILE_URL, {
@@ -50,6 +93,7 @@ export async function requestCompile(code: string, phrase: string): Promise<Comp
 				"content-type": "application/json",
 				"x-class-phrase": phrase,
 				"x-client-id": loadClientId(),
+				"x-compile-token": token,
 			},
 			body: JSON.stringify({ code }),
 		});

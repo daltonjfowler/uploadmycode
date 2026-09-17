@@ -335,6 +335,11 @@ Dashboard steps, if that day comes:
 4. Period **10 seconds**, requests **20**, duration **60 seconds**, action **Block**.
 5. Deploy.
 
+The same rule must never be pointed at `/api/queue`. That endpoint is polled every three seconds
+by every Chromebook that is waiting for the compiler, so a per-IP rule there would be tripped by
+one busy classroom within seconds — and the whole school is one IP. Its two fuses are per client id
+and site-wide, in `src/ratelimit.ts`, for exactly that reason.
+
 Remember what section 4a says about one address: this rule is per IP, so at school it is per
 *school*, and it is per school for students as well as for a script. Keep the numbers loose: the
 teacher page fires one GET on load and one request per button press, so twenty in ten seconds is
@@ -548,6 +553,8 @@ The guardrails, all already in place:
 | Rate limit, per client | `src/ratelimit.ts` | 6 compiles per minute per `x-client-id` (section 4a) |
 | Auto indent limit, per client | `src/ratelimit.ts` | 12 per minute per `x-client-id`, its own bucket |
 | Global ceiling | `src/ratelimit.ts` | 120 requests per minute, everyone and both endpoints together |
+| Queue polls, per client | `src/ratelimit.ts` | 60 per minute per `x-client-id`, its own bucket (the page asks every 3 s while it waits) |
+| Queue polls, everybody | `src/ratelimit.ts` | 1200 per minute, counted apart from the compiles on purpose |
 | Wrong-key guard | `src/teacher-guard.ts` | more than 100 wrong teacher keys / 15 min (section 4a) |
 | Class phrase | KV + `src/worker.ts` | required on every compile |
 

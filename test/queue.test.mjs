@@ -1,0 +1,141 @@
+/**
+ * The compile queue: who is ahead of whom, and what happens to the tokens of
+ * requests that never came back.
+ *
+ * Run with `npm test`. Node runs src/queue.ts directly (it strips the types).
+ * The clock is always passed in, so a token can be aged out without waiting two
+ * real minutes.
+ */
+
+import assert from "node:assert/strict";
+import { test } from "node:test";
+
+import { CompileQueue, isUsableToken, MAX_WAIT_MS } from "../src/queue.ts";
+
+const A = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa";
+const B = "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb";
+const C = "cccccccc-3333-4333-8333-cccccccccccc";
+
+test("the first in line has nobody ahead, and the third has two", () => {
+	const queue = new CompileQueue();
+	const now = 1_000_000;
+
+	assert.equal(queue.enter(A, now), 0);
+	assert.equal(queue.enter(B, now + 10), 1);
+	assert.equal(queue.enter(C, now + 20), 2);
+
+	assert.equal(queue.positionOf(A, now + 30), 0);
+	assert.equal(queue.positionOf(B, now + 30), 1);
+	assert.equal(queue.positionOf(C, now + 30), 2);
+	assert.equal(queue.depth(now + 30), 3);
+});
+
+test("when the one in front finishes, everybody moves up", () => {
+	const queue = new CompileQueue();
+	const now = 1_000_000;
+	queue.enter(A, now);
+	queue.enter(B, now + 10);
+	queue.enter(C, now + 20);
+
+	queue.leave(A);
+
+	assert.equal(queue.positionOf(B, now + 30), 0);
+	assert.equal(queue.positionOf(C, now + 30), 1);
+	assert.equal(queue.depth(now + 30), 2);
+});
+
+test("a token that is not waiting has no position at all", () => {
+	const queue = new CompileQueue();
+	const now = 1_000_000;
+
+	assert.equal(queue.positionOf(A, now), null, "never joined");
+
+	queue.enter(A, now);
+	queue.leave(A);
+	assert.equal(queue.positionOf(A, now + 10), null, "already finished");
+});
+
+test("leaving twice, or leaving something that never joined, is harmless", () => {
+	const queue = new CompileQueue();
+	const now = 1_000_000;
+	queue.enter(A, now);
+
+	queue.leave(A);
+	queue.leave(A);
+	queue.leave(B);
+
+	assert.equal(queue.depth(now), 0);
+});
+
+test("re-entering keeps the original place rather than going to the back", () => {
+	const queue = new CompileQueue();
+	const now = 1_000_000;
+	queue.enter(A, now);
+	queue.enter(B, now + 10);
+
+	assert.equal(queue.enter(A, now + 20), 0);
+	assert.equal(queue.positionOf(B, now + 20), 1);
+	assert.equal(queue.depth(now + 20), 2);
+});
+
+test("a token left behind by a lost request ages out of the line", () => {
+	const queue = new CompileQueue();
+	const now = 1_000_000;
+	queue.enter(A, now);
+	queue.enter(B, now + 1000);
+
+	const later = now + MAX_WAIT_MS + 1;
+	assert.equal(queue.positionOf(A, later), null, "the lost one is gone");
+	assert.equal(queue.positionOf(B, later), 0, "and stops counting against the rest");
+	assert.equal(queue.depth(later), 1);
+});
+
+test("the line cannot grow without bound", () => {
+	const queue = new CompileQueue();
+	const now = 1_000_000;
+	for (let i = 0; i < 400; i += 1) {
+		queue.enter(`token-${String(i).padStart(4, "0")}`, now + i);
+	}
+	assert.ok(queue.depth(now + 400) <= 256, `depth was ${queue.depth(now + 400)}`);
+});
+
+test("only sane tokens are tracked", () => {
+	assert.equal(isUsableToken(A), true);
+	assert.equal(isUsableToken("t-1a2b3c4d-9z8y7x6w"), true);
+	assert.equal(isUsableToken(""), false);
+	assert.equal(isUsableToken("short"), false);
+	assert.equal(isUsableToken(null), false);
+	assert.equal(isUsableToken(undefined), false);
+	assert.equal(isUsableToken("has spaces in it"), false);
+	assert.equal(isUsableToken("x".repeat(65)), false);
+	assert.equal(isUsableToken("semi;colon-and-more"), false);
+});
+
+// The buckets a queue poll spends. Kept here rather than in ratelimit.test.mjs
+// because the reason they exist is the queue: polls must not be able to spend
+// the budget that lets a class compile.
+
+test("a queue poll lands in its own bucket, never a compile's", async () => {
+	const { queuePollKey, QUEUE_KEY_PREFIX, rateLimitKey, formatRateLimitKey } = await import(
+		"../src/ratelimit.ts"
+	);
+	const clientId = "abcd1234-ef56-7890-abcd-ef1234567890";
+	const schoolIp = "203.0.113.7";
+
+	assert.equal(QUEUE_KEY_PREFIX, "queue ");
+	assert.notEqual(queuePollKey(clientId, schoolIp), rateLimitKey(clientId, schoolIp));
+	assert.notEqual(queuePollKey(clientId, schoolIp), formatRateLimitKey(clientId, schoolIp));
+	assert.notEqual(queuePollKey(null, schoolIp), rateLimitKey(null, schoolIp));
+});
+
+test("the poll ceilings are loose enough for a whole class waiting", async () => {
+	const { QUEUE_POLL_MAX, GLOBAL_QUEUE_POLL_MAX_PER_MINUTE, GLOBAL_COMPILE_MAX_PER_MINUTE } =
+		await import("../src/ratelimit.ts");
+
+	// The page polls every 3 s: 20 a minute per waiting Chromebook.
+	assert.ok(QUEUE_POLL_MAX >= 20 * 3, "one Chromebook must have room to spare");
+	// Thirty Chromebooks polling at once is 600.
+	assert.ok(GLOBAL_QUEUE_POLL_MAX_PER_MINUTE >= 600 * 2, "a whole class must fit, twice over");
+	// And it is counted separately from the compiles, not carved out of them.
+	assert.ok(GLOBAL_QUEUE_POLL_MAX_PER_MINUTE > GLOBAL_COMPILE_MAX_PER_MINUTE);
+});

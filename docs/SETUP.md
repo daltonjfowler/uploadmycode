@@ -301,7 +301,14 @@ Other details worth knowing:
 
 - The board is fixed: `arduino-cli compile --fqbn arduino:avr:uno`. There is no board parameter.
 - One compile runs at a time, per container. Requests queue in-process; the toolchain saturates a
-  quarter vCPU on its own.
+  quarter vCPU on its own. A class that all presses Compile at once therefore forms a line: five at
+  once, measured live, finished at 6.8 s, 13.6 s, 21.2 s, 28.3 s and 35.4 s, all of them green. The
+  compile timeout applies to one `arduino-cli` run, NOT to the wait in line, so a queued student is
+  never timed out for standing in it.
+- The editor sends `x-compile-token` with each compile and asks `GET /api/queue?token=...` every
+  three seconds while it waits, so the output panel can say "3 sketches are ahead of yours". That
+  endpoint reads a number and nothing else: it needs no class phrase, never touches the container,
+  and answers `{ position, depth }` where `position` is null once the compile is no longer waiting.
 - A compile is killed at 60 seconds and comes back as `ok:false`.
 - Server-side temp paths are stripped out of error text before it is returned, so a student sees
   `sketch.ino:34:3`, not a path from inside the container.

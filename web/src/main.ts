@@ -7,7 +7,12 @@
 
 import "./style.css";
 
-import { hexProgramBytes, requestCompile } from "./compile.ts";
+import {
+	hexProgramBytes,
+	newCompileToken,
+	requestCompile,
+	requestQueuePosition,
+} from "./compile.ts";
 import { createEditor, type Editor } from "./editor.ts";
 import { hintFor } from "./error-hints.ts";
 import { errorLines, firstErrorSummary, parseCompileErrors, type CompileError } from "./errors.ts";
@@ -351,6 +356,59 @@ phraseChange.addEventListener("click", () => {
  * that left them out would disagree with the clock on the wall. One decimal up
  * to ten seconds, whole seconds after that — nobody needs a tenth of a minute.
  */
+/** How often the page asks where it is in the line. */
+const QUEUE_POLL_MS = 3000;
+/**
+ * How long to wait before asking at all. A compile that is not queued answers
+ * in a couple of seconds, and telling a student about a queue they are at the
+ * front of is noise.
+ */
+const QUEUE_FIRST_POLL_MS = 2500;
+
+/**
+ * What the output window says while a compile is on the server.
+ *
+ * Nothing is claimed about a queue until the server has said there is one. A
+ * poll that fails, a Durable Object that has forgotten the line, an older
+ * deployment without the endpoint — all of them land on the plain sentence,
+ * which is exactly what the page used to say on its own.
+ */
+function waitingMessage(ahead: number | null): string {
+	if (ahead === null || ahead <= 0) {
+		return "Compiling on the server. The first compile after a quiet spell can take half a minute.";
+	}
+	return ahead === 1
+		? "Waiting for the compiler. 1 sketch is ahead of yours."
+		: `Waiting for the compiler. ${ahead} sketches are ahead of yours.`;
+}
+
+/**
+ * Ask where we are in the line, every few seconds, until the compile answers.
+ *
+ * Returns the function that stops it, which the caller MUST call — in a
+ * `finally`, so that a thrown compile cannot leave the page polling forever.
+ * After it is called, a poll already in flight is ignored rather than raced
+ * against the result being rendered.
+ */
+function pollQueueWhileWaiting(token: string, show: (ahead: number | null) => void): () => void {
+	let stopped = false;
+	let timer = 0;
+
+	const ask = async (): Promise<void> => {
+		const ahead = await requestQueuePosition(token);
+		if (stopped) return;
+		show(ahead);
+		timer = window.setTimeout(() => void ask(), QUEUE_POLL_MS);
+	};
+
+	timer = window.setTimeout(() => void ask(), QUEUE_FIRST_POLL_MS);
+
+	return () => {
+		stopped = true;
+		window.clearTimeout(timer);
+	};
+}
+
 function elapsedSince(startedAt: number): string {
 	const seconds = (performance.now() - startedAt) / 1000;
 	const shown = seconds < 10 ? seconds.toFixed(1) : String(Math.round(seconds));
@@ -375,11 +433,18 @@ async function compileSketch(): Promise<void> {
 	editor.clearErrorLines();
 	statusPill.title = "";
 	setStatus("compiling", "Compiling…");
-	showOutput("Compiling on the server. The first compile after a quiet spell can take half a minute.", "plain");
+	showOutput(waitingMessage(null), "plain");
+
+	const token = newCompileToken();
+	const stopPolling = pollQueueWhileWaiting(token, (ahead) => {
+		setStatus("compiling", ahead !== null && ahead > 0 ? "In line…" : "Compiling…");
+		showOutput(waitingMessage(ahead), "plain");
+	});
 
 	const startedAt = performance.now();
 	try {
-		const outcome = await requestCompile(code, phrase);
+		const outcome = await requestCompile(code, phrase, token);
+		stopPolling();
 
 		if (outcome.kind === "success") {
 			setCompiledHex(outcome.hex, code);
@@ -427,6 +492,9 @@ async function compileSketch(): Promise<void> {
 			if (summary) statusPill.title = summary;
 		}
 	} finally {
+		// Belt as well as braces: stopPolling() already ran on the happy path, and
+		// this is what catches a throw on the way there.
+		stopPolling();
 		compiling = false;
 		refreshRunButtons();
 	}

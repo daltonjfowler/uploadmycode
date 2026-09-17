@@ -1,9 +1,11 @@
 /**
- * A fixed-cost sliding-window rate limiter, kept in memory, used three times.
+ * A fixed-cost sliding-window rate limiter, kept in memory, used five times.
  *
  *   per client    6 compiles a minute, keyed by the browser's own client id
  *   per client   12 formats  a minute, keyed the same way, counted separately
  *   everybody   120 requests a minute, compiles and formats together
+ *   per client   60 queue-position polls a minute, keyed the same way
+ *   everybody  1200 queue-position polls a minute
  *
  * All three are about the bill, not security: the class phrase is the lock,
  * these are the fuse. A student working normally never sees any of them; a
@@ -114,6 +116,39 @@ export const FORMAT_KEY_PREFIX = "fmt ";
 
 export function formatRateLimitKey(clientId: string | null | undefined, ip: string): string {
 	return FORMAT_KEY_PREFIX + rateLimitKey(clientId, ip);
+}
+
+/**
+ * Queue-position polls allowed per window, per client id.
+ *
+ * The page asks every three seconds while it is waiting, so sixty a minute is
+ * three times what one waiting Chromebook can use. A poll costs one Durable
+ * Object call and touches neither KV nor the container; this is here so that
+ * the cheap thing stays cheap, not because anyone is expected to meet it.
+ */
+export const QUEUE_POLL_MAX = 60;
+
+/**
+ * The same guard the compiles have, for the same reason and in its own count:
+ * a spray of invented client ids walks around the per-client bucket, so there
+ * is a number for everybody together as well. Thirty Chromebooks polling every
+ * three seconds is 600 a minute, so this is roughly double a whole class
+ * waiting at once.
+ *
+ * Deliberately NOT the compile ceiling. Polls are twenty times more frequent
+ * than compiles by design, and a student watching a queue must never be able to
+ * spend the budget that lets the class compile.
+ */
+export const GLOBAL_QUEUE_POLL_MAX_PER_MINUTE = 1200;
+
+/** The single bucket the poll ceiling counts into. Not an id anyone can send. */
+export const GLOBAL_QUEUE_POLL_KEY = "everyone-queue";
+
+/** What a queue poll is counted into: the same bucket name, behind `queue `. */
+export const QUEUE_KEY_PREFIX = "queue ";
+
+export function queuePollKey(clientId: string | null | undefined, ip: string): string {
+	return QUEUE_KEY_PREFIX + rateLimitKey(clientId, ip);
 }
 
 export class RateLimiter {
