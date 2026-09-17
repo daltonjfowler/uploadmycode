@@ -97,7 +97,7 @@ test("one header is not mistaken for another that contains it", () => {
 });
 
 test("every library in the menu inserts once and only once", () => {
-	assert.equal(LIBRARIES.length, 8);
+	assert.equal(LIBRARIES.length, 9);
 
 	const headers = LIBRARIES.map((library) => library.header);
 	assert.equal(new Set(headers).size, headers.length, "duplicate header in LIBRARIES");

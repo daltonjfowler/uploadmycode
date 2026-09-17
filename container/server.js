@@ -30,7 +30,7 @@
 
 import { spawn } from "node:child_process";
 import { realpathSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -82,6 +82,27 @@ const TEMP_ROOT = (() => {
 		return tmpdir();
 	}
 })();
+
+/**
+ * Where compiles are built. This directory is REUSED across requests, not thrown
+ * away, which is the whole trick: arduino-cli keeps each build's compiled library
+ * objects, so the next compile only rebuilds the sketch itself. The pathological
+ * case is Arduino SensorKit — it pulls in the entire U8g2 OLED library, tens of
+ * seconds of avr-gcc on a quarter of a vCPU, well past COMPILE_TIMEOUT_MS if it
+ * is rebuilt every time.
+ *
+ * Two buckets, not one: arduino-cli evicts a build's library objects when the
+ * next sketch in the same build path does not use them, so a plain Blink between
+ * two SensorKit compiles would throw U8g2 away and make the second one cold
+ * again. Keeping SensorKit sketches in their own bucket stops that. Small
+ * libraries recompile in about a second, so they do not each need a bucket; only
+ * the expensive one has to be protected.
+ *
+ * The Dockerfile pre-compiles into these same paths as the runtime user, so the
+ * first real compile after a container cold start is already warm. Set BUILD_ROOT
+ * to a persistent image path; a dev box can leave it unset and build under temp.
+ */
+const BUILD_ROOT = process.env.BUILD_ROOT || path.join(TEMP_ROOT, "uno-ide-build");
 
 // ---------------------------------------------------------------- compile queue
 
@@ -191,21 +212,42 @@ function toPosix(p) {
  * @param {string} code
  * @returns {Promise<{ ok: true, hex: string } | { ok: false, stderr: string }>}
  */
+/**
+ * Which build bucket a sketch uses. Sketches that include Arduino SensorKit share
+ * one bucket; everything else shares the other. See BUILD_ROOT for why.
+ * @param {string} code
+ * @returns {"sensorkit" | "general"}
+ */
+function buildBucket(code) {
+	return /#\s*include\s*[<"]\s*Arduino_SensorKit\.h/i.test(code) ? "sensorkit" : "general";
+}
+
 async function compile(code) {
-	// TEMP_ROOT keeps this correct on both platforms; no hardcoded /tmp.
-	const root = await mkdtemp(path.join(TEMP_ROOT, "uno-ide-"));
+	// One compile runs at a time (see enqueue), so a fixed, reused directory per
+	// bucket is safe: nothing else is writing sketch.ino or reading the hex.
+	const bucketDir = path.join(BUILD_ROOT, buildBucket(code));
 	// arduino-cli requires the sketch folder name to match the .ino file name.
-	const sketchDir = path.join(root, "sketch");
-	const outDir = path.join(root, "out");
+	const sketchDir = path.join(bucketDir, "sketch");
+	const buildPath = path.join(bucketDir, "build");
+	const outDir = path.join(bucketDir, "out");
+	const hexPath = path.join(outDir, "sketch.ino.hex");
 
 	try {
-		await mkdir(sketchDir);
+		await mkdir(sketchDir, { recursive: true });
 		await writeFile(path.join(sketchDir, "sketch.ino"), code, "utf8");
+		// The directory is reused, so a previous compile's hex may still be here.
+		// Remove it first: a failure that writes no hex must never be answered
+		// with the last sketch's output.
+		await rm(hexPath, { force: true }).catch(() => {});
 
 		const result = await runArduinoCli([
 			"compile",
 			"--fqbn",
 			FQBN,
+			// An explicit, reused build path is what lets arduino-cli keep the
+			// compiled library objects between compiles instead of rebuilding them.
+			"--build-path",
+			buildPath,
 			"--output-dir",
 			outDir,
 			sketchDir,
@@ -220,21 +262,21 @@ async function compile(code) {
 		if (!result.ok) {
 			// arduino-cli puts compiler errors on stderr; fall back to stdout so a
 			// surprising failure is never reported as an empty message.
-			const message = stripTempPaths(result.stderr || result.stdout, root);
+			const message = stripTempPaths(result.stderr || result.stdout, bucketDir);
 			return { ok: false, stderr: message || "Compile failed." };
 		}
 
 		try {
-			const hex = await readFile(path.join(outDir, "sketch.ino.hex"), "utf8");
+			const hex = await readFile(hexPath, "utf8");
 			return { ok: true, hex };
 		} catch {
 			return { ok: false, stderr: "Compile succeeded but produced no hex file." };
 		}
 	} catch (error) {
 		return { ok: false, stderr: `Compile server error: ${String(error)}` };
-	} finally {
-		await rm(root, { recursive: true, force: true }).catch(() => {});
 	}
+	// No cleanup on purpose: the build directory is the cache. It is reused by the
+	// next compile in the same bucket and reset only when the container restarts.
 }
 
 // ------------------------------------------------------------------ formatting

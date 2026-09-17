@@ -67,7 +67,8 @@ RUN curl -fsSL -o /tmp/arduino-cli.tar.gz \
 ENV ARDUINO_DIRECTORIES_DATA=/opt/arduino/data \
 	ARDUINO_DIRECTORIES_USER=/opt/arduino/user \
 	ARDUINO_DIRECTORIES_DOWNLOADS=/opt/arduino/downloads \
-	ARDUINO_BUILD_CACHE_PATH=/opt/arduino/cache
+	ARDUINO_BUILD_CACHE_PATH=/opt/arduino/cache \
+	BUILD_ROOT=/opt/arduino/build
 
 # --- AVR core and the library allowlist -------------------------------------
 # Baked into the image: students cannot install libraries, and a compile never
@@ -111,9 +112,10 @@ RUN apt-get update \
 # avr-gcc, so it spends its whole life as an ordinary user that owns only the
 # arduino toolchain directories and /app.
 #
-# The warm-up compile below runs as this user on purpose: it fills
-# ARDUINO_BUILD_CACHE_PATH with files the runtime user already owns, so the
-# first real compile reuses the cache instead of rebuilding the core.
+# The warm-up compiles below run as this user on purpose: they fill
+# ARDUINO_BUILD_CACHE_PATH and the reused BUILD_ROOT build directories with files
+# the runtime user already owns, so the first real compile reuses the cache
+# instead of rebuilding the core or the libraries.
 RUN useradd --create-home --home-dir /home/uploader --shell /usr/sbin/nologin --uid 10001 uploader \
 	&& mkdir -p /opt/arduino/cache /app \
 	&& chown -R uploader:uploader /opt/arduino /app
@@ -122,16 +124,27 @@ RUN useradd --create-home --home-dir /home/uploader --shell /usr/sbin/nologin --
 ENV HOME=/home/uploader
 USER uploader
 
-# --- warm-up compile --------------------------------------------------------
-# Compiling the AVR core is the slow half of a first compile. Doing it here bakes
-# the result into the image, so the first student after a container cold start
-# pays a warm compile instead of a cold one. Measured on Windows with the same
-# pins: 2.9 s cold, 1.3 s warm, for about 1 MB of cache.
-RUN mkdir -p /tmp/warmup/sketch \
+# --- warm-up compiles -------------------------------------------------------
+# server.js reuses one build directory per bucket (BUILD_ROOT/general and
+# BUILD_ROOT/sensorkit) so a compile keeps the previous one's compiled library
+# objects. These two compiles fill those exact directories at build time, so the
+# first student after a container cold start reuses them instead of building cold.
+#
+# The paths, the sketch folder name and the build/output layout must match what
+# server.js uses, or the reuse is lost. general warms the AVR core with a Blink;
+# sensorkit warms the whole Arduino SensorKit stack — its bundled U8g2 is the
+# slow half of a SensorKit compile and the reason this bucket exists.
+RUN for b in general sensorkit; do mkdir -p "$BUILD_ROOT/$b/sketch"; done \
 	&& printf 'void setup() { pinMode(LED_BUILTIN, OUTPUT); }\nvoid loop() { digitalWrite(LED_BUILTIN, HIGH); delay(1000); digitalWrite(LED_BUILTIN, LOW); delay(1000); }\n' \
-		> /tmp/warmup/sketch/sketch.ino \
-	&& arduino-cli compile --fqbn arduino:avr:uno --output-dir /tmp/warmup/out /tmp/warmup/sketch \
-	&& rm -rf /tmp/warmup
+		> "$BUILD_ROOT/general/sketch/sketch.ino" \
+	&& arduino-cli compile --fqbn arduino:avr:uno \
+		--build-path "$BUILD_ROOT/general/build" --output-dir "$BUILD_ROOT/general/out" \
+		"$BUILD_ROOT/general/sketch" \
+	&& printf '#include "Arduino_SensorKit.h"\nvoid setup() { Environment_I2C.begin(); Pressure.begin(); Accelerometer.begin(); Oled.begin(); }\nvoid loop() { Serial.println(Accelerometer.readX()); }\n' \
+		> "$BUILD_ROOT/sensorkit/sketch/sketch.ino" \
+	&& arduino-cli compile --fqbn arduino:avr:uno \
+		--build-path "$BUILD_ROOT/sensorkit/build" --output-dir "$BUILD_ROOT/sensorkit/out" \
+		"$BUILD_ROOT/sensorkit/sketch"
 
 # --- the server -------------------------------------------------------------
 WORKDIR /app
