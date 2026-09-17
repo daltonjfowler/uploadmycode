@@ -39,7 +39,9 @@ The editor page at Chromebook resolution (1366x768), before any sketch is compil
   ceiling, a request-size cap and a compile timeout. All of it so a runaway loop cannot run up a
   bill overnight.
 - **Libraries** — a fixed allowlist baked into the container image, so a compile never touches the
-  network. Servo, LiquidCrystal, LiquidCrystal I2C and Stepper ship by default.
+  network. Servo, LiquidCrystal, LiquidCrystal I2C, Stepper and Arduino SensorKit (the Seeed Grove
+  sensor kit) ship by default. The SensorKit's own dependencies, DHT20 and the LIS3DHTR
+  accelerometer, are pinned and baked in alongside it.
 
 ## The live site
 
@@ -94,6 +96,9 @@ arduino-cli lib install Servo@1.3.0
 arduino-cli lib install LiquidCrystal@1.0.7
 arduino-cli lib install "LiquidCrystal I2C@1.1.2"
 arduino-cli lib install Stepper@1.1.3
+arduino-cli lib install DHT20@0.3.3
+arduino-cli lib install "Grove-3-Axis-Digital-Accelerometer-2g-to-16g-LIS3DHTR@1.2.4"
+arduino-cli lib install Arduino_Sensorkit@1.4.0
 
 # 4. Serve on http://localhost:8080.
 node container/server.js
@@ -140,7 +145,7 @@ This project's own code is MIT licensed — see [LICENSE](LICENSE).
 ## Credits
 
 This is a thin shell around other people's work. [CREDITS.md](CREDITS.md) lists every open-source
-project it stands on — the compiler toolchain the container downloads, the four classroom
+project it stands on — the compiler toolchain the container downloads, the classroom
 libraries, CodeMirror, the build tooling, and the protocol documents the flasher was written from —
 with a link and a verified license for each, and a support link wherever the project publishes one.
 None of those projects endorses this one; being credited is not affiliation.

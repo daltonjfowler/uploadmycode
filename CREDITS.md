@@ -78,8 +78,10 @@ The version numbers above were read from the installed toolchain: `avr-gcc --ver
 
 ## The classroom library allowlist
 
-Four libraries, pinned in `container/Dockerfile`, baked into the image so a compile never touches
-the network. They are what the editor's library dropdown offers.
+The editor's library dropdown offers five entries, pinned in `container/Dockerfile` and baked into
+the image so a compile never touches the network. Arduino SensorKit is a meta-library: it brings two
+more pinned dependencies and vendors several libraries inside its own source tree. Everything the
+image ships is credited below.
 
 ### Servo 1.3.0
 
@@ -118,6 +120,43 @@ support by Ryan Orendorff.
 - License: **LGPL-2.1-or-later** — verified from the header of `src/Stepper.cpp`
 - Home: <https://www.arduino.cc/en/Reference/Stepper>
 - Repo: <https://github.com/arduino-libraries/Stepper>
+
+### Arduino SensorKit 1.4.0
+
+The Seeed Grove sensor kit as one library: an environment sensor (temperature and humidity), a
+barometric pressure sensor, a 3-axis accelerometer and a small OLED display. By Lenard George and
+Pablo Marquínez, maintained by Arduino. A sketch includes only `Arduino_SensorKit.h`.
+
+- License: **MPL-2.0** — the installed release ships no license file; taken from the project's
+  GitHub repo
+- Home: <https://sensorkit.arduino.cc/>
+- Repo: <https://github.com/arduino-libraries/Arduino_SensorKit>
+
+It is a meta-library. Two dependencies are pinned and installed alongside it. They are not offered
+in the dropdown, because a sketch reaches them only through the kit's own header.
+
+### DHT20 0.3.3
+
+I2C temperature and humidity sensor — the kit's environment module. By Rob Tillaart.
+
+- License: **MIT** — verified from `LICENSE` in the installed library
+- Repo: <https://github.com/RobTillaart/DHT20>
+
+### Grove 3-Axis Digital Accelerometer LIS3DHTR 1.2.4
+
+The kit's motion module. By Seeed Studio.
+
+- License: **MIT** — verified from `LICENSE` in the installed library
+- Repo: <https://github.com/Seeed-Studio/Seeed_Arduino_LIS3DHTR>
+
+The kit also vendors two more libraries inside its own `src/` tree, so the image ships their code as
+part of the SensorKit package rather than as separate installs:
+
+- **U8g2 2.34.22** — the OLED display driver. License: **2-clause BSD** — verified from
+  `src/U8g2/LICENSE`. By olikraus. Repo: <https://github.com/olikraus/u8g2>
+- **Grove Barometer Sensor BMP280 1.0.1** — the pressure driver. License: **MIT** — verified from
+  `src/Grove_-_Barometer_Sensor_BMP280/License.txt`. By Seeed Studio. Repo:
+  <https://github.com/Seeed-Studio/Grove_BMP280>
 
 ## The editor
 
@@ -295,7 +334,7 @@ So you can redo it rather than trust it.
 
 The setup that makes this reproducible is in the README under
 ["Running the compile server without Docker"](README.md#running-the-compile-server-without-docker):
-it puts `arduino-cli`, the core, the toolchain and the four libraries under `tools/`, where all of
+it puts `arduino-cli`, the core, the toolchain and the pinned libraries under `tools/`, where all of
 the files named above can be read.
 
 Anything wrong or missing here is a bug. Open an issue.
