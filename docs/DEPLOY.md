@@ -552,7 +552,7 @@ The guardrails, all already in place:
 
 | Guardrail | Where | Value |
 |---|---|---|
-| One container instance | `wrangler.jsonc` `max_instances` | 1 |
+| Two container instances | `wrangler.jsonc` `max_instances` (= `CONTAINER_COUNT`) | 2 (compiles two sketches at once; least-loaded routing in `src/queue.ts`) |
 | Small instance | `wrangler.jsonc` `instance_type` | `basic` (1/4 vCPU, 1 GiB) |
 | Sleeps when idle | `src/worker.ts` `sleepAfter` | 5 minutes |
 | Compile timeout | `container/server.js` | 60 s |

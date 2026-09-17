@@ -66,27 +66,62 @@ export const MAX_WAIT_MS = 120_000;
  */
 const MAX_TRACKED = 256;
 
+/**
+ * How many compile containers the site runs, and therefore how many ways this
+ * queue spreads the work.
+ *
+ * This MUST equal `max_instances` for the CompilerContainer class in
+ * wrangler.jsonc. The Worker turns an assigned index 0..N-1 into a container
+ * name `compiler-<index>`, and Cloudflare gives each distinct name its own
+ * instance up to max_instances; a name past the cap has no instance to land on.
+ * Raise the two together. Two `basic` containers, so a class that all presses
+ * Compile at once has two sketches building at once instead of one — see
+ * docs/DEPLOY.md.
+ */
+export const CONTAINER_COUNT = 2;
+
+/** One compile in flight: when it joined, and which container it went to. */
+interface Waiter {
+	joinedAt: number;
+	container: number;
+}
+
 export class CompileQueue {
-	/** Token -> when it joined. Map keeps insertion order, which IS the order. */
-	readonly #waiting = new Map<string, number>();
+	/** Token -> its waiter. Map keeps insertion order, which IS join order. */
+	readonly #waiting = new Map<string, Waiter>();
+	readonly #containerCount: number;
+
+	constructor(containerCount: number = CONTAINER_COUNT) {
+		this.#containerCount = Math.max(1, Math.floor(containerCount));
+	}
 
 	/**
-	 * Join the line. Returns how long the line now is, including this compile,
-	 * so the caller can log it without a second round trip.
+	 * Join the line, and be handed the container to compile on.
 	 *
-	 * Entering twice with the same token counts once: a retried request is not a
-	 * second student.
+	 * Returns that container's index and how long the whole line now is,
+	 * including this compile, so the caller logs and routes without a second
+	 * round trip.
+	 *
+	 * The container is the least-loaded one, ties to the lower index. That tie
+	 * rule is load-bearing, not tidiness: when only one compile is in flight it
+	 * always lands on container 0, so the others stay asleep until a real burst
+	 * needs them — which is what keeps a second container from billing memory all
+	 * day. Re-entering with a token already here keeps its first container: a
+	 * retried request is the same compile, not a second one, and must not be
+	 * counted twice or moved to a different queue.
 	 */
-	enter(token: string, now: number): number {
+	enter(token: string, now: number): { container: number; depth: number } {
 		this.#sweep(now);
-		if (!this.#waiting.has(token)) {
-			this.#waiting.set(token, now);
-			if (this.#waiting.size > MAX_TRACKED) {
-				const oldest = this.#waiting.keys().next();
-				if (!oldest.done && oldest.value !== token) this.#waiting.delete(oldest.value);
-			}
+		const existing = this.#waiting.get(token);
+		if (existing) return { container: existing.container, depth: this.#waiting.size };
+
+		const container = this.#leastLoaded();
+		this.#waiting.set(token, { joinedAt: now, container });
+		if (this.#waiting.size > MAX_TRACKED) {
+			const oldest = this.#waiting.keys().next();
+			if (!oldest.done && oldest.value !== token) this.#waiting.delete(oldest.value);
 		}
-		return this.#waiting.size;
+		return { container, depth: this.#waiting.size };
 	}
 
 	/** Leave the line. Unknown tokens are not an error; the answer arrived. */
@@ -106,18 +141,34 @@ export class CompileQueue {
 		return this.#waiting.has(token);
 	}
 
-	/** How many compiles are in flight altogether. */
+	/** How many compiles are in flight altogether, across every container. */
 	depth(now: number): number {
 		this.#sweep(now);
 		return this.#waiting.size;
 	}
 
+	/**
+	 * The container carrying the fewest compiles right now; ties to the lower
+	 * index so a quiet site keeps using container 0 and leaves the rest asleep.
+	 */
+	#leastLoaded(): number {
+		const load = new Array<number>(this.#containerCount).fill(0);
+		for (const waiter of this.#waiting.values()) {
+			if (waiter.container >= 0 && waiter.container < load.length) load[waiter.container] += 1;
+		}
+		let best = 0;
+		for (let i = 1; i < load.length; i += 1) {
+			if (load[i]! < load[best]!) best = i;
+		}
+		return best;
+	}
+
 	/** Drop anything that has been waiting longer than a compile can live. */
 	#sweep(now: number): void {
 		const cutoff = now - MAX_WAIT_MS;
-		for (const [token, joinedAt] of this.#waiting) {
+		for (const [token, waiter] of this.#waiting) {
 			// Insertion order, so the first token still inside the window ends it.
-			if (joinedAt > cutoff) break;
+			if (waiter.joinedAt > cutoff) break;
 			this.#waiting.delete(token);
 		}
 	}

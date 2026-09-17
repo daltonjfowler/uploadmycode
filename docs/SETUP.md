@@ -223,11 +223,19 @@ A class period of 30 students compiling 20 times each at ~3 vCPU-seconds is abou
 an eighth of the monthly included CPU, for one period. You would need a lot of periods to leave the
 included allowance.
 
-The guardrails that keep it that way are all already on: one container instance, `basic` size,
-scale-to-zero after 10 minutes idle, 6 compiles a minute per browser, a 120/minute global ceiling, a
-100 KB request cap and a 60-second compile timeout. **Do not add a scheduled ping to keep the
-container warm** — memory is billed the whole time the instance is awake, so a keep-alive bills all
-night. Warming it by hand before class costs one compile.
+The guardrails that keep it that way are all already on: two `basic` container instances (the
+second only wakes during a real burst, see below), scale-to-zero after 5 minutes idle, 6 compiles a
+minute per browser, a 120/minute global ceiling, a 100 KB request cap and a 60-second compile
+timeout. **Do not add a scheduled ping to keep the container warm** — memory is billed the whole
+time the instance is awake, so a keep-alive bills all night. Warming it by hand before class costs
+one compile.
+
+The **second container earns its keep only when a class bursts.** The Worker routes every compile to
+the least-loaded container, and that routing sends everything to the first one whenever a single
+compile is in flight — so on a quiet afternoon the second instance never wakes and never bills. When
+a whole class presses Compile together, the two share the load and the line drains about twice as
+fast. Both are warm from the image, so the first compile routed to a freshly-woken second container
+still reuses the baked-in build cache instead of starting cold.
 
 Set a billing alert on the first day: [DEPLOY.md, section 7](DEPLOY.md#7-cost-and-how-to-keep-it-that-way).
 
@@ -300,11 +308,11 @@ on the status code.
 Other details worth knowing:
 
 - The board is fixed: `arduino-cli compile --fqbn arduino:avr:uno`. There is no board parameter.
-- One compile runs at a time, per container. Requests queue in-process; the toolchain saturates a
-  quarter vCPU on its own. A class that all presses Compile at once therefore forms a line: five at
-  once, measured live, finished at 6.8 s, 13.6 s, 21.2 s, 28.3 s and 35.4 s, all of them green. The
-  compile timeout applies to one `arduino-cli` run, NOT to the wait in line, so a queued student is
-  never timed out for standing in it.
+- One compile runs at a time **per container**, and there are two, so up to two compile at once.
+  Each `arduino-cli` run saturates a quarter vCPU on its own; a class that all presses Compile at
+  once forms a line that drains two at a time. The compile timeout applies to one `arduino-cli` run,
+  NOT to the wait in line, so a queued student is never timed out for standing in it — proven live
+  by holding ten concurrent compiles open, the slowest for 107 seconds, all green.
 - The editor sends `x-compile-token` with each compile and asks `GET /api/queue?token=...` every
   three seconds while it waits, so the output panel can say "4 sketches are in the line, including
   yours". That endpoint reads a number and nothing else: it needs no class phrase, never touches

@@ -48,7 +48,7 @@ import {
 	PHRASE_KEY,
 	type PhraseRecord,
 } from "./phrase.ts";
-import { CompileQueue, isUsableToken } from "./queue.ts";
+import { CompileQueue, CONTAINER_COUNT, isUsableToken } from "./queue.ts";
 import {
 	FORMAT_RATE_LIMIT_MAX,
 	GLOBAL_COMPILE_KEY,
@@ -185,10 +185,10 @@ export class Counters extends DurableObject<Env> {
 	}
 
 	/**
-	 * Join the compile queue. Returns how long the line now is, including this
-	 * compile, which is what the log line reports.
+	 * Join the compile queue. Returns the container to compile on (the
+	 * least-loaded one) and how long the line now is, including this compile.
 	 */
-	enterCompileQueue(token: string): number {
+	enterCompileQueue(token: string): { container: number; depth: number } {
 		return this.#queue.enter(token, Date.now());
 	}
 
@@ -227,8 +227,22 @@ function sleep(ms: number): Promise<void> {
  * forwarded to it, because reaching it renews its sleep timer: see the note on
  * CompilerContainer.
  */
-function compilerStub(env: Env): DurableObjectStub<CompilerContainer> {
-	return getContainer(env.COMPILER, "compiler");
+function compilerStub(env: Env, index: number): DurableObjectStub<CompilerContainer> {
+	// One name per container, `compiler-0` .. `compiler-(N-1)`. Cloudflare gives
+	// each distinct name its own instance up to max_instances in wrangler.jsonc,
+	// which must equal CONTAINER_COUNT. The old single "compiler" name is simply
+	// no longer addressed; that instance sleeps and scales to zero on its own.
+	return getContainer(env.COMPILER, `compiler-${index}`);
+}
+
+/**
+ * A container to use when there is no line to balance against: a format (cheap,
+ * and clang-format never waits behind a compile), or a compile with no usable
+ * token. Random rather than always-zero so these still spread, and cheap so it
+ * costs no Durable Object call.
+ */
+function randomContainer(): number {
+	return Math.floor(Math.random() * CONTAINER_COUNT);
 }
 
 /**
@@ -393,10 +407,20 @@ async function compile(request: Request, env: Env): Promise<Response> {
 	// fails must never cost somebody their compile.
 	const token = request.headers.get("x-compile-token");
 	const tracked = isUsableToken(token);
+	// The queue also decides which of the containers this compile runs on, so a
+	// tracked compile takes the container the line assigns it and everything else
+	// falls back to a random one. If the counters call fails, the compile still
+	// happens — on a random container rather than none.
+	let container = randomContainer();
 	if (tracked) {
 		try {
-			const inLine = await tally.enterCompileQueue(token);
-			if (inLine > 1) console.log(JSON.stringify({ event: "compile-queued", inLine }));
+			const assignment = await tally.enterCompileQueue(token);
+			container = assignment.container;
+			if (assignment.depth > 1) {
+				console.log(
+					JSON.stringify({ event: "compile-queued", inLine: assignment.depth, container }),
+				);
+			}
 		} catch (error) {
 			console.error(JSON.stringify({ message: "queue enter failed", error: String(error) }));
 		}
@@ -404,7 +428,7 @@ async function compile(request: Request, env: Env): Promise<Response> {
 
 	try {
 		// Only now is the container touched — and only now is its sleep timer renewed.
-		return await forwardToContainer(compilerStub(env), "/compile", verdict.body);
+		return await forwardToContainer(compilerStub(env, container), "/compile", verdict.body);
 	} finally {
 		if (tracked) {
 			// Leaving the line is the half that must not be skipped: a token left
@@ -478,7 +502,7 @@ async function format(request: Request, env: Env): Promise<Response> {
 	if (!verdict.ok) return verdict.response;
 
 	// Same rule as a compile: the container is reached only once the gate is clear.
-	return await forwardToContainer(compilerStub(env), "/format", verdict.body);
+	return await forwardToContainer(compilerStub(env, randomContainer()), "/format", verdict.body);
 }
 
 // -------------------------------------------------------------------- routing

@@ -27,7 +27,7 @@ T0–T5 built, tested, committed, and deployed to https://uploadmycode.com. Rema
 | Auth | Rolling class phrase: teacher sets today's phrase (with an expiry) from a `/teacher` page guarded by a `TEACHER_KEY` secret; the Worker checks it on every compile from KV. Students enter it once per tab (`sessionStorage`). Optional school-IP allowlist. No student accounts, no PII stored. Spec in T5. |
 | Sketch storage | Browser `localStorage` + download/upload of `.ino` files. No server-side storage in MVP. |
 | Libraries | Fixed allowlist baked into the container image. Adding a library = edit Dockerfile, redeploy. Start: `Servo`, `LiquidCrystal`. |
-| Cost caps | `max_instances: 1` (raise to 2 only if a real class saturates it), `instance_type: "basic"`, request body cap 100 KB, 6 compiles/min per browser client id + global ceiling 120/min (never per IP: the school shares one), compile timeout 60 s (was 30 s; a cold-start SensorKit compile did not fit). |
+| Cost caps | `max_instances: 2` (two `basic` containers; least-loaded routing wakes the 2nd only during a real burst — 2026-09-17, was 1), `instance_type: "basic"`, request body cap 100 KB, 6 compiles/min per browser client id + global ceiling 120/min (never per IP: the school shares one), compile timeout 60 s (was 30 s; a cold-start SensorKit compile did not fit). |
 
 ## Architecture
 
