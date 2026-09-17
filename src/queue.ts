@@ -1,5 +1,5 @@
 /**
- * Who is waiting for the compiler, and in what order.
+ * How many compiles are waiting for the compiler.
  *
  * One compile runs at a time (container/server.js serialises them on a quarter
  * of a vCPU), so a class that all presses Compile at once forms a line. Five at
@@ -7,15 +7,25 @@
  * one of them succeeded — a student standing in line is not failing — but the
  * page had nothing to say about it, so the fifth student watched `Compiling…`
  * for half a minute with no way to tell the difference between a queue and a
- * broken site. This is what lets the page say "3 sketches ahead of you".
+ * broken site. This is what lets the page say how long the line is.
  *
  * The Worker adds a token before it forwards a compile and removes it when the
  * answer comes back, so what is counted here is exactly the set of compiles in
- * flight. It is a HINT, not a promise: the real queue is the one inside the
- * container, ordering is by arrival at the Durable Object rather than at
- * avr-gcc, and if the Durable Object is evicted the line is forgotten and the
- * page quietly stops showing a position. Nothing depends on it being right —
- * the compile itself is unaffected either way.
+ * flight — the LENGTH of the line, and whether a given compile is still in it.
+ *
+ * It deliberately does NOT report a personal place in the line. The first
+ * version did, and the live burst test showed the number lying: the order five
+ * Worker isolates reach this object in is not the order their requests reach
+ * avr-gcc in, so the student who finished last was told "0 ahead of you" for
+ * forty-four seconds while the one who finished first was told there were two.
+ * Only the container knows its own order, and asking it every three seconds
+ * would cost more than the answer is worth. The length of the line is true
+ * whatever the order, and it is the part that tells a student the site is busy
+ * rather than broken.
+ *
+ * Even the length is a HINT: if the Durable Object is evicted the line is
+ * forgotten and the page quietly goes back to saying nothing about it. Nothing
+ * depends on it being right — the compile itself is unaffected either way.
  *
  * Formats are deliberately NOT tracked. clang-format has its own small
  * allowance in the container and finishes in milliseconds; it never forms a
@@ -44,8 +54,8 @@ export function isUsableToken(token: string | null | undefined): token is string
  * A compile is killed at 60 seconds, and the Worker removes its own token in a
  * `finally`, so a token older than this means the Worker never got to run that
  * `finally` — an isolate that went away mid-request. Sweeping them is what
- * stops one lost request from adding a phantom to everybody's position for the
- * rest of the day.
+ * stops one lost request from adding a phantom to the line for the rest of the
+ * day.
  */
 export const MAX_WAIT_MS = 120_000;
 
@@ -61,11 +71,11 @@ export class CompileQueue {
 	readonly #waiting = new Map<string, number>();
 
 	/**
-	 * Join the line. Returns how many compiles are already ahead, so the caller
-	 * can log it without a second round trip.
+	 * Join the line. Returns how long the line now is, including this compile,
+	 * so the caller can log it without a second round trip.
 	 *
-	 * Re-entering with a token already in the line keeps the original place
-	 * rather than moving to the back: a retried request is not a new student.
+	 * Entering twice with the same token counts once: a retried request is not a
+	 * second student.
 	 */
 	enter(token: string, now: number): number {
 		this.#sweep(now);
@@ -76,7 +86,7 @@ export class CompileQueue {
 				if (!oldest.done && oldest.value !== token) this.#waiting.delete(oldest.value);
 			}
 		}
-		return this.positionOf(token, now) ?? 0;
+		return this.#waiting.size;
 	}
 
 	/** Leave the line. Unknown tokens are not an error; the answer arrived. */
@@ -85,20 +95,15 @@ export class CompileQueue {
 	}
 
 	/**
-	 * How many compiles are ahead of this one: 0 means it is the one being
-	 * compiled now. `null` means this token is not in the line at all — it
-	 * finished, it was never here, or the object was evicted and forgot. The page
-	 * treats all three the same way, by saying nothing about a queue.
+	 * Is this compile still in the line?
+	 *
+	 * False covers three things the page treats identically: it has finished, it
+	 * was never here, or this object was evicted and forgot. All three mean the
+	 * page says nothing about a queue.
 	 */
-	positionOf(token: string, now: number): number | null {
+	isWaiting(token: string, now: number): boolean {
 		this.#sweep(now);
-		if (!this.#waiting.has(token)) return null;
-		let ahead = 0;
-		for (const other of this.#waiting.keys()) {
-			if (other === token) return ahead;
-			ahead += 1;
-		}
-		return null;
+		return this.#waiting.has(token);
 	}
 
 	/** How many compiles are in flight altogether. */

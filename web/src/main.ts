@@ -11,7 +11,7 @@ import {
 	hexProgramBytes,
 	newCompileToken,
 	requestCompile,
-	requestQueuePosition,
+	requestQueueLength,
 } from "./compile.ts";
 import { createEditor, type Editor } from "./editor.ts";
 import { hintFor } from "./error-hints.ts";
@@ -368,18 +368,21 @@ const QUEUE_FIRST_POLL_MS = 2500;
 /**
  * What the output window says while a compile is on the server.
  *
+ * `inLine` is how many sketches are in the line, this one included, so it only
+ * has something to say from two upwards. It is the length of the line and not a
+ * place in it, because the order the Worker sees is not the order avr-gcc sees
+ * and a personal position would sometimes be a lie — see src/queue.ts.
+ *
  * Nothing is claimed about a queue until the server has said there is one. A
  * poll that fails, a Durable Object that has forgotten the line, an older
  * deployment without the endpoint — all of them land on the plain sentence,
  * which is exactly what the page used to say on its own.
  */
-function waitingMessage(ahead: number | null): string {
-	if (ahead === null || ahead <= 0) {
+function waitingMessage(inLine: number | null): string {
+	if (inLine === null || inLine < 2) {
 		return "Compiling on the server. The first compile after a quiet spell can take half a minute.";
 	}
-	return ahead === 1
-		? "Waiting for the compiler. 1 sketch is ahead of yours."
-		: `Waiting for the compiler. ${ahead} sketches are ahead of yours.`;
+	return `Waiting for the compiler. ${inLine} sketches are in the line, including yours.`;
 }
 
 /**
@@ -390,14 +393,14 @@ function waitingMessage(ahead: number | null): string {
  * After it is called, a poll already in flight is ignored rather than raced
  * against the result being rendered.
  */
-function pollQueueWhileWaiting(token: string, show: (ahead: number | null) => void): () => void {
+function pollQueueWhileWaiting(token: string, show: (inLine: number | null) => void): () => void {
 	let stopped = false;
 	let timer = 0;
 
 	const ask = async (): Promise<void> => {
-		const ahead = await requestQueuePosition(token);
+		const inLine = await requestQueueLength(token);
 		if (stopped) return;
-		show(ahead);
+		show(inLine);
 		timer = window.setTimeout(() => void ask(), QUEUE_POLL_MS);
 	};
 
@@ -436,9 +439,9 @@ async function compileSketch(): Promise<void> {
 	showOutput(waitingMessage(null), "plain");
 
 	const token = newCompileToken();
-	const stopPolling = pollQueueWhileWaiting(token, (ahead) => {
-		setStatus("compiling", ahead !== null && ahead > 0 ? "In line…" : "Compiling…");
-		showOutput(waitingMessage(ahead), "plain");
+	const stopPolling = pollQueueWhileWaiting(token, (inLine) => {
+		setStatus("compiling", inLine !== null && inLine >= 2 ? "In line…" : "Compiling…");
+		showOutput(waitingMessage(inLine), "plain");
 	});
 
 	const startedAt = performance.now();

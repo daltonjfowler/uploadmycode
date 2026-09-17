@@ -306,9 +306,11 @@ Other details worth knowing:
   compile timeout applies to one `arduino-cli` run, NOT to the wait in line, so a queued student is
   never timed out for standing in it.
 - The editor sends `x-compile-token` with each compile and asks `GET /api/queue?token=...` every
-  three seconds while it waits, so the output panel can say "3 sketches are ahead of yours". That
-  endpoint reads a number and nothing else: it needs no class phrase, never touches the container,
-  and answers `{ position, depth }` where `position` is null once the compile is no longer waiting.
+  three seconds while it waits, so the output panel can say "4 sketches are in the line, including
+  yours". That endpoint reads a number and nothing else: it needs no class phrase, never touches
+  the container, and answers `{ waiting, depth }`. It reports the LENGTH of the line, never a place
+  in it — the order requests reach the Worker in is not the order they reach `arduino-cli` in, so a
+  personal position would sometimes tell the last student they were next.
 - A compile is killed at 60 seconds and comes back as `ok:false`.
 - Server-side temp paths are stripped out of error text before it is returned, so a student sees
   `sketch.ino:34:3`, not a path from inside the container.

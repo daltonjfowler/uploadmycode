@@ -561,7 +561,7 @@ The guardrails, all already in place:
 | Rate limit, per client | `src/ratelimit.ts` | 6 compiles per minute per `x-client-id` (section 4a) |
 | Auto indent limit, per client | `src/ratelimit.ts` | 12 per minute per `x-client-id`, its own bucket |
 | Global ceiling | `src/ratelimit.ts` | 120 requests per minute, everyone and both endpoints together |
-| Queue polls, per client | `src/ratelimit.ts` | 60 per minute per `x-client-id`, its own bucket (the page asks every 3 s while it waits) |
+| Queue polls, per client | `src/ratelimit.ts` | 60 per minute per `x-client-id`, its own bucket (the page asks every 3 s while it waits, for the length of the line) |
 | Queue polls, everybody | `src/ratelimit.ts` | 1200 per minute, counted apart from the compiles on purpose |
 | Wrong-key guard | `src/teacher-guard.ts` | more than 100 wrong teacher keys / 15 min (section 4a) |
 | Class phrase | KV + `src/worker.ts` | required on every compile |

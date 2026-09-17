@@ -185,8 +185,8 @@ export class Counters extends DurableObject<Env> {
 	}
 
 	/**
-	 * Join the compile queue. Returns how many compiles are already ahead, which
-	 * is what the log line reports; the page asks for its own position later.
+	 * Join the compile queue. Returns how long the line now is, including this
+	 * compile, which is what the log line reports.
 	 */
 	enterCompileQueue(token: string): number {
 		return this.#queue.enter(token, Date.now());
@@ -198,13 +198,13 @@ export class Counters extends DurableObject<Env> {
 	}
 
 	/**
-	 * How many compiles are ahead of this one, and how long the whole line is.
-	 * `position` is null when the token is not waiting — finished, never here, or
-	 * forgotten because this object was evicted.
+	 * How long the line is, and whether this compile is still standing in it.
+	 * Not a personal place in the queue: see the note at the top of src/queue.ts
+	 * for why that number could not be told truthfully.
 	 */
-	compileQueueStatus(token: string): { position: number | null; depth: number } {
+	compileQueueStatus(token: string): { waiting: boolean; depth: number } {
 		const now = Date.now();
-		return { position: this.#queue.positionOf(token, now), depth: this.#queue.depth(now) };
+		return { waiting: this.#queue.isWaiting(token, now), depth: this.#queue.depth(now) };
 	}
 
 	/**
@@ -395,8 +395,8 @@ async function compile(request: Request, env: Env): Promise<Response> {
 	const tracked = isUsableToken(token);
 	if (tracked) {
 		try {
-			const ahead = await tally.enterCompileQueue(token);
-			if (ahead > 0) console.log(JSON.stringify({ event: "compile-queued", ahead }));
+			const inLine = await tally.enterCompileQueue(token);
+			if (inLine > 1) console.log(JSON.stringify({ event: "compile-queued", inLine }));
 		} catch (error) {
 			console.error(JSON.stringify({ message: "queue enter failed", error: String(error) }));
 		}
@@ -419,7 +419,7 @@ async function compile(request: Request, env: Env): Promise<Response> {
 }
 
 /**
- * GET /api/queue?token=… — "how many sketches are ahead of mine?"
+ * GET /api/queue?token=… — "how long is the line I am standing in?"
  *
  * The one endpoint here that asks for no class phrase. Three reasons, in order
  * of how much they matter: it reads a number and changes nothing; requiring the
@@ -459,7 +459,7 @@ async function queuePosition(request: Request, env: Env): Promise<Response> {
 	}
 
 	const status = await tally.compileQueueStatus(token);
-	return json(200, { ok: true, position: status.position, depth: status.depth });
+	return json(200, { ok: true, waiting: status.waiting, depth: status.depth });
 }
 
 /**

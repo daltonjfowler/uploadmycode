@@ -23,9 +23,9 @@
  *                   gives every Chromebook its own six compiles a minute
  *                   instead of six for the school.
  *   x-compile-token a fresh token for this one press of Compile, which is what
- *                   lets the page ask GET /api/queue how many sketches are
- *                   ahead of it while it waits. Tracking it is best-effort at
- *                   both ends: a compile sent without one still compiles.
+ *                   lets the page ask GET /api/queue how long the line is while
+ *                   it waits. Tracking it is best-effort at both ends: a
+ *                   compile sent without one still compiles.
  *
  * An HTTP 429 is therefore always about pace, never about the phrase: either
  * this browser has compiled six times in a minute or the whole site is at its
@@ -60,21 +60,27 @@ export function newCompileToken(): string {
 }
 
 /**
- * How many compiles are ahead of this one. 0 means it is being compiled now.
+ * How many compiles are in the line this one is standing in, or null if it is
+ * not standing in a line any more.
  *
- * Null for every unhappy answer there is — not waiting any more, refused, the
- * network hiccuped, a shape we do not recognise — because this is decoration on
- * a wait that is happening anyway. It must never turn into an error a student
- * has to read.
+ * Deliberately the length of the line and not a place in it: the Worker's
+ * order is not the container's, so a personal position could not be told
+ * truthfully. See src/queue.ts.
+ *
+ * Null for every unhappy answer there is — finished, refused, the network
+ * hiccuped, a shape we do not recognise — because this is decoration on a wait
+ * that is happening anyway. It must never turn into an error a student has to
+ * read.
  */
-export async function requestQueuePosition(token: string): Promise<number | null> {
+export async function requestQueueLength(token: string): Promise<number | null> {
 	try {
 		const response = await fetch(`${QUEUE_URL}?token=${encodeURIComponent(token)}`, {
 			headers: { "x-client-id": loadClientId() },
 		});
 		if (!response.ok) return null;
-		const body = (await response.json()) as { position?: unknown };
-		return typeof body.position === "number" ? body.position : null;
+		const body = (await response.json()) as { waiting?: unknown; depth?: unknown };
+		if (body.waiting !== true || typeof body.depth !== "number") return null;
+		return body.depth;
 	} catch {
 		return null;
 	}

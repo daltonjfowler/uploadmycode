@@ -1,6 +1,10 @@
 /**
- * The compile queue: who is ahead of whom, and what happens to the tokens of
- * requests that never came back.
+ * The compile queue: how long the line is, who is still standing in it, and
+ * what happens to the tokens of requests that never came back.
+ *
+ * There is no test for a personal place in the line because the code no longer
+ * reports one: the Worker's order is not the container's, so that number could
+ * not be told truthfully. See the note at the top of src/queue.ts.
  *
  * Run with `npm test`. Node runs src/queue.ts directly (it strips the types).
  * The clock is always passed in, so a token can be aged out without waiting two
@@ -16,21 +20,21 @@ const A = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa";
 const B = "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb";
 const C = "cccccccc-3333-4333-8333-cccccccccccc";
 
-test("the first in line has nobody ahead, and the third has two", () => {
+test("joining reports the length of the line, this compile included", () => {
 	const queue = new CompileQueue();
 	const now = 1_000_000;
 
-	assert.equal(queue.enter(A, now), 0);
-	assert.equal(queue.enter(B, now + 10), 1);
-	assert.equal(queue.enter(C, now + 20), 2);
+	assert.equal(queue.enter(A, now), 1);
+	assert.equal(queue.enter(B, now + 10), 2);
+	assert.equal(queue.enter(C, now + 20), 3);
 
-	assert.equal(queue.positionOf(A, now + 30), 0);
-	assert.equal(queue.positionOf(B, now + 30), 1);
-	assert.equal(queue.positionOf(C, now + 30), 2);
 	assert.equal(queue.depth(now + 30), 3);
+	assert.equal(queue.isWaiting(A, now + 30), true);
+	assert.equal(queue.isWaiting(B, now + 30), true);
+	assert.equal(queue.isWaiting(C, now + 30), true);
 });
 
-test("when the one in front finishes, everybody moves up", () => {
+test("when one finishes, the line gets shorter for everybody left", () => {
 	const queue = new CompileQueue();
 	const now = 1_000_000;
 	queue.enter(A, now);
@@ -39,20 +43,20 @@ test("when the one in front finishes, everybody moves up", () => {
 
 	queue.leave(A);
 
-	assert.equal(queue.positionOf(B, now + 30), 0);
-	assert.equal(queue.positionOf(C, now + 30), 1);
 	assert.equal(queue.depth(now + 30), 2);
+	assert.equal(queue.isWaiting(A, now + 30), false);
+	assert.equal(queue.isWaiting(B, now + 30), true);
 });
 
-test("a token that is not waiting has no position at all", () => {
+test("a token that is not waiting says so", () => {
 	const queue = new CompileQueue();
 	const now = 1_000_000;
 
-	assert.equal(queue.positionOf(A, now), null, "never joined");
+	assert.equal(queue.isWaiting(A, now), false, "never joined");
 
 	queue.enter(A, now);
 	queue.leave(A);
-	assert.equal(queue.positionOf(A, now + 10), null, "already finished");
+	assert.equal(queue.isWaiting(A, now + 10), false, "already finished");
 });
 
 test("leaving twice, or leaving something that never joined, is harmless", () => {
@@ -67,14 +71,13 @@ test("leaving twice, or leaving something that never joined, is harmless", () =>
 	assert.equal(queue.depth(now), 0);
 });
 
-test("re-entering keeps the original place rather than going to the back", () => {
+test("entering twice with one token counts once", () => {
 	const queue = new CompileQueue();
 	const now = 1_000_000;
 	queue.enter(A, now);
 	queue.enter(B, now + 10);
 
-	assert.equal(queue.enter(A, now + 20), 0);
-	assert.equal(queue.positionOf(B, now + 20), 1);
+	assert.equal(queue.enter(A, now + 20), 2, "still two compiles, not three");
 	assert.equal(queue.depth(now + 20), 2);
 });
 
@@ -85,9 +88,9 @@ test("a token left behind by a lost request ages out of the line", () => {
 	queue.enter(B, now + 1000);
 
 	const later = now + MAX_WAIT_MS + 1;
-	assert.equal(queue.positionOf(A, later), null, "the lost one is gone");
-	assert.equal(queue.positionOf(B, later), 0, "and stops counting against the rest");
-	assert.equal(queue.depth(later), 1);
+	assert.equal(queue.isWaiting(A, later), false, "the lost one is gone");
+	assert.equal(queue.isWaiting(B, later), true, "and the real one is untouched");
+	assert.equal(queue.depth(later), 1, "so it stops lengthening the line for everybody");
 });
 
 test("the line cannot grow without bound", () => {
