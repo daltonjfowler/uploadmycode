@@ -35,9 +35,9 @@ The editor page at Chromebook resolution (1366x768), before any sketch is compil
 - **A rolling class phrase** — the teacher sets today's phrase, with an expiry, from a `/teacher`
   page guarded by a secret. Nobody compiles without it. Students type it once per tab and it dies
   with the tab.
-- **Cost caps** — one container instance, scale-to-zero, a per-browser rate limit, a global
-  ceiling, a request-size cap and a compile timeout. All of it so a runaway loop cannot run up a
-  bill overnight.
+- **Cost caps** — two small container instances (the second wakes only during a burst and sleeps
+  again), scale-to-zero, a per-browser rate limit, a global ceiling, a request-size cap and a
+  compile timeout. All of it so a runaway loop cannot run up a bill overnight.
 - **Libraries** — a fixed allowlist baked into the container image, so a compile never touches the
   network. Servo, LiquidCrystal, LiquidCrystal I2C, Stepper and Arduino SensorKit (the Seeed Grove
   sensor kit) ship by default. The SensorKit's own dependencies, DHT20 and the LIS3DHTR

@@ -155,7 +155,7 @@ Goal: only students physically in Dalton's class can compile, with zero student 
   saying the site only works from school. Empty by default. Document how to obtain the ranges.
 
 **Other hardening.** Rate limit 6 compiles/min per browser client id (`x-client-id`), plus a global ceiling of 120/min as the bill guard; never per IP, the whole school shares one public IP. Reject bodies
-over 100 KB at the Worker (413). Confirm `max_instances: 1` and idle sleep. Add a non-root user
+over 100 KB at the Worker (413). Confirm `max_instances` and idle sleep. Add a non-root user
 to the container image (T1 security note) and verify the image still builds and compiles.
 
 **Docs.** `docs/DEPLOY.md`: fresh-machine deploy, creating `TEACHER_KEY` and the KV namespace,
@@ -176,7 +176,7 @@ Circuits for simulation, so there is nothing to rebuild. Do not start any of thi
 
 - Fixed: $5/month Workers Paid.
 - One class period: ~30 students × ~20 compiles × ~3 vCPU-s ≈ 30 vCPU-min active CPU, well inside the 375 vCPU-min monthly included quota for occasional use; heavy month maybe a few dollars of overage. Memory: `basic` provisions 1 GiB only while awake.
-- Guardrails that keep it boring: scale-to-zero, `max_instances: 1`, rate limit, body cap, billing notification (T5 doc).
+- Guardrails that keep it boring: scale-to-zero, `max_instances: 2` (least-loaded routing wakes the 2nd only during a burst), rate limit, body cap, billing notification (T5 doc).
 
 ## References
 
