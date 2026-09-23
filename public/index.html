@@ -11,8 +11,10 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="manifest" href="/manifest.webmanifest">
     <meta name="theme-color" content="#1F9FA5">
-  <script type="module" crossorigin src="/assets/index-DLAqVcc8.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-LA6xrrnI.css">
+    <!-- Blocking on purpose: sets data-theme before the first paint. -->
+    <script src="/theme-boot.js"></script>
+  <script type="module" crossorigin src="/assets/index-DhCnlRyA.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-Cxtv2_KL.css">
 </head>
 	<body>
 		<div class="app">
@@ -50,6 +52,9 @@
 					<input id="autocomplete-toggle" type="checkbox" checked />
 					Autocomplete
 				</label>
+
+				<!-- Cycles System, Light, Dark. src/theme.ts writes its label. -->
+				<button id="theme-toggle" type="button">🖥️ System</button>
 
 				<!-- Next to Compile, but deliberately outside .run-group: that group is
 				     the two buttons that talk to the board plus the pill that reports on

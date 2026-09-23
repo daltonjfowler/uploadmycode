@@ -2,9 +2,10 @@
  * One stylesheet, plain CSS, no framework.
  *
  * Every colour is a custom property declared twice: once for light and once
- * inside prefers-color-scheme: dark. The CodeMirror theme in editor.ts uses the
- * same properties, so the editor follows the system theme with no JavaScript
- * and nothing to re-create when a student flips their Chromebook to dark mode.
+ * under [data-theme="dark"]. public/theme-boot.js stamps that attribute before
+ * the first paint and src/theme.ts keeps it right after (the theme button, or
+ * System following the Chromebook). The CodeMirror theme in editor.ts uses the
+ * same properties, so the editor has nothing to re-create when the theme flips.
  *
  * The layout in one sentence: .app is a column, the editor is the only row in
  * it that flexes, and every other row is as tall as its own content and no
@@ -19,7 +20,7 @@
  */
 
 :root {
-	color-scheme: light dark;
+	color-scheme: light;
 
 	--bg: #ffffff;
 	--panel: #f3f4f6;
@@ -77,44 +78,44 @@
 	--plot-grid: #e6e9ee;
 }
 
-@media (prefers-color-scheme: dark) {
-	:root {
-		--bg: #0d1117;
-		--panel: #161b22;
-		--gutter-bg: #0d1117;
-		--editor-bg: #0d1117;
-		--fg: #e6edf3;
-		--muted: #9198a1;
-		--border: #30363d;
-		--accent: #2f9ea4;
-		--accent-fg: #04191b;
-		--ok: #3fb950;
-		--danger: #f85149;
-		--warn: #d29922;
-		--selection: #23405e;
-		--active-line: rgba(230, 237, 243, 0.05); /* translucent; see the light-mode note on why */
-		--bracket: #26374a;
-		--error-line: #2d1618;
+:root[data-theme="dark"] {
+	color-scheme: dark;
 
-		--tok-comment: #8b949e;
-		--tok-keyword: #ff7b72;
-		--tok-type: #ffa657;
-		--tok-number: #79c0ff;
-		--tok-string: #a5d6ff;
-		--tok-function: #d2a8ff;
-		--tok-preproc: #7ee787;
-		--tok-constant: #79c0ff;
-		--tok-punct: #9198a1;
+	--bg: #0d1117;
+	--panel: #161b22;
+	--gutter-bg: #0d1117;
+	--editor-bg: #0d1117;
+	--fg: #e6edf3;
+	--muted: #9198a1;
+	--border: #30363d;
+	--accent: #2f9ea4;
+	--accent-fg: #04191b;
+	--ok: #3fb950;
+	--danger: #f85149;
+	--warn: #d29922;
+	--selection: #23405e;
+	--active-line: rgba(230, 237, 243, 0.05); /* translucent; see the light-mode note on why */
+	--bracket: #26374a;
+	--error-line: #2d1618;
 
-		/* The same four hues lifted for a #0d1117 background. The light values
-		   are far too dark to read here, which is the whole reason the plotter
-		   reads them from CSS instead of holding its own list. */
-		--plot-1: #58a6ff;
-		--plot-2: #ff7b72;
-		--plot-3: #3fb950;
-		--plot-4: #d2a8ff;
-		--plot-grid: #21262d;
-	}
+	--tok-comment: #8b949e;
+	--tok-keyword: #ff7b72;
+	--tok-type: #ffa657;
+	--tok-number: #79c0ff;
+	--tok-string: #a5d6ff;
+	--tok-function: #d2a8ff;
+	--tok-preproc: #7ee787;
+	--tok-constant: #79c0ff;
+	--tok-punct: #9198a1;
+
+	/* The same four hues lifted for a #0d1117 background. The light values
+	   are far too dark to read here, which is the whole reason the plotter
+	   reads them from CSS instead of holding its own list. */
+	--plot-1: #58a6ff;
+	--plot-2: #ff7b72;
+	--plot-3: #3fb950;
+	--plot-4: #d2a8ff;
+	--plot-grid: #21262d;
 }
 
 * {

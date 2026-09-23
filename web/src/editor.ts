@@ -10,8 +10,8 @@
  *     as a line highlight plus the output panel, so nothing lints in the page.
  *
  * All colours are CSS custom properties defined in style.css, which is where
- * light and dark are chosen from prefers-color-scheme. Nothing here reads the
- * colour scheme, and nothing has to be re-created when the system theme flips.
+ * light and dark are chosen by the data-theme attribute. Nothing here reads the
+ * colour scheme, and nothing has to be re-created when the theme flips.
  */
 
 import {

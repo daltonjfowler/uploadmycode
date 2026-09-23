@@ -33,6 +33,8 @@ const MONITOR_OPEN_KEY = "uno-ide.v1.monitor-open";
 const MONITOR_BAUD_KEY = "uno-ide.v1.monitor-baud";
 const MONITOR_VIEW_KEY = "uno-ide.v1.monitor-view";
 const CLIENT_ID_KEY = "uno-ide.v1.client-id";
+// public/theme-boot.js reads this key by name too; keep the two in step.
+const THEME_KEY = "uno-ide.v1.theme";
 const PANEL_HEIGHT_KEYS = {
 	output: "uno-ide.v1.output-height",
 	monitor: "uno-ide.v1.monitor-height",
@@ -167,6 +169,19 @@ export function loadMonitorView(): MonitorView {
 
 export function saveMonitorView(view: MonitorView): void {
 	writeKey(MONITOR_VIEW_KEY, view);
+}
+
+/** The theme button's three settings. System follows the Chromebook. */
+export type ThemePreference = "system" | "light" | "dark";
+
+/** Default System: a student who never touches the button gets their device's theme. */
+export function loadThemePreference(): ThemePreference {
+	const raw = readKey(THEME_KEY);
+	return raw === "light" || raw === "dark" ? raw : "system";
+}
+
+export function saveThemePreference(preference: ThemePreference): void {
+	writeKey(THEME_KEY, preference);
 }
 
 /** The two panels a student can drag a handle on. */

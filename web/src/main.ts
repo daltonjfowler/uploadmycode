@@ -15,6 +15,7 @@ import {
 } from "./compile.ts";
 import { createEditor, type Editor } from "./editor.ts";
 import { hintFor } from "./error-hints.ts";
+import { initThemeButton } from "./theme.ts";
 import { errorLines, firstErrorSummary, parseCompileErrors, type CompileError } from "./errors.ts";
 import { formatEdit, requestFormat } from "./format.ts";
 import { HexParseError, parseIntelHex } from "./flash/intel-hex.ts";
@@ -1197,6 +1198,8 @@ librarySelect.addEventListener("change", () => {
 	clearErrorRows();
 	editor.focus();
 });
+
+initThemeButton(el<HTMLButtonElement>("theme-toggle"));
 
 autocompleteToggle.checked = loadAutocompleteEnabled();
 autocompleteToggle.addEventListener("change", () => {

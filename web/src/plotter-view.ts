@@ -73,10 +73,10 @@ export function createPlotView(canvas: HTMLCanvasElement, data: PlotData): PlotV
 	let frame = 0;
 
 	// A theme flip repaints the page but not a canvas, so ask for a redraw when
-	// the system switches between light and dark.
-	const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
-	const onThemeChange = (): void => requestDraw();
-	darkQuery.addEventListener("change", onThemeChange);
+	// data-theme changes — from the theme button, or from the system while the
+	// button is on System (src/theme.ts).
+	const themeObserver = new MutationObserver(() => requestDraw());
+	themeObserver.observe(document.documentElement, { attributeFilter: ["data-theme"] });
 
 	// The panel is inside a flex column, so it resizes without the window
 	// resizing: dragging the monitor's handle changes this canvas's box while the
@@ -128,7 +128,7 @@ export function createPlotView(canvas: HTMLCanvasElement, data: PlotData): PlotV
 
 	function dispose(): void {
 		setVisible(false);
-		darkQuery.removeEventListener("change", onThemeChange);
+		themeObserver.disconnect();
 		window.removeEventListener("resize", onResize);
 		observer.disconnect();
 	}
