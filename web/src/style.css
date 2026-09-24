@@ -265,9 +265,16 @@ body.resizing {
 }
 
 .brand {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
 	font-weight: 700;
 	letter-spacing: -0.01em;
 	margin-right: 0.25rem;
+}
+
+.brand img {
+	border-radius: 7px;
 }
 
 .grow {
