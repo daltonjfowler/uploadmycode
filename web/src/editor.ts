@@ -9,6 +9,9 @@
  *   - linting is left out. Compiler errors arrive from the server and are shown
  *     as a line highlight plus the output panel, so nothing lints in the page.
  *
+ * The search panel (Ctrl+F, or the Find & replace button) is our own, from
+ * find.ts. The search keymap and the searching itself are still CodeMirror's.
+ *
  * All colours are CSS custom properties defined in style.css, which is where
  * light and dark are chosen by the data-theme attribute. Nothing here reads the
  * colour scheme, and nothing has to be re-created when the theme flips.
@@ -30,7 +33,13 @@ import {
 	indentOnInput,
 	syntaxHighlighting,
 } from "@codemirror/language";
-import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
+import {
+	closeSearchPanel,
+	highlightSelectionMatches,
+	openSearchPanel,
+	searchKeymap,
+	searchPanelOpen,
+} from "@codemirror/search";
 import { Compartment, EditorState, StateEffect, StateField, Text } from "@codemirror/state";
 import {
 	Decoration,
@@ -49,6 +58,7 @@ import type { DecorationSet } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 
 import { arduinoCompletions } from "./arduino-completions.ts";
+import { findReplace } from "./find.ts";
 
 // ------------------------------------------------------------------ appearance
 
@@ -141,6 +151,60 @@ const editorTheme = EditorView.theme({
 	},
 	".cm-panels": { backgroundColor: "var(--panel)", color: "var(--fg)" },
 	".cm-panels.cm-panels-bottom": { borderTop: "1px solid var(--border)" },
+	".cm-panels.cm-panels-top": { borderBottom: "1px solid var(--border)" },
+	// The Find & replace panel (find.ts). Its buttons are the page's own, from
+	// style.css; only the text boxes and the layout are set here.
+	".cm-find": {
+		display: "flex",
+		alignItems: "flex-start",
+		gap: "0.5rem",
+		padding: "0.4rem 0.75rem",
+	},
+	".cm-find-body": {
+		flex: "1 1 auto",
+		display: "flex",
+		flexWrap: "wrap",
+		alignItems: "center",
+		gap: "0.4rem 1rem",
+	},
+	// highlightSelectionMatches marks every copy of the selected text, inside
+	// other words too, in the same colour as a search match. While the panel is
+	// up the selection usually IS a match, so those extra marks would show a
+	// Whole word search hitting the i in `print`. Only the search's own marks
+	// are honest here.
+	"&:has(.cm-find) .cm-selectionMatch": { backgroundColor: "transparent" },
+	".cm-find-group": {
+		display: "inline-flex",
+		flexWrap: "wrap",
+		alignItems: "center",
+		gap: "0.4rem",
+	},
+	".cm-find .cm-textfield": {
+		font: "inherit",
+		fontFamily: 'ui-monospace, "Cascadia Mono", Consolas, "Roboto Mono", monospace',
+		fontSize: "0.85rem",
+		width: "11rem",
+		color: "var(--fg)",
+		backgroundColor: "var(--bg)",
+		border: "1px solid var(--border)",
+		borderRadius: "5px",
+		padding: "0.28rem 0.5rem",
+	},
+	".cm-find .cm-textfield:focus": { borderColor: "var(--accent)" },
+	".cm-find-count": {
+		minWidth: "5.5rem",
+		fontSize: "0.8rem",
+		color: "var(--muted)",
+		fontVariantNumeric: "tabular-nums",
+	},
+	".cm-find-count[data-state=none]": { color: "var(--danger)", fontWeight: "600" },
+	".cm-find button.cm-find-close": {
+		border: "none",
+		background: "none",
+		fontSize: "1.1rem",
+		lineHeight: "1",
+		color: "var(--muted)",
+	},
 	".cm-searchMatch": { backgroundColor: "var(--bracket)" },
 	".cm-searchMatch.cm-searchMatch-selected": {
 		backgroundColor: "var(--accent)",
@@ -224,6 +288,8 @@ export interface Editor {
 	/** The 1-based line the caret is on right now. */
 	caretLine(): number;
 	setAutocomplete(enabled: boolean): void;
+	/** Open the Find & replace panel, or close it if it is already open. */
+	toggleFind(): void;
 	focus(): void;
 }
 
@@ -233,6 +299,8 @@ export interface EditorOptions {
 	autocomplete: boolean;
 	/** Called after every change to the document, including programmatic ones. */
 	onChange: (code: string) => void;
+	/** Called when the Find & replace panel opens or closes, by any route. */
+	onFindToggle: (open: boolean) => void;
 }
 
 export function createEditor(options: EditorOptions): Editor {
@@ -273,9 +341,12 @@ export function createEditor(options: EditorOptions): Editor {
 				editorTheme,
 				EditorView.lineWrapping,
 				errorLineField,
+				findReplace(),
 				autocompleteConf.of(autocompleteExtension(options.autocomplete)),
 				EditorView.updateListener.of((update) => {
 					if (update.docChanged) options.onChange(update.state.doc.toString());
+					const open = searchPanelOpen(update.state);
+					if (open !== searchPanelOpen(update.startState)) options.onFindToggle(open);
 				}),
 			],
 		}),
@@ -336,6 +407,17 @@ export function createEditor(options: EditorOptions): Editor {
 
 		setAutocomplete(enabled) {
 			view.dispatch({ effects: autocompleteConf.reconfigure(autocompleteExtension(enabled)) });
+		},
+
+		toggleFind() {
+			if (!searchPanelOpen(view.state)) {
+				openSearchPanel(view);
+				return;
+			}
+			closeSearchPanel(view);
+			// The button has the focus now, not the panel, so closeSearchPanel
+			// does not hand it back to the editor on its own.
+			view.focus();
 		},
 
 		focus: () => view.focus(),

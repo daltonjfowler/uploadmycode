@@ -243,15 +243,96 @@ body.resizing {
 /* ------------------------------------------------------------------ toolbar */
 
 /* align-items: center, not the default stretch, so a button on a wrapped row is
-   never taller than its own text. */
+   never taller than its own text. The wide column gap is what tells the groups
+   apart; inside a group the controls sit closer. */
 .toolbar {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: 0.4rem 0.5rem;
+	gap: 0.4rem 1.1rem;
 	padding: 0.5rem 0.75rem;
 	background: var(--panel);
 	border-bottom: 1px solid var(--border);
+}
+
+/* A group wraps as one piece, so a narrow window never strands a button away
+   from the controls it belongs with. */
+.tool-group {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+/* File and Settings: a small caret says "this opens a list". */
+.menu-button::after {
+	content: "▾";
+	margin-left: 0.35rem;
+	color: var(--muted);
+}
+
+/* An open menu, and the Find & replace panel while it is up. */
+.menu-button[aria-expanded="true"],
+#find[aria-expanded="true"] {
+	border-color: var(--accent);
+	background: color-mix(in srgb, var(--accent) 14%, var(--bg));
+}
+
+/* The UA sheet centres a popover in the viewport. Ours hangs off its button:
+   src/menus.ts writes top and left (or right) just before it opens. */
+.menu {
+	position: fixed;
+	inset: auto;
+	margin: 0;
+	min-width: 12rem;
+	max-width: calc(100vw - 1rem);
+	padding: 0.3rem;
+	color: var(--fg);
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	box-shadow: 0 8px 24px rgb(0 0 0 / 0.22);
+}
+
+.menu:popover-open {
+	display: flex;
+	flex-direction: column;
+	gap: 0.1rem;
+}
+
+/* Menu items: whole-width rows, not boxed buttons. */
+.menu > button {
+	text-align: left;
+	border-color: transparent;
+	background: none;
+	padding: 0.4rem 0.65rem;
+}
+
+.menu > button:hover:not(:disabled) {
+	border-color: transparent;
+	background: var(--panel);
+}
+
+.menu > button.danger {
+	color: var(--danger);
+}
+
+.menu hr {
+	border: none;
+	border-top: 1px solid var(--border);
+	margin: 0.25rem 0.3rem;
+}
+
+.menu > .check,
+.menu-row {
+	padding: 0.35rem 0.65rem;
+}
+
+.menu-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	font-size: 0.85rem;
 }
 
 /* Compile, Upload and the status pill travel as one group, pushed to the right
@@ -316,7 +397,7 @@ select {
 /* The Library menu always shows its own name — it snaps back to the placeholder
    the moment a library is picked — so it never needs room for the longest entry.
    The open list is drawn at full width by the browser whatever this says. Narrow
-   keeps it beside Import on a phone instead of costing the toolbar a row. */
+   keeps it beside Find & replace instead of costing the toolbar a row. */
 #library-select {
 	max-width: 9rem;
 }

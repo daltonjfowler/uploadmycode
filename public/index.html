@@ -13,55 +13,52 @@
     <meta name="theme-color" content="#1F9FA5">
     <!-- Blocking on purpose: sets data-theme before the first paint. -->
     <script src="/theme-boot.js"></script>
-  <script type="module" crossorigin src="/assets/index-DYpk2tLg.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-hu7pLjVV.css">
+  <script type="module" crossorigin src="/assets/index-BsmQDiRL.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-BCEq70DM.css">
 </head>
 	<body>
 		<div class="app">
+			<!-- Four groups, left to right: which sketch (and the File menu for it),
+			     tools that change the text, Settings, and the run group. The sketch
+			     file actions and the preferences live in the two menus below. -->
 			<header class="toolbar">
 				<span class="brand"><img src="/icon.svg" alt="" width="36" height="36">uploadmycode</span>
 
-				<label class="field">
-					<span>Sketch</span>
-					<select id="sketch-select" aria-label="Open sketch"></select>
-				</label>
+				<div class="tool-group">
+					<label class="field">
+						<span>Sketch</span>
+						<select id="sketch-select" aria-label="Open sketch"></select>
+					</label>
+					<button id="file-menu-button" class="menu-button" type="button" popovertarget="file-menu">
+						File
+					</button>
+				</div>
 
-				<button id="new-sketch" type="button">New</button>
-				<button id="rename-sketch" type="button">Rename</button>
-				<button id="delete-sketch" type="button">Delete</button>
-
-				<button id="download-sketch" type="button">Download</button>
-				<button id="import-sketch" type="button">Import</button>
-				<input
-					id="import-input"
-					type="file"
-					accept=".ino,.pde,.txt,text/plain"
-					hidden
-					aria-hidden="true"
-					tabindex="-1"
-				/>
-
-				<!-- Options come from src/libraries.ts, so the menu and the list the
-				     container installs cannot drift apart in the markup. -->
-				<label class="field">
-					<span>Library</span>
+				<div class="tool-group">
+					<!-- Options come from src/libraries.ts, so the menu and the list the
+					     container installs cannot drift apart in the markup. -->
 					<select id="library-select" aria-label="Add a library include"></select>
-				</label>
+					<button
+						id="find"
+						type="button"
+						aria-expanded="false"
+						title="Find a word in this sketch, and swap it for another if you like. Ctrl+F also opens this."
+					>
+						🔍 Find &amp; replace
+					</button>
+					<button id="format" type="button" title="Tidy this sketch's indentation. Ctrl+Z undoes it.">
+						Auto indent
+					</button>
+				</div>
 
-				<label class="check">
-					<input id="autocomplete-toggle" type="checkbox" checked />
-					Autocomplete
-				</label>
-
-				<!-- Cycles System, Light, Dark. src/theme.ts writes its label. -->
-				<button id="theme-toggle" type="button">🖥️ System</button>
-
-				<!-- Next to Compile, but deliberately outside .run-group: that group is
-				     the two buttons that talk to the board plus the pill that reports on
-				     them, and tidying reports nothing. .run-group's margin-left:auto is
-				     what keeps this button hard against Compile all the same. -->
-				<button id="format" type="button" title="Tidy this sketch's indentation. Ctrl+Z undoes it.">
-					Auto indent
+				<button
+					id="settings-menu-button"
+					class="menu-button"
+					type="button"
+					popovertarget="settings-menu"
+					title="Autocomplete and theme"
+				>
+					⚙️ Settings
 				</button>
 
 				<!-- One group so a wrapping toolbar never splits the two buttons from
@@ -76,6 +73,39 @@
 					>
 				</div>
 			</header>
+
+			<!-- The toolbar's two menus. Popovers, so the browser handles one open at
+			     a time, click-away and Escape; src/menus.ts hangs each one under its
+			     button. Closed, a popover takes no room, so where they sit in the page
+			     does not matter to the layout. -->
+			<div id="file-menu" class="menu" popover data-close-on-pick>
+				<button id="new-sketch" type="button">New sketch</button>
+				<button id="import-sketch" type="button">Import .ino file</button>
+				<button id="download-sketch" type="button">Download .ino file</button>
+				<hr />
+				<button id="rename-sketch" type="button">Rename</button>
+				<button id="delete-sketch" class="danger" type="button">Delete</button>
+			</div>
+			<input
+				id="import-input"
+				type="file"
+				accept=".ino,.pde,.txt,text/plain"
+				hidden
+				aria-hidden="true"
+				tabindex="-1"
+			/>
+
+			<div id="settings-menu" class="menu" popover data-align="end">
+				<label class="check">
+					<input id="autocomplete-toggle" type="checkbox" checked />
+					Autocomplete
+				</label>
+				<div class="menu-row">
+					<span>Theme</span>
+					<!-- Cycles System, Light, Dark. src/theme.ts writes its label. -->
+					<button id="theme-toggle" type="button">🖥️ System</button>
+				</div>
+			</div>
 
 			<main id="editor" class="editor"></main>
 

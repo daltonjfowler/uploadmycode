@@ -75,7 +75,7 @@ These eleven steps are the T3 gate. Fill in "Actual" as you go.
 
 | # | Do this | Expect | Actual |
 |---|---|---|---|
-| 1 | Look at the toolbar. | Buttons read: New, Rename, Delete, Download, Import, then Autocomplete, then **Compile** and **Upload** on the right. **Upload is greyed out.** Hover it: the tooltip says "Compile first — the board can only be sent a sketch that has just compiled." | |
+| 1 | Look at the toolbar. | It reads: Sketch dropdown, **File** menu, Library dropdown, **🔍 Find & replace**, **Auto indent**, **⚙️ Settings**, then **Compile** and **Upload** on the right. **Upload is greyed out.** Hover it: the tooltip says "Compile first — the board can only be sent a sketch that has just compiled." | |
 | 2 | Click in the editor, Ctrl+A, and paste the **Blink** sketch from the bottom of this file. | The Blink code replaces the template, syntax-coloured. Upload is **still greyed out** — pasting is not compiling. | |
 | 3 | Click **Compile**. | Status pill goes `Compiling…` then green **`Compiled`**. Output: `Compiled with no errors.` and `Program size: 924 bytes of 32256 (3%).` **Upload is now enabled**, and its tooltip reads "Send this sketch to the Uno over USB." | |
 | 4 | Type a single space at the end of any line. | Upload greys out again the instant you type. The status pill goes back to `Ready`. | |

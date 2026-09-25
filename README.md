@@ -14,7 +14,7 @@ same tool on every desk in under a minute.
 
 ## Screenshot
 
-<img src="docs/screenshot-editor.png" width="800" alt="The editor page at Chromebook size: sketch toolbar with New, Rename, Delete, Download, Import and a library dropdown; Compile and Upload buttons; a CodeMirror editor holding the default setup and loop sketch; an output panel; and a collapsed serial monitor">
+<img src="docs/screenshot-editor.png" width="800" alt="The editor page at Chromebook size: a one-row toolbar with the sketch dropdown and a File menu, a library dropdown, Find and replace, Auto indent and a Settings menu; Compile and Upload buttons; a CodeMirror editor holding the default setup and loop sketch; an output panel; and a collapsed serial monitor">
 
 The editor page at Chromebook resolution (1366x768), before any sketch is compiled. Compile and Upload sit top right, the output panel and serial monitor sit below the editor.
 

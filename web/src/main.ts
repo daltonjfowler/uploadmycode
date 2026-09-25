@@ -20,6 +20,7 @@ import { errorLines, firstErrorSummary, parseCompileErrors, type CompileError } 
 import { formatEdit, requestFormat } from "./format.ts";
 import { HexParseError, parseIntelHex } from "./flash/intel-hex.ts";
 import { findIncludeLine, insertInclude, LIBRARIES } from "./libraries.ts";
+import { initMenus } from "./menus.ts";
 import {
 	findGrantedUnoPort,
 	isWebSerialAvailable,
@@ -94,6 +95,7 @@ const librarySelect = el<HTMLSelectElement>("library-select");
 const autocompleteToggle = el<HTMLInputElement>("autocomplete-toggle");
 const compileButton = el<HTMLButtonElement>("compile");
 const formatButton = el<HTMLButtonElement>("format");
+const findButton = el<HTMLButtonElement>("find");
 const uploadButton = el<HTMLButtonElement>("upload");
 const statusPill = el<HTMLSpanElement>("status");
 const errorList = el<HTMLDivElement>("error-list");
@@ -1022,6 +1024,11 @@ const editor: Editor = createEditor({
 		refreshRunButtons();
 		if (appState.status === "success") setStatus("idle", "Ready");
 	},
+	// Ctrl+F, Escape and the panel's own close button all open or shut it too,
+	// so the button follows the panel rather than keeping its own count.
+	onFindToggle(open) {
+		findButton.setAttribute("aria-expanded", String(open));
+	},
 });
 
 // ----------------------------------------------------------- panel resizing
@@ -1199,6 +1206,7 @@ librarySelect.addEventListener("change", () => {
 	editor.focus();
 });
 
+initMenus();
 initThemeButton(el<HTMLButtonElement>("theme-toggle"));
 
 autocompleteToggle.checked = loadAutocompleteEnabled();
@@ -1215,6 +1223,8 @@ compileButton.addEventListener("click", () => {
 formatButton.addEventListener("click", () => {
 	void formatSketch();
 });
+
+findButton.addEventListener("click", () => editor.toggleFind());
 
 uploadButton.addEventListener("click", () => {
 	void uploadSketch();
