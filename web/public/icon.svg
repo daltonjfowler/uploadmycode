@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
   <!-- uploadmycode icon: a friendly chip wearing an upload arrow. Regenerate PNGs with scripts/make-icons.mjs -->
-  <rect x="0" y="0" width="64" height="64" rx="14" fill="#1E40AF"/>
+  <rect x="0" y="0" width="64" height="64" rx="14" fill="#134E4A"/>
   <!-- upload arrow (hat) -->
-  <polygon points="32,5 23,15 41,15" fill="#60A5FA"/>
-  <rect x="29" y="14" width="6" height="7" fill="#60A5FA"/>
+  <polygon points="32,5 23,15 41,15" fill="#2DD4BF"/>
+  <rect x="29" y="14" width="6" height="7" fill="#2DD4BF"/>
   <!-- pins -->
   <rect x="8" y="27" width="6" height="3" rx="1" fill="#AEB6C0"/>
   <rect x="8" y="34" width="6" height="3" rx="1" fill="#AEB6C0"/>

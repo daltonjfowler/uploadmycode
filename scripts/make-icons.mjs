@@ -7,8 +7,8 @@ import { join } from "node:path";
 
 const OUT = process.argv[2] || ".";
 // Family look shared with uploadmylaser and uploadmymodel: a grey robot face on a deep tile of the site's
-// colour, wearing an upload arrow in a brighter tint of that colour. uploadmycode's colour is blue.
-const BG = [0x1e, 0x40, 0xaf], FACE = [0xae, 0xb6, 0xc0], ARROW = [0x60, 0xa5, 0xfa], DARK = [0x0f, 0x3d, 0x40];
+// colour, wearing an upload arrow in a brighter tint of that colour. uploadmycode's colour is teal.
+const BG = [0x13, 0x4e, 0x4a], FACE = [0xae, 0xb6, 0xc0], ARROW = [0x2d, 0xd4, 0xbf], DARK = [0x0f, 0x3d, 0x40];
 
 // Geometry in the 64-unit SVG space. Each shape: (x, y) -> inside?
 const rrect = (x, y, w, h, r) => (px, py) => {
