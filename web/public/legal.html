@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>uploadmycode: privacy and legal</title>
+  <meta name="description" content="What uploadmycode does with your code, safety, licences and trademarks.">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <style>
+    :root { --bg: #ffffff; --ink: #14181d; --muted: #5b6570; --line: #d5dae0; --accent: #0f766e; color-scheme: light; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #121314; --ink: #ecedee; --muted: #a0a3a8; --line: #343639; --accent: #2dd4bf; color-scheme: dark; }
+    }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; padding-inline: 16px; padding-block: 24px 48px; }
+    main { max-width: 68ch; margin: 0 auto; }
+    h1 { font-size: 1.7rem; line-height: 1.2; margin: 0 0 4px; }
+    h2 { font-size: 1.15rem; margin: 28px 0 6px; padding-top: 18px; border-top: 1px solid var(--line); }
+    p, li { color: var(--ink); }
+    .muted { color: var(--muted); }
+    a { color: var(--accent); }
+    ul { padding-left: 20px; }
+    code { font-size: .92em; }
+  </style>
+</head>
+<body>
+<main>
+  <p class="muted"><a href="/">← Back to uploadmycode</a></p>
+  <h1>Privacy and legal</h1>
+  <p class="muted">uploadmycode · last updated 2026-09-26</p>
+
+  <h2>What this is</h2>
+  <p>uploadmycode is an independent classroom project made by <a href="https://daltonjfowler.com" rel="noopener">Dalton Fowler</a>, a teacher, for his school district's classes. It is not a commercial product and has no accounts, ads or payments.</p>
+
+  <h2>Safety</h2>
+  <p><strong>uploadmycode is not a safety system.</strong> It compiles the code you write and uploads it to a microcontroller board plugged into this computer. The limits it applies reduce mistakes; they do not make a project safe.</p>
+  <ul>
+    <li>A trained adult checks the wiring and supervises the class whenever boards are plugged in.</li>
+    <li>Wiring, batteries, motors and mains power are the teacher's call. Ask before you connect any of them.</li>
+    <li>Unplug the board from the computer before you change any wiring.</li>
+    <li>The site checks that a program fits on the board and was built from the code on screen. It cannot tell whether a program is safe for what is wired to the board.</li>
+  </ul>
+  <p>The software is provided "as is", without warranty of any kind, as its open-source licence says.</p>
+
+  <h2>Privacy</h2>
+  <ul>
+    <li>Your code leaves this computer only when you press <strong>Compile</strong> or <strong>Auto indent</strong>. The site never asks for your name.</li>
+    <li><strong>Compile</strong> sends your code to the compile server. The server writes it to a working file, builds it, and sends back the program or the error messages. That working file and the built program are not deleted straight away: the next compile overwrites them, and they are wiped when the server shuts down, about 5 minutes after its last compile. Your code is not saved anywhere else and is not written to the server's logs.</li>
+    <li><strong>Auto indent</strong> sends your code to the same server, which tidies it in memory and sends it back without writing it to disk. If tidying fails, the first part of the tool's error message goes into the server log, and that message can quote a line of your code.</li>
+    <li>The class phrase the teacher sets is kept on the server, with the time it ends, until it runs out (12 hours at most) or the teacher ends it. Nothing else about the class is kept there.</li>
+    <li>To share the compiler fairly, the server counts each browser's compiles for one minute, using a random id the browser made (or the network address if there is no id). Those counts are held in memory only and never saved.</li>
+    <li>The class phrase you type is kept for the open tab only and is forgotten when the tab closes. On the teacher page, the teacher key is kept in that browser only if the teacher presses <em>Remember on this machine</em>.</li>
+    <li>Your sketches are saved in this browser only, never on the server. Use <em>Download .ino file</em> to keep a copy somewhere else.</li>
+    <li>No accounts, no cookies, no ads, no tracking. Cloudflare adds a Web Analytics script to the site; this site's security settings block it, so it collects nothing.</li>
+    <li>The site runs on Cloudflare. Like any web host, Cloudflare keeps short request logs (for example the page asked for, the time, the browser and the network address) for up to 7 days, to keep the site running. They are not used for anything else.</li>
+    <li>Your browser may keep your own settings and work (for example your theme, and your saved sketches and which one was open, your editor and serial monitor settings, the panel sizes, and the random id used to share the compiler fairly) on this device only. Clearing site data removes them.</li>
+  </ul>
+
+  <h2>Trademarks</h2>
+  <p>uploadmycode is not affiliated with, made by, tested by or endorsed by Arduino S.r.l. or Arduino AG (the Arduino company), Google, or Seeed Studio. Arduino and Uno, Chrome and Chromebook, and Grove are trademarks of their owners and are named here only to say which machines and programs the site works with.</p>
+
+  <h2>Open source and licences</h2>
+  <p>The site's own code is open source under the MIT licence: <a href="https://github.com/daltonjfowler/uploadmycode" rel="noopener">github.com/daltonjfowler/uploadmycode</a>.</p>
+  <p>The editor is built on open-source libraries, and a compiled program also contains code from the board core and from any libraries the sketch uses. That code keeps its own licences. The list and the licence texts are in <a href="/licenses.txt">/licenses.txt</a>.</p>
+
+  <h2>Contact</h2>
+  <p>Questions or a problem: contact Dalton Fowler through <a href="https://daltonjfowler.com" rel="noopener">daltonjfowler.com</a>.</p>
+</main>
+</body>
+</html>

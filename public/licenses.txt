@@ -1,0 +1,831 @@
+uploadmycode: third-party licences
+==============================================================================
+
+This file lists the other people's code that reaches your computer when you
+use this site, and the licence each one is under. There are two kinds:
+
+  1. Code that runs in your browser: the editor.
+  2. Code inside your compiled program: the parts of the board core and of the
+     libraries that the compiler builds into the hex file sent to your board.
+
+A third list, the compiler toolchain, runs on the server only and is never
+sent to you. It is at the end, for completeness.
+
+This site's own code is MIT licensed:
+https://github.com/daltonjfowler/uploadmycode (see LICENSE there).
+The full credits, with how each fact was checked, are in CREDITS.md in the
+same repository.
+
+
+==============================================================================
+PART 1. CODE THAT RUNS IN YOUR BROWSER
+==============================================================================
+
+The editor page is one bundled script built by Vite. These packages are
+inside it. Each licence below is copied word for word from the package.
+
+  @codemirror/autocomplete 6.20.3          MIT
+  @codemirror/commands 6.11.0              MIT
+  @codemirror/lang-cpp 6.0.3               MIT
+  @codemirror/language 6.12.4              MIT
+  @codemirror/search 6.7.2                 MIT
+  @codemirror/state 6.7.2                  MIT
+  @codemirror/view 6.43.10                 MIT
+  @lezer/common 1.5.2                      MIT
+  @lezer/cpp 1.1.6                         MIT
+  @lezer/highlight 1.2.3                   MIT
+  @lezer/lr 1.4.10                         MIT
+  @marijn/find-cluster-break 1.0.4         MIT
+  crelt 1.0.7                              MIT
+  style-mod 4.1.3                          MIT
+  w3c-keyname 2.2.8                        MIT
+  Vite 8.2.2 (small module-preload helper) MIT
+
+------------------------------------------------------------------------------
+@codemirror/autocomplete 6.20.3  (MIT)
+Source: https://code.haverbeke.berlin/codemirror/autocomplete
+------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (C) 2018-2021 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+
+------------------------------------------------------------------------------
+@codemirror/commands 6.11.0  (MIT)
+Source: https://code.haverbeke.berlin/codemirror/commands
+------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (C) 2018-2021 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+
+------------------------------------------------------------------------------
+@codemirror/lang-cpp 6.0.3  (MIT)
+Source: https://github.com/codemirror/lang-cpp
+------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (C) 2018-2021 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+
+------------------------------------------------------------------------------
+@codemirror/language 6.12.4  (MIT)
+Source: https://code.haverbeke.berlin/codemirror/language
+------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (C) 2018-2021 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+
+------------------------------------------------------------------------------
+@codemirror/search 6.7.2  (MIT)
+Source: https://code.haverbeke.berlin/codemirror/search
+------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (C) 2018-2021 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+
+------------------------------------------------------------------------------
+@codemirror/state 6.7.2  (MIT)
+Source: https://code.haverbeke.berlin/codemirror/state
+------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (C) 2018-2021 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+
+------------------------------------------------------------------------------
+@codemirror/view 6.43.10  (MIT)
+Source: https://code.haverbeke.berlin/codemirror/view
+------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (C) 2018-2021 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+
+------------------------------------------------------------------------------
+@lezer/common 1.5.2  (MIT)
+Source: https://github.com/lezer-parser/common
+------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (C) 2018 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+
+------------------------------------------------------------------------------
+@lezer/cpp 1.1.6  (MIT)
+Source: https://code.haverbeke.berlin/lezer/cpp
+------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (C) 2020 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+
+------------------------------------------------------------------------------
+@lezer/highlight 1.2.3  (MIT)
+Source: https://github.com/lezer-parser/highlight
+------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (C) 2018 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+
+------------------------------------------------------------------------------
+@lezer/lr 1.4.10  (MIT)
+Source: https://code.haverbeke.berlin/lezer/lr
+------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (C) 2018 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+
+------------------------------------------------------------------------------
+@marijn/find-cluster-break 1.0.4  (MIT)
+Source: https://code.haverbeke.berlin/marijn/find-cluster-break
+------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (C) 2024 by Marijn Haverbeke <marijn@haverbeke.berlin>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+
+------------------------------------------------------------------------------
+crelt 1.0.7  (MIT)
+Source: https://code.haverbeke.berlin/marijn/crelt
+------------------------------------------------------------------------------
+
+Copyright (C) 2020 by Marijn Haverbeke <marijn@haverbeke.berlin>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+
+------------------------------------------------------------------------------
+style-mod 4.1.3  (MIT)
+Source: https://github.com/marijnh/style-mod
+------------------------------------------------------------------------------
+
+Copyright (C) 2018 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+
+------------------------------------------------------------------------------
+w3c-keyname 2.2.8  (MIT)
+Source: https://github.com/marijnh/w3c-keyname
+------------------------------------------------------------------------------
+
+Copyright (C) 2016 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+
+------------------------------------------------------------------------------
+Vite 8.2.2  (MIT)
+Source: https://github.com/vitejs/vite
+Only Vite's small module-preload helper ends up in the page; the rest of
+Vite is the build tool and stays on the build machine.
+------------------------------------------------------------------------------
+
+Vite is released under the MIT license:
+
+MIT License
+
+Copyright (c) 2019-present, VoidZero Inc. and Vite contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+==============================================================================
+PART 2. CODE INSIDE YOUR COMPILED PROGRAM
+==============================================================================
+
+When you press Compile, the server builds your sketch together with the parts
+of the pieces below that your sketch uses, and sends the result (a hex file)
+to your browser, which writes it onto the board. That code keeps its own
+licence. Your own sketch is yours.
+
+Board core and libraries under the LGPL
+----------------------------------------
+
+  Arduino AVR Boards core (arduino:avr) 1.8.8   LGPL-2.1-or-later
+    The setup/loop, pinMode, digitalWrite, Serial ... code every sketch uses.
+    Source: https://github.com/arduino/ArduinoCore-avr
+
+  Servo 1.3.0                          LGPL-2.1
+    Source: https://github.com/arduino-libraries/Servo
+
+  LiquidCrystal 1.0.7                  LGPL-2.1-or-later
+    Source: https://github.com/arduino-libraries/LiquidCrystal
+
+  Stepper 1.1.3                        LGPL-2.1-or-later
+    Source: https://github.com/arduino-libraries/Stepper
+
+  Licence text: https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
+
+  The LGPL lets you change these libraries and rebuild your program with the
+  changed version. You have what that needs: your own sketch, and the library
+  source at the links above. The repository README explains how to compile
+  with the same pinned versions on your own computer.
+
+Libraries under the MPL
+-----------------------
+
+  Arduino SensorKit 1.4.0              MPL-2.0
+    Source: https://github.com/arduino-libraries/Arduino_SensorKit
+    Licence text: https://www.mozilla.org/en-US/MPL/2.0/
+    (The installed release ships no licence file; the licence is the one
+    stated in the project's repository.)
+
+  SensorKit carries three other libraries inside its own source tree. They
+  keep their own licences, printed in full further down:
+    U8g2 2.34.22 (OLED display)                 BSD-2-Clause, fonts under their own terms
+    Grove Barometer Sensor BMP280 1.0.1         MIT
+    Grove Temperature And Humidity Sensor 2.0.1 MIT
+
+Library with NO STATED LICENCE
+------------------------------
+
+  LiquidCrystal I2C 1.1.2              no licence stated
+    By Frank de Brabander, maintained by Marco Schwartz.
+    Home:   https://github.com/marcoschwartz/LiquidCrystal_I2C
+    Source of the release served: https://github.com/johnrickman/LiquidCrystal_I2C
+    The release ships no licence file and the library index gives no licence.
+    Because no licence is stated, the terms for using and sharing it are
+    unclear. It is offered because classroom I2C LCD kits need it, and the
+    site owner is reviewing it. Its code only lands in your program if your
+    sketch includes LiquidCrystal_I2C.h.
+
+MIT and BSD libraries, and the C library
+----------------------------------------
+
+  DHT20 0.3.3                          MIT
+    Source: https://github.com/RobTillaart/DHT20
+  Grove 3-Axis Digital Accelerometer LIS3DHTR 1.2.4   MIT
+    Source: https://github.com/Seeed-Studio/Seeed_Arduino_LIS3DHTR
+  U8g2 2.34.22 (inside SensorKit)      BSD-2-Clause
+    Source: https://github.com/olikraus/u8g2
+  Grove Barometer Sensor BMP280 1.0.1 (inside SensorKit)   MIT
+    Source: https://github.com/Seeed-Studio/Grove_BMP280
+  Grove Temperature And Humidity Sensor 2.0.1 (inside SensorKit)   MIT
+    Source: https://github.com/Seeed-Studio/Grove_Temperature_And_Humidity_Sensor
+  avr-libc 2.0.0 (the C library)      BSD-3-Clause
+    Source: https://github.com/avrdudes/avr-libc  (older home: https://www.nongnu.org/avr-libc/)
+  libgcc, the GCC runtime (small maths helpers)
+                                       GPL-3.0-or-later WITH GCC Runtime Library Exception
+    The exception means a program built with GCC is not covered by the GPL
+    because of the runtime code GCC adds to it.
+    Source: https://gcc.gnu.org/   Exception: https://www.gnu.org/licenses/gcc-exception-3.1.html
+
+The notices those licences ask to be passed on with a compiled program follow,
+copied word for word from the installed files.
+
+------------------------------------------------------------------------------
+DHT20 0.3.3
+------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (c) 2022-2026 Rob Tillaart
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+------------------------------------------------------------------------------
+Grove 3-Axis Digital Accelerometer LIS3DHTR 1.2.4
+------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (c) 2019 Seeed Studio
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+------------------------------------------------------------------------------
+Grove Barometer Sensor BMP280 1.0.1 (inside Arduino SensorKit)
+------------------------------------------------------------------------------
+
+The MIT License (MIT)
+
+Copyright (c) 2016 Seeed Technology Inc.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+
+------------------------------------------------------------------------------
+Grove Temperature And Humidity Sensor 2.0.1 (inside Arduino SensorKit)
+------------------------------------------------------------------------------
+
+The MIT License (MIT)
+
+Copyright (c) 2016 Seeed Studio
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+------------------------------------------------------------------------------
+U8g2 2.34.22 (inside Arduino SensorKit), with its font licences
+------------------------------------------------------------------------------
+
+
+The U8g2lib code (http://code.google.com/p/u8g2/) is licensed under the terms of 
+the new-bsd license (two-clause bsd license).
+See also: http://www.opensource.org/licenses/bsd-license.php
+
+Fonts are licensed under different conditions.
+See 
+	https://github.com/olikraus/u8g2/wiki/fntgrp
+for detailed information on the licensing conditions for each font.
+
+The example code in sys/raspi_gpio/hal will use the bcm2835 lib from Mike McCauley
+which is licensed under GPL V3: http://www.airspayce.com/mikem/bcm2835/
+
+============ X11 Fonts COUR, HELV, NCEN, TIM, SYMB ============
+
+For fonts derived from the following files, the license below applies.
+COURB08.BDF COURB10.BDF COURB12.BDF COURB14.BDF COURB18.BDF 
+COURB24.BDF COURR08.BDF COURR10.BDF COURR12.BDF COURR14.BDF 
+COURR18.BDF COURR24.BDF HELVB08.BDF HELVB10.BDF HELVB12.BDF HELVB14.BDF 
+HELVB18.BDF HELVB24.BDF HELVR08.BDF HELVR10.BDF HELVR12.BDF HELVR14.BDF 
+HELVR18.BDF HELVR24.BDF NCENB08.BDF NCENB10.BDF NCENB12.BDF 
+NCENB14.BDF NCENB18.BDF NCENB24.BDF NCENR08.BDF NCENR10.BDF 
+NCENR12.BDF NCENR14.BDF NCENR18.BDF NCENR24.BDF SYMB08.BDF SYMB10.BDF 
+SYMB12.BDF SYMB14.BDF SYMB18.BDF SYMB24.BDF TIMB08.BDF TIMB10.BDF 
+TIMB12.BDF TIMB14.BDF TIMB18.BDF TIMB24.BDF TIMR08.BDF TIMR10.BDF 
+TIMR12.BDF TIMR14.BDF TIMR18.BDF TIMR24.BDF 
+
+Copyright 1984-1989, 1994 Adobe Systems Incorporated.
+Copyright 1988, 1994 Digital Equipment Corporation.
+
+Adobe is a trademark of Adobe Systems Incorporated which may be
+registered in certain jurisdictions.
+Permission to use these trademarks is hereby granted only in
+association with the images described in this file.
+
+Permission to use, copy, modify, distribute and sell this software
+and its documentation for any purpose and without fee is hereby
+granted, provided that the above copyright notices appear in all
+copies and that both those copyright notices and this permission
+notice appear in supporting documentation, and that the names of
+Adobe Systems and Digital Equipment Corporation not be used in
+advertising or publicity pertaining to distribution of the software
+without specific, written prior permission.  Adobe Systems and
+Digital Equipment Corporation make no representations about the
+suitability of this software for any purpose.  It is provided "as
+is" without express or implied warranty.
+
+
+============ BSD License for U8g2lib Code ============
+
+Universal 8bit Graphics Library (http://code.google.com/p/u8g2/)
+
+Copyright (c) 2016, olikraus@gmail.com
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, 
+are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this list 
+  of conditions and the following disclaimer.
+  
+* Redistributions in binary form must reproduce the above copyright notice, this 
+  list of conditions and the following disclaimer in the documentation and/or other 
+  materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND 
+CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, 
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF 
+MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR 
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT 
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER 
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, 
+STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF 
+ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+------------------------------------------------------------------------------
+avr-libc 2.0.0
+------------------------------------------------------------------------------
+
+avr-libc is under a 3-clause BSD licence. Each of its files names its own
+copyright holders; the full list is in the LICENSE file of the avr-libc
+source. This is the notice exactly as it appears in <avr/io.h>, which every
+Uno program includes:
+
+/* Copyright (c) 2002,2003,2005,2006,2007 Marek Michalkiewicz, Joerg Wunsch
+   Copyright (c) 2007 Eric B. Weddington
+   All rights reserved.
+
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions are met:
+
+   * Redistributions of source code must retain the above copyright
+     notice, this list of conditions and the following disclaimer.
+
+   * Redistributions in binary form must reproduce the above copyright
+     notice, this list of conditions and the following disclaimer in
+     the documentation and/or other materials provided with the
+     distribution.
+
+   * Neither the name of the copyright holders nor the names of
+     contributors may be used to endorse or promote products derived
+     from this software without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+  POSSIBILITY OF SUCH DAMAGE. */
+
+
+==============================================================================
+PART 3. THE TOOLCHAIN (SERVER ONLY, NEVER SENT TO YOU)
+==============================================================================
+
+These programs run inside the compile server. They build your program; they
+are not part of it, and none of them is sent to your browser.
+
+  arduino-cli 1.5.1                    GPL-3.0
+    https://github.com/arduino/arduino-cli
+  avr-gcc 7.3.0 (GCC)                  GPL-3.0-or-later
+    https://gcc.gnu.org/
+  GNU Binutils (avr-as, avr-ld, avr-objcopy)   GPL-3.0-or-later
+    https://www.gnu.org/software/binutils/
+  AVRDUDE 8.0.0-arduino1 (installed with the core, never run)   GPL-2.0
+    https://github.com/avrdudes/avrdude
+  clang-format 14.0.6 (the Auto indent button)   Apache-2.0 WITH LLVM-exception
+    https://llvm.org/
+  Node.js 24.19.0 (runs the compile server)      MIT
+    https://nodejs.org/
+  Debian 12 (the server's operating system)      many licences, all free software
+    https://www.debian.org/
+
+The server image downloads these from their publishers when it is built;
+this site's repository does not contain or redistribute them.
+

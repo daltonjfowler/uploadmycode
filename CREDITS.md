@@ -23,6 +23,10 @@ read from a local file it says **(license: see project page)** rather than a gue
 publishes no funding link that this repo can see, there is no support line — starring the repo and
 filing good bug reports is the support on offer.
 
+The site serves the license texts themselves at `/licenses.txt` (source:
+`web/public/licenses.txt`): every package bundled into the editor page, and the notices for the
+core and library code that ends up inside a student's compiled program.
+
 ---
 
 ## The compile toolchain
@@ -104,8 +108,12 @@ Text LCDs on the HD44780 chipset, wired directly. By Arduino and Adafruit.
 The same displays over two wires instead of six. By **Frank de Brabander**, maintained by Marco
 Schwartz.
 
-- **(license: see project page)** — no license file ships in the release, and the library index
-  carries no license field
+- **No stated license.** No license file ships in the release and the library index carries no
+  license field (the two GitHub repositories below were not checked). Without a license the terms
+  for using and redistributing it are unclear. It stays in the allowlist for now, because removing
+  it would break every student sketch that drives an I2C LCD; whether to keep it, replace it with a
+  clearly licensed I2C LCD library, or ask the maintainer for a license is an open decision for the
+  site owner. The served `/licenses.txt` says the same.
 - Home: <https://github.com/marcoschwartz/LiquidCrystal_I2C>
 - The release the index actually serves is built from
   <https://github.com/johnrickman/LiquidCrystal_I2C>
@@ -149,14 +157,19 @@ The kit's motion module. By Seeed Studio.
 - License: **MIT** — verified from `LICENSE` in the installed library
 - Repo: <https://github.com/Seeed-Studio/Seeed_Arduino_LIS3DHTR>
 
-The kit also vendors two more libraries inside its own `src/` tree, so the image ships their code as
-part of the SensorKit package rather than as separate installs:
+The kit also vendors three more libraries inside its own `src/` tree, so the image ships their code
+as part of the SensorKit package rather than as separate installs:
 
 - **U8g2 2.34.22** — the OLED display driver. License: **2-clause BSD** — verified from
   `src/U8g2/LICENSE`. By olikraus. Repo: <https://github.com/olikraus/u8g2>
 - **Grove Barometer Sensor BMP280 1.0.1** — the pressure driver. License: **MIT** — verified from
   `src/Grove_-_Barometer_Sensor_BMP280/License.txt`. By Seeed Studio. Repo:
   <https://github.com/Seeed-Studio/Grove_BMP280>
+- **Grove Temperature And Humidity Sensor 2.0.1** — the DHT11/AM2302 driver the kit's header
+  includes. License: **MIT** — verified from
+  `src/Grove_Temperature_And_Humidity_Sensor/LICENSE`. By Seeed Studio. Repo:
+  <https://github.com/Seeed-Studio/Grove_Temperature_And_Humidity_Sensor> (read from its
+  `library.properties`)
 
 ## The editor
 
@@ -252,6 +265,16 @@ installed on top of it.
   Guidelines. **(license: see project page)**
 - Home: <https://www.debian.org/>
 
+### clang-format 14.0.6
+
+The Auto indent button. Installed from Debian bookworm's own `clang-format` package; the version
+is the one `clang-format --version` prints during the image build (see `container/Dockerfile`).
+The sketch goes in on stdin and never touches the disk.
+
+- License: **Apache-2.0 WITH LLVM-exception** (the LLVM project's own terms; not read from a local
+  file)
+- Home: <https://llvm.org/>
+
 ### Node.js 24.19.0
 
 Runs `container/server.js`, the small HTTP service that receives a sketch and shells out to the
@@ -330,7 +353,7 @@ So you can redo it rather than trust it.
 | Node.js version and license | the `NODE_VERSION` pin in `container/Dockerfile`; the `LICENSE` file of that same version |
 | Example sketch attribution | the comment blocks quoted in `docs/T2-TEST.md` |
 | CodeMirror / Lezer funding link | `https://github.com/sponsors/marijnh`, fetched live 2026-09-02; the page names CodeMirror and Lezer itself |
-| The rest | a handful of URLs are official project homes stated plainly rather than read from a file: gcc.gnu.org, gnu.org/software/binutils, nongnu.org/avr-libc (printed as a bare host in `optiboot.c`), nodejs.org and github.com/nodejs/node, debian.org, microchip.com, intel.com, github.com/Optiboot/optiboot, github.com/avrdudes/avrdude, github.com/arduino/arduinoOTA |
+| The rest | a handful of URLs are official project homes stated plainly rather than read from a file: gcc.gnu.org, gnu.org/software/binutils, nongnu.org/avr-libc (printed as a bare host in `optiboot.c`), nodejs.org and github.com/nodejs/node, debian.org, microchip.com, intel.com, github.com/Optiboot/optiboot, github.com/avrdudes/avrdude, github.com/arduino/arduinoOTA, llvm.org (and the clang-format license) |
 
 The setup that makes this reproducible is in the README under
 ["Running the compile server without Docker"](README.md#running-the-compile-server-without-docker):
