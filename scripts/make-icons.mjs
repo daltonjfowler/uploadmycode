@@ -6,7 +6,9 @@ import { deflateSync } from "node:zlib";
 import { join } from "node:path";
 
 const OUT = process.argv[2] || ".";
-const TEAL = [0x1f, 0x9f, 0xa5], WHITE = [0xff, 0xff, 0xff], DARK = [0x0f, 0x3d, 0x40];
+// Family look shared with uploadmylaser and uploadmymodel: a grey robot face on a deep tile of the site's
+// colour, wearing an upload arrow in a brighter tint of that colour. uploadmycode's colour is blue.
+const BG = [0x1e, 0x40, 0xaf], FACE = [0xae, 0xb6, 0xc0], ARROW = [0x60, 0xa5, 0xfa], DARK = [0x0f, 0x3d, 0x40];
 
 // Geometry in the 64-unit SVG space. Each shape: (x, y) -> inside?
 const rrect = (x, y, w, h, r) => (px, py) => {
@@ -32,10 +34,10 @@ const smile = (px, py) => {
   return false;
 };
 const layers = [
-  [rrect(0, 0, 64, 64, 14), TEAL],
-  [tri(32, 5, 23, 15, 41, 15), WHITE], [rrect(29, 14, 6, 7, 0), WHITE],
-  ...[27, 34, 41].flatMap(y => [[rrect(8, y, 6, 3, 1), WHITE], [rrect(50, y, 6, 3, 1), WHITE]]),
-  [rrect(14, 20, 36, 31, 6), WHITE],
+  [rrect(0, 0, 64, 64, 14), BG],
+  [tri(32, 5, 23, 15, 41, 15), ARROW], [rrect(29, 14, 6, 7, 0), ARROW],
+  ...[27, 34, 41].flatMap(y => [[rrect(8, y, 6, 3, 1), FACE], [rrect(50, y, 6, 3, 1), FACE]]),
+  [rrect(14, 20, 36, 31, 6), FACE],
   [circle(25, 33, 3), DARK], [circle(39, 33, 3), DARK], [smile, DARK],
 ];
 
