@@ -4,9 +4,9 @@
  * Both are plain popovers (the `popover` attribute, opened by a
  * `popovertarget` button), so the browser already does the hard parts: one
  * open at a time, click-away and Escape to close, and drawing above
- * everything. This module does the three things it does not: hang the menu
- * under its button, mark the button while its menu is open, and close File the
- * moment one of its items is picked.
+ * everything. This module does the four things it does not: hang the menu
+ * under its button, keep it on the screen, mark the button while its menu is
+ * open, and close File the moment one of its items is picked.
  *
  * The items themselves are wired in main.ts by id, the same as when they were
  * loose toolbar buttons.
@@ -34,6 +34,10 @@ export function initMenus(): void {
 				menu.style.right = "auto";
 				menu.style.left = `${rect.left}px`;
 			}
+			// The menu has no width until it is open, so the check that it fits
+			// waits for the next frame. A frame callback runs after the menu opens
+			// and before anything is painted, so the correction never shows.
+			requestAnimationFrame(() => keepOnScreen(menu));
 		});
 		button.setAttribute("aria-expanded", "false");
 
@@ -55,4 +59,24 @@ export function initMenus(): void {
 	window.addEventListener("resize", () => {
 		for (const menu of menus) if (menu.matches(":popover-open")) menu.hidePopover();
 	});
+}
+
+/** Space kept between an open menu and either side of the screen. */
+const GUTTER = 16;
+
+/**
+ * Slides an open menu sideways until it is inside the screen, GUTTER clear of
+ * each edge. On a phone the toolbar wraps and Settings can land at the left
+ * end of a row, where hanging the menu off the button's right edge would push
+ * most of it past the left side of the screen. The menu keeps its size; only
+ * where it starts changes. The max-width in style.css is what makes sure it
+ * can always fit.
+ */
+function keepOnScreen(menu: HTMLElement): void {
+	const box = menu.getBoundingClientRect();
+	const width = document.documentElement.clientWidth;
+	if (box.left >= GUTTER && box.right <= width - GUTTER) return;
+	const left = Math.max(GUTTER, Math.min(box.left, width - GUTTER - box.width));
+	menu.style.right = "auto";
+	menu.style.left = `${left}px`;
 }

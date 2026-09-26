@@ -284,7 +284,9 @@ body.resizing {
 	inset: auto;
 	margin: 0;
 	min-width: 12rem;
-	max-width: calc(100vw - 1rem);
+	/* 16px clear of each side of the screen: the gutter menus.ts keeps when it
+	   slides a menu back on screen. */
+	max-width: calc(100vw - 32px);
 	padding: 0.3rem;
 	color: var(--fg);
 	background: var(--bg);
@@ -841,12 +843,46 @@ button.link {
 	color: var(--accent);
 }
 
-/* Narrow Chromebook windows: let the toolbar wrap without a horizontal scroll. */
+/* Narrow Chromebook windows and phones: let the toolbar wrap without a
+   horizontal scroll, in as few rows as it can. The name shares a row with the
+   sketch picker, the groups sit closer, and button labels stay on one line so
+   no button is two lines tall. Library is the one control that gives up width
+   for that, which is safe because it only ever shows its own name. On the
+   narrowest phones a group may still wrap inside itself, which beats a toolbar
+   wider than the screen. */
 @media (max-width: 640px) {
 	.field span {
 		display: none;
 	}
-	.brand {
-		width: 100%;
+	.toolbar {
+		column-gap: 0.6rem;
+	}
+	.toolbar button {
+		white-space: nowrap;
+	}
+	.tool-group {
+		flex-wrap: wrap;
+	}
+	#library-select {
+		max-width: 6rem;
+	}
+}
+
+/* Phones and touch screens: every control at least 40px tall, which is about
+   what a fingertip needs to hit it first time. Mouse users keep the compact
+   size, so a Chromebook with a trackpad looks exactly as before. */
+@media (pointer: coarse) {
+	button,
+	select,
+	.monitor-send input[type="text"],
+	.cm-find .cm-textfield,
+	.check {
+		min-height: 2.5rem;
+	}
+	button {
+		min-width: 2.5rem;
+	}
+	.phrase-form input[type="text"] {
+		height: 2.5rem;
 	}
 }
