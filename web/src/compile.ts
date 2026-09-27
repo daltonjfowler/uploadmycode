@@ -16,20 +16,24 @@
  *   x-class-phrase  today's class phrase. A 403 means it is missing, wrong or
  *                   expired, and the Worker's sentence is shown word for word
  *                   because it is what tells a student to ask the teacher. A
- *                   wrong phrase is only ever a 403 — never a lockout, never a
- *                   delay — because the whole school shares one public address
- *                   and one student must not be able to shut the room down.
+ *                   wrong phrase is a plain 403 — no delay, no budget spent —
+ *                   because the whole school shares one public address and one
+ *                   student must not be able to shut the room down. The only
+ *                   brake on guessing is per address and set no tighter than
+ *                   the site's own ceiling (see src/compile-gate.ts).
  *   x-client-id     this browser's id from storage.ts, which is how the Worker
  *                   gives every Chromebook its own six compiles a minute
  *                   instead of six for the school.
  *   x-compile-token a fresh token for this one press of Compile, which is what
  *                   lets the page ask GET /api/queue how long the line is while
- *                   it waits. Tracking it is best-effort at both ends: a
- *                   compile sent without one still compiles.
+ *                   it waits. A compile sent without one still compiles; the
+ *                   Worker gives it a token of its own.
  *
- * An HTTP 429 is therefore always about pace, never about the phrase: either
- * this browser has compiled six times in a minute or the whole site is at its
- * ceiling. Both say so in a sentence and both mean "wait, then click Compile".
+ * An HTTP 429 is therefore always about pace, never about the phrase: this
+ * browser has compiled six times in a minute, the whole site is at its ceiling,
+ * or this network has sent as many tries in a minute as that same ceiling. All
+ * say so in a sentence and all mean "wait, then click Compile". An HTTP 503 can
+ * also mean the line of waiting compiles is full; its sentence says so too.
  */
 
 import { loadClientId } from "./storage.ts";

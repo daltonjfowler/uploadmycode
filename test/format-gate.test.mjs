@@ -1,5 +1,5 @@
 /**
- * POST /api/format: the same five checks as a compile, and the one thing that
+ * POST /api/format: the same six checks as a compile, and the one thing that
  * must NOT be shared — the budget.
  *
  * The promise this file exists to keep is narrow and worth stating plainly: a
@@ -53,8 +53,11 @@ function fakeKv(phrase) {
 	return kv;
 }
 
+/** The per-address brake, always saying yes. test/compile-gate.test.mjs tests it. */
+const openLimiter = { limit: async () => ({ success: true }) };
+
 function envWith(phrase, allowedCidrs = "") {
-	return { ALLOWED_CIDRS: allowedCidrs, CLASS_KV: fakeKv(phrase) };
+	return { ALLOWED_CIDRS: allowedCidrs, CLASS_KV: fakeKv(phrase), PHRASE_LIMITER: openLimiter };
 }
 
 function spyCounters({ client = true, global = true } = {}) {

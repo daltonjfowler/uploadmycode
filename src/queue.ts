@@ -12,6 +12,8 @@
  * The Worker adds a token before it forwards a compile and removes it when the
  * answer comes back, so what is counted here is exactly the set of compiles in
  * flight — the LENGTH of the line, and whether a given compile is still in it.
+ * Every compile gets one: the page's own, or one the Worker mints for a request
+ * that sent none, so leaving the header off cannot dodge MAX_QUEUE_DEPTH.
  *
  * It deliberately does NOT report a personal place in the line. The first
  * version did, and the live burst test showed the number lying: the order five
@@ -60,11 +62,19 @@ export function isUsableToken(token: string | null | undefined): token is string
 export const MAX_WAIT_MS = 120_000;
 
 /**
- * The most tokens tracked at once. A class is tens; this is here so that a
- * spray of made-up tokens cannot grow the object without bound. Over the cap,
- * the oldest goes — it is the one most likely to be a leftover anyway.
+ * The longest the line may get. A compile that arrives to find this many
+ * already in flight is turned away with a 503 ("try again in a minute")
+ * instead of joining.
+ *
+ * Without it, one student with the phrase and a script could stack up compiles
+ * that each take the full 60 seconds, and every classmate would wait behind all
+ * of them. Forty is more than a whole class pressing Compile in the same second
+ * (the live burst test was five), so a real class never meets it; and forty
+ * minute-long compiles over two containers is already twenty minutes, which is
+ * as much of the lesson as anybody should be able to spend. It is also what
+ * keeps a spray of made-up tokens from growing this object without bound.
  */
-const MAX_TRACKED = 256;
+export const MAX_QUEUE_DEPTH = 40;
 
 /**
  * How many compile containers the site runs, and therefore how many ways this
@@ -86,6 +96,11 @@ interface Waiter {
 	container: number;
 }
 
+/** What joining the line answers: where to compile, or that the line is full. */
+export type Admission =
+	| { admitted: true; container: number; depth: number }
+	| { admitted: false; depth: number };
+
 export class CompileQueue {
 	/** Token -> its waiter. Map keeps insertion order, which IS join order. */
 	readonly #waiting = new Map<string, Waiter>();
@@ -100,7 +115,8 @@ export class CompileQueue {
 	 *
 	 * Returns that container's index and how long the whole line now is,
 	 * including this compile, so the caller logs and routes without a second
-	 * round trip.
+	 * round trip. When the line is already MAX_QUEUE_DEPTH long the compile is
+	 * NOT added, and `admitted: false` tells the caller to turn it away.
 	 *
 	 * The container is the least-loaded one, ties to the lower index. That tie
 	 * rule is load-bearing, not tidiness: when only one compile is in flight it
@@ -110,18 +126,19 @@ export class CompileQueue {
 	 * retried request is the same compile, not a second one, and must not be
 	 * counted twice or moved to a different queue.
 	 */
-	enter(token: string, now: number): { container: number; depth: number } {
+	enter(token: string, now: number): Admission {
 		this.#sweep(now);
 		const existing = this.#waiting.get(token);
-		if (existing) return { container: existing.container, depth: this.#waiting.size };
+		if (existing) {
+			return { admitted: true, container: existing.container, depth: this.#waiting.size };
+		}
+		if (this.#waiting.size >= MAX_QUEUE_DEPTH) {
+			return { admitted: false, depth: this.#waiting.size };
+		}
 
 		const container = this.#leastLoaded();
 		this.#waiting.set(token, { joinedAt: now, container });
-		if (this.#waiting.size > MAX_TRACKED) {
-			const oldest = this.#waiting.keys().next();
-			if (!oldest.done && oldest.value !== token) this.#waiting.delete(oldest.value);
-		}
-		return { container, depth: this.#waiting.size };
+		return { admitted: true, container, depth: this.#waiting.size };
 	}
 
 	/** Leave the line. Unknown tokens are not an error; the answer arrived. */

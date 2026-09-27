@@ -15,36 +15,19 @@
 	/** Unix ms the current phrase dies, or 0 when there is none. */
 	var expiresAt = 0;
 
-	// Short, spellable, classroom-safe. Three of these joined with
-	// hyphens is easy to read off a projector and easy to type once.
-	var WORDS = [
-		"apple", "anchor", "banjo", "blue", "bridge", "cactus", "candle", "cedar",
-		"cherry", "cobalt", "comet", "copper", "coral", "crayon", "delta", "dragon",
-		"ember", "falcon", "ferry", "forest", "garden", "ginger", "granite", "harbor",
-		"hazel", "indigo", "island", "jasper", "jungle", "kayak", "lantern", "lemon",
-		"lily", "magnet", "mango", "maple", "marble", "meadow", "mint", "nickel",
-		"olive", "orbit", "otter", "pancake", "pebble", "pepper", "piano", "pilot",
-		"planet", "pumpkin", "quartz", "quilt", "rabbit", "radish", "ranger", "raven",
-		"river", "robot", "rocket", "saffron", "sailor", "silver", "sparrow", "spruce",
-		"sunset", "tandem", "thunder", "tiger", "timber", "tulip", "umbrella", "valley",
-		"velvet", "walnut", "willow", "window", "yellow", "zebra"
-	];
+	/**
+	 * Three different words and a two-digit number, "otter-maple-rocket-47".
+	 * The list and the reasons for it live in phrase-words.js, which
+	 * teacher.html loads just before this file.
+	 */
+	var generatePhrase = window.uploadmycodePhrase.generatePhrase;
 
-	function randomWord() {
-		var pick = new Uint32Array(1);
-		crypto.getRandomValues(pick);
-		return WORDS[pick[0] % WORDS.length];
-	}
-
-	function generatePhrase() {
-		var picked = [];
-		while (picked.length < 3) {
-			var word = randomWord();
-			// Three different words: "robot-robot-maple" reads like a typo.
-			if (picked.indexOf(word) === -1) picked.push(word);
-		}
-		return picked.join("-");
-	}
+	/**
+	 * The Worker refuses a phrase shorter than this (MIN_PHRASE_LENGTH in
+	 * src/phrase.ts), because a short phrase is a guessable one. Checked
+	 * here too so the teacher hears why before anything is sent.
+	 */
+	var MIN_PHRASE_LENGTH = 12;
 
 	/**
 	 * The Worker's own 429 sentence, verbatim, minutes and all.
@@ -237,6 +220,16 @@
 		var phrase = phraseInput.value.trim();
 		if (phrase === "") {
 			say("Type a phrase, or press Generate.", "error");
+			return;
+		}
+		if (normalize(phrase).length < MIN_PHRASE_LENGTH) {
+			say(
+				"That phrase is too short to be safe. Use at least " +
+					MIN_PHRASE_LENGTH +
+					" characters (three words and a number is plenty), or press Generate.",
+				"error"
+			);
+			phraseInput.focus();
 			return;
 		}
 		var ttl = Number(durationSelect.value);

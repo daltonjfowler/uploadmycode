@@ -14,7 +14,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { CompileQueue, CONTAINER_COUNT, isUsableToken, MAX_WAIT_MS } from "../src/queue.ts";
+import {
+	CompileQueue,
+	CONTAINER_COUNT,
+	isUsableToken,
+	MAX_QUEUE_DEPTH,
+	MAX_WAIT_MS,
+} from "../src/queue.ts";
 
 const A = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa";
 const B = "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb";
@@ -160,7 +166,66 @@ test("the line cannot grow without bound", () => {
 	for (let i = 0; i < 400; i += 1) {
 		queue.enter(`token-${String(i).padStart(4, "0")}`, now + i);
 	}
-	assert.ok(queue.depth(now + 400) <= 256, `depth was ${queue.depth(now + 400)}`);
+	assert.equal(queue.depth(now + 400), MAX_QUEUE_DEPTH);
+});
+
+// ------------------------------------------------------ the cap on the line
+
+/** Fill a queue to exactly the cap and hand back the tokens that got in. */
+function fullQueue(now) {
+	const queue = twoContainers();
+	const tokens = [];
+	for (let i = 0; i < MAX_QUEUE_DEPTH; i += 1) {
+		const token = `full-${String(i).padStart(4, "0")}-aaaa`;
+		const admission = queue.enter(token, now + i);
+		assert.equal(admission.admitted, true, `compile ${i + 1} of ${MAX_QUEUE_DEPTH}`);
+		tokens.push(token);
+	}
+	return { queue, tokens };
+}
+
+test("the cap is about forty: more than a class at once, less than a stall", () => {
+	assert.ok(MAX_QUEUE_DEPTH >= 30, "a whole class pressing Compile together must fit");
+	assert.ok(MAX_QUEUE_DEPTH <= 50);
+});
+
+test("one past the cap is turned away and is not added to the line", () => {
+	const now = 1_000_000;
+	const { queue } = fullQueue(now);
+
+	const refused = queue.enter(D, now + 100);
+	assert.equal(refused.admitted, false);
+	assert.equal(refused.depth, MAX_QUEUE_DEPTH);
+	assert.equal("container" in refused, false, "nowhere to compile");
+	assert.equal(queue.isWaiting(D, now + 101), false);
+	assert.equal(queue.depth(now + 101), MAX_QUEUE_DEPTH, "the refusal did not grow the line");
+});
+
+test("a compile already in the line is never turned away by the cap", () => {
+	const now = 1_000_000;
+	const { queue, tokens } = fullQueue(now);
+
+	// A retried request is the same compile, so it keeps its place.
+	const again = queue.enter(tokens[5], now + 100);
+	assert.equal(again.admitted, true);
+	assert.equal(again.depth, MAX_QUEUE_DEPTH);
+});
+
+test("as soon as one compile finishes, the next is let in", () => {
+	const now = 1_000_000;
+	const { queue, tokens } = fullQueue(now);
+	assert.equal(queue.enter(D, now + 100).admitted, false);
+
+	queue.leave(tokens[0]);
+	const admitted = queue.enter(D, now + 101);
+	assert.equal(admitted.admitted, true);
+	assert.equal(admitted.depth, MAX_QUEUE_DEPTH);
+});
+
+test("lost compiles age out, so a full line of leftovers does not stay full", () => {
+	const now = 1_000_000;
+	const { queue } = fullQueue(now);
+	assert.equal(queue.enter(D, now + MAX_WAIT_MS + 1000).admitted, true);
 });
 
 test("only sane tokens are tracked", () => {

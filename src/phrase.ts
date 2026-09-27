@@ -27,6 +27,14 @@ export const MAX_TTL_SECONDS = 43200;
 export const DEFAULT_TTL_SECONDS = 5400;
 /** Long enough for four or five words, short enough to read off a projector. */
 export const MAX_PHRASE_LENGTH = 64;
+/**
+ * The shortest phrase a teacher may SET. A short phrase is a guessable one: a
+ * guesser starts with short dictionary words, and "robots" falls to those long
+ * before the per-address limit in src/compile-gate.ts has a say. Twelve is
+ * "two words and a number" long, and every phrase the teacher page's Generate
+ * button makes is longer. Counted once spaces are tidied, like everything here.
+ */
+export const MIN_PHRASE_LENGTH = 12;
 
 /** What the teacher endpoint stores in KV under PHRASE_KEY. */
 export interface PhraseRecord {
@@ -47,8 +55,21 @@ export function normalizePhrase(raw: unknown): string {
 	return raw.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-/** A phrase is usable if it survived normalizing and is not absurdly long. */
+/**
+ * Whether a teacher may set this phrase: long enough not to be guessed, short
+ * enough to read off a projector. Only the teacher endpoint asks this.
+ */
 export function isUsablePhrase(normalized: string): boolean {
+	return normalized.length >= MIN_PHRASE_LENGTH && normalized.length <= MAX_PHRASE_LENGTH;
+}
+
+/**
+ * Whether a phrase already in KV still counts. Looser than `isUsablePhrase` on
+ * purpose: a short phrase set before the twelve-character rule existed keeps
+ * working until it expires (twelve hours at most), rather than refusing a
+ * class mid-lesson on the morning the rule is deployed.
+ */
+function isStoredPhrase(normalized: string): boolean {
 	return normalized.length > 0 && normalized.length <= MAX_PHRASE_LENGTH;
 }
 
@@ -84,7 +105,7 @@ export function activeRecord(value: unknown, now: number): PhraseRecord | null {
 
 	const record = value as { phrase?: unknown; expiresAt?: unknown };
 	const phrase = normalizePhrase(record.phrase);
-	if (!isUsablePhrase(phrase)) return null;
+	if (!isStoredPhrase(phrase)) return null;
 	if (typeof record.expiresAt !== "number" || !Number.isFinite(record.expiresAt)) return null;
 	if (now >= record.expiresAt) return null;
 

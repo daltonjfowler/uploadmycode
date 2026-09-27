@@ -12,10 +12,11 @@
  */
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { gateCompile, MAX_COMPILE_BYTES } from "../src/compile-gate.ts";
-import { rateLimitKey } from "../src/ratelimit.ts";
+import { gateCompile, gateFormat, MAX_COMPILE_BYTES } from "../src/compile-gate.ts";
+import { GLOBAL_COMPILE_MAX_PER_MINUTE, rateLimitKey } from "../src/ratelimit.ts";
 
 // `crypto.subtle.timingSafeEqual` is a Cloudflare extension to SubtleCrypto and
 // Node does not have it. The gate uses it only to compare the phrase, and what
@@ -42,8 +43,23 @@ function fakeKv(phrase) {
 	return kv;
 }
 
-function envWith(phrase, allowedCidrs = "") {
-	return { ALLOWED_CIDRS: allowedCidrs, CLASS_KV: fakeKv(phrase) };
+/**
+ * The per-address brake: a stand-in for the Workers Rate Limiting binding that
+ * remembers every key it was asked about and says yes to the first `allow`.
+ */
+function fakeLimiter(allow = Number.POSITIVE_INFINITY) {
+	const limiter = {
+		keys: [],
+		async limit({ key }) {
+			limiter.keys.push(key);
+			return { success: limiter.keys.length <= allow };
+		},
+	};
+	return limiter;
+}
+
+function envWith(phrase, allowedCidrs = "", limiter = fakeLimiter()) {
+	return { ALLOWED_CIDRS: allowedCidrs, CLASS_KV: fakeKv(phrase), PHRASE_LIMITER: limiter };
 }
 
 /**
@@ -261,4 +277,151 @@ test("the school IP lock refuses before the phrase is read", async () => {
 		spyCounters(),
 	);
 	assert.equal(inside.ok, true);
+});
+
+// ------------------------------------------------- the per-address brake
+
+const BRAKE_SENTENCE =
+	"That is a lot of tries from your network in one minute. Wait a minute and try again.";
+
+test("every request carrying a phrase is counted against its address before the phrase is read", async () => {
+	const limiter = fakeLimiter();
+	const env = envWith(PHRASE, "", limiter);
+
+	await gateCompile(compileRequest(goodHeaders()), env, spyCounters());
+	await gateCompile(compileRequest(goodHeaders({ "x-class-phrase": "a wrong guess" })), env, spyCounters());
+	await gateFormat(compileRequest(goodHeaders()), env, spyCounters());
+
+	assert.deepEqual(limiter.keys, [SCHOOL_IP, SCHOOL_IP, SCHOOL_IP], "right, wrong and format alike");
+});
+
+test("over the brake is a 429 before KV or any counter is touched", async () => {
+	const counters = spyCounters();
+	const env = envWith(PHRASE, "", fakeLimiter(0));
+
+	const verdict = await gateCompile(compileRequest(goodHeaders({ "x-class-phrase": "a guess" })), env, counters);
+
+	assert.equal(verdict.ok, false);
+	assert.equal(verdict.response.status, 429);
+	assert.equal(await errorOf(verdict.response), BRAKE_SENTENCE);
+	assert.equal(verdict.response.headers.get("retry-after"), "60");
+	assert.equal(env.CLASS_KV.reads, 0, "the phrase was never looked up");
+	assert.deepEqual(counters.calls.client, []);
+	assert.equal(counters.calls.global, 0);
+});
+
+test("over the brake, the RIGHT phrase is refused too, so a guesser learns nothing", async () => {
+	const env = envWith(PHRASE, "", fakeLimiter(2));
+
+	const wrong = await gateCompile(compileRequest(goodHeaders({ "x-class-phrase": "guess-one" })), env, spyCounters());
+	assert.equal(wrong.response.status, 403);
+	const right = await gateCompile(compileRequest(goodHeaders()), env, spyCounters());
+	assert.equal(right.ok, true, "inside the limit the right phrase works");
+
+	const wrongAgain = await gateCompile(compileRequest(goodHeaders({ "x-class-phrase": "guess-two" })), env, spyCounters());
+	const rightAgain = await gateCompile(compileRequest(goodHeaders()), env, spyCounters());
+	assert.equal(wrongAgain.response.status, 429);
+	assert.equal(rightAgain.response.status, 429, "same answer for right and wrong");
+	assert.equal(await errorOf(wrongAgain.response), await errorOf(rightAgain.response));
+});
+
+test("a request with no phrase at all is not a guess and is not counted", async () => {
+	const limiter = fakeLimiter(0);
+	const verdict = await gateCompile(compileRequest(), envWith(PHRASE, "", limiter), spyCounters());
+
+	assert.equal(verdict.response.status, 403, "still the plain phrase refusal");
+	assert.deepEqual(limiter.keys, []);
+});
+
+test("an address the gate cannot see still gets a bucket, not a free pass", async () => {
+	const limiter = fakeLimiter();
+	await gateCompile(
+		compileRequest(goodHeaders({ "cf-connecting-ip": "" })),
+		envWith(PHRASE, "", limiter),
+		spyCounters(),
+	);
+	assert.deepEqual(limiter.keys, ["unknown"]);
+});
+
+test("a broken limiter binding lets the class compile rather than locking it out", async () => {
+	const broken = {
+		async limit() {
+			throw new Error("binding unavailable");
+		},
+	};
+	const originalError = console.error;
+	console.error = () => {};
+	try {
+		const verdict = await gateCompile(compileRequest(goodHeaders()), envWith(PHRASE, "", broken), spyCounters());
+		assert.equal(verdict.ok, true);
+	} finally {
+		console.error = originalError;
+	}
+});
+
+test("the brake in wrangler.jsonc is exactly the site-wide ceiling, never tighter", () => {
+	// The whole school shares one address. Held to less than the bill guard
+	// already allows everybody together, the brake would punish a class for its
+	// own size. See the notes at the top of src/compile-gate.ts.
+	const config = readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8");
+	const block = /"ratelimits"\s*:\s*\[([\s\S]*?)\]/.exec(config);
+	assert.ok(block, "wrangler.jsonc has a ratelimits block");
+	assert.match(block[1], /"name"\s*:\s*"PHRASE_LIMITER"/);
+	assert.match(block[1], /"namespace_id"\s*:\s*"20260930"/);
+	const simple = /"limit"\s*:\s*(\d+)\s*,\s*"period"\s*:\s*(\d+)/.exec(block[1]);
+	assert.ok(simple, "a simple limit and period");
+	assert.equal(Number(simple[1]), GLOBAL_COMPILE_MAX_PER_MINUTE);
+	assert.equal(Number(simple[2]), 60, "a minute, the same window as the ceiling");
+});
+
+// ------------------------------------------------- a body with no length
+
+/** A streamed body with no Content-Length, `chunks` pieces of `size` bytes. */
+function streamedRequest(chunkSize, chunks) {
+	let sent = 0;
+	const state = { pulled: 0, cancelled: false };
+	const body = new ReadableStream({
+		pull(controller) {
+			if (sent >= chunks) {
+				controller.close();
+				return;
+			}
+			sent += 1;
+			state.pulled += 1;
+			controller.enqueue(new Uint8Array(chunkSize).fill(0x20));
+		},
+		cancel() {
+			state.cancelled = true;
+		},
+	});
+	const request = new Request("https://uploadmycode.com/api/compile", {
+		method: "POST",
+		headers: { "cf-connecting-ip": SCHOOL_IP, ...goodHeaders() },
+		body,
+		duplex: "half",
+	});
+	assert.equal(request.headers.get("content-length"), null, "nothing declared");
+	return { request, state };
+}
+
+test("a chunked upload with no length is cut off at the cap, not read to the end", async () => {
+	const env = envWith(PHRASE);
+	// Effectively endless: if the gate read it all, this test would never finish.
+	const { request, state } = streamedRequest(16 * 1024, Number.MAX_SAFE_INTEGER);
+
+	const verdict = await gateCompile(request, env, spyCounters());
+
+	assert.equal(verdict.ok, false);
+	assert.equal(verdict.response.status, 413);
+	assert.ok(state.pulled <= Math.ceil(MAX_COMPILE_BYTES / (16 * 1024)) + 2, `pulled ${state.pulled} pieces`);
+	assert.equal(state.cancelled, true, "the rest of the upload was cancelled");
+	assert.equal(env.CLASS_KV.reads, 0);
+});
+
+test("a chunked upload under the cap arrives whole", async () => {
+	const { request } = streamedRequest(1000, 5);
+	const verdict = await gateCompile(request, envWith(PHRASE), spyCounters());
+
+	assert.equal(verdict.ok, true);
+	assert.equal(verdict.body.byteLength, 5000);
 });

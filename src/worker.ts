@@ -10,9 +10,11 @@
  *
  * POST /api/compile hands the sketch to the arduino-cli container and passes
  * its answer straight back, but only after the gate in src/compile-gate.ts:
- * size, the optional school IP lock, the class phrase, six compiles a minute
- * for this browser's client id, and the all-of-us bill guard. That file holds
- * the order and the reasons; this one holds the wiring.
+ * size, the optional school IP lock, the per-address brake on guessing, the
+ * class phrase, six compiles a minute for this browser's client id, and the
+ * all-of-us bill guard. That file holds the order and the reasons; this one
+ * holds the wiring. A compile that clears the gate is still turned away with a
+ * 503 if forty are already in flight (src/queue.ts).
  *
  * POST /api/format is the Auto indent button and goes through the very same
  * gate, spending a bucket of its own (twelve a minute) so that tidying a sketch
@@ -22,8 +24,10 @@
  * The rule behind both gates: nothing a stranger gets wrong is allowed to cost
  * anybody else anything. The school leaves Cloudflare through one address, so a
  * per-IP penalty is a whole-class outage. A wrong phrase is therefore a plain
- * 403 every time, and the only guard on the teacher key is failure-path only,
- * so a correct key always gets in. See src/teacher-guard.ts.
+ * 403 that spends no budget, the one per-address brake is set no tighter than
+ * what the site already allows everybody together (src/compile-gate.ts), and
+ * the only guard on the teacher key is failure-path only, so a correct key
+ * always gets in. See src/teacher-guard.ts.
  *
  * Keep this file small; a teacher maintains it.
  */
@@ -44,11 +48,12 @@ import {
 	clampTtlSeconds,
 	isUsablePhrase,
 	MAX_PHRASE_LENGTH,
+	MIN_PHRASE_LENGTH,
 	normalizePhrase,
 	PHRASE_KEY,
 	type PhraseRecord,
 } from "./phrase.ts";
-import { CompileQueue, CONTAINER_COUNT, isUsableToken } from "./queue.ts";
+import { CompileQueue, CONTAINER_COUNT, isUsableToken, type Admission } from "./queue.ts";
 import {
 	FORMAT_RATE_LIMIT_MAX,
 	GLOBAL_COMPILE_KEY,
@@ -186,9 +191,10 @@ export class Counters extends DurableObject<Env> {
 
 	/**
 	 * Join the compile queue. Returns the container to compile on (the
-	 * least-loaded one) and how long the line now is, including this compile.
+	 * least-loaded one) and how long the line now is, including this compile —
+	 * or, when the line is full, that this compile must be turned away.
 	 */
-	enterCompileQueue(token: string): { container: number; depth: number } {
+	enterCompileQueue(token: string): Admission {
 		return this.#queue.enter(token, Date.now());
 	}
 
@@ -338,7 +344,12 @@ async function teacherPhrase(request: Request, env: Env): Promise<Response> {
 	if (!isUsablePhrase(phrase)) {
 		return json(400, {
 			ok: false,
-			error: "A phrase must be 1 to " + MAX_PHRASE_LENGTH + " characters once spaces are tidied.",
+			error:
+				"A phrase must be " +
+				MIN_PHRASE_LENGTH +
+				" to " +
+				MAX_PHRASE_LENGTH +
+				" characters long. Press Generate for one that is.",
 		});
 	}
 
@@ -402,28 +413,35 @@ async function compile(request: Request, env: Env): Promise<Response> {
 	if (!verdict.ok) return verdict.response;
 
 	// The page mints a token per compile and polls /api/queue with it while it
-	// waits. Tracking it is best-effort in both directions: a request without a
-	// usable token compiles exactly as it always did, and a counters call that
-	// fails must never cost somebody their compile.
-	const token = request.headers.get("x-compile-token");
-	const tracked = isUsableToken(token);
-	// The queue also decides which of the containers this compile runs on, so a
-	// tracked compile takes the container the line assigns it and everything else
-	// falls back to a random one. If the counters call fails, the compile still
-	// happens — on a random container rather than none.
+	// waits. A request without a usable token is given one here, so every
+	// compile stands in the line and none can skip the cap on its length by
+	// leaving the header off; nobody polls with a minted one, and that is fine.
+	const sent = request.headers.get("x-compile-token");
+	const token = isUsableToken(sent) ? sent : crypto.randomUUID();
+	// The queue also decides which of the containers this compile runs on. If
+	// the counters call fails the compile still happens, on a random container
+	// rather than none: a fault in the line must never cost somebody their compile.
 	let container = randomContainer();
-	if (tracked) {
-		try {
-			const assignment = await tally.enterCompileQueue(token);
-			container = assignment.container;
-			if (assignment.depth > 1) {
-				console.log(
-					JSON.stringify({ event: "compile-queued", inLine: assignment.depth, container }),
-				);
-			}
-		} catch (error) {
-			console.error(JSON.stringify({ message: "queue enter failed", error: String(error) }));
+	let tracked = false;
+	try {
+		const assignment = await tally.enterCompileQueue(token);
+		if (!assignment.admitted) {
+			console.log(JSON.stringify({ event: "compile-refused-queue-full", inLine: assignment.depth }));
+			return json(
+				503,
+				{ ok: false, error: "The compiler is very busy. Try again in a minute." },
+				{ "retry-after": "60" },
+			);
 		}
+		tracked = true;
+		container = assignment.container;
+		if (assignment.depth > 1) {
+			console.log(
+				JSON.stringify({ event: "compile-queued", inLine: assignment.depth, container }),
+			);
+		}
+	} catch (error) {
+		console.error(JSON.stringify({ message: "queue enter failed", error: String(error) }));
 	}
 
 	try {

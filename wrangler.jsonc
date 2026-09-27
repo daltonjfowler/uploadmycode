@@ -43,6 +43,23 @@
     { "binding": "CLASS_KV", "id": "1826452392d7425b96e48aa005f9be77" }
   ],
 
+  // The per-address brake on guessing the class phrase. Every compile or format
+  // that carries a phrase is counted here, keyed by cf-connecting-ip, BEFORE the
+  // phrase is compared, so a guesser runs out of tries whether their guesses are
+  // right or wrong. The limit is the site-wide bill guard's own number
+  // (GLOBAL_COMPILE_MAX_PER_MINUTE in src/ratelimit.ts): the whole school shares
+  // one address, and it must never be held to less than the site already allows
+  // everybody together. Raise the two together. namespace_id is unique across
+  // the Cloudflare account; do not reuse it for another limiter or another site.
+  // See src/compile-gate.ts and docs/DEPLOY.md section 4a.
+  "ratelimits": [
+    {
+      "name": "PHRASE_LIMITER",
+      "namespace_id": "20260930",
+      "simple": { "limit": 120, "period": 60 }
+    }
+  ],
+
   "vars": {
     // Optional in-person lock (T5). Empty = off, and the site works from anywhere as long as
     // the class phrase is right. Set it to a comma-separated list of the school's public

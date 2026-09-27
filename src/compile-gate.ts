@@ -7,11 +7,12 @@
  *
  *   1. size          over 100 KB is refused before anything else runs
  *   2. school        the optional ALLOWED_CIDRS lock, off unless the var is set
- *   3. phrase        today's class phrase from KV, compared in constant time
- *   4. per client    six compiles, or twelve formats, a minute for this browser
- *   5. everybody     the bill guard: 120 requests a minute in total, both kinds
+ *   3. per address   120 phrase-carrying requests a minute per public address
+ *   4. phrase        today's class phrase from KV, compared in constant time
+ *   5. per client    six compiles, or twelve formats, a minute for this browser
+ *   6. everybody     the bill guard: 120 requests a minute in total, both kinds
  *
- * Both endpoints run the exact same five checks in the exact same order. Only
+ * Both endpoints run the exact same six checks in the exact same order. Only
  * two things differ, and they are the only two things `GateKind` decides: which
  * per-client bucket the attempt is counted into, and which sentence the 429
  * carries. The size and phrase answers are word for word identical, because a
@@ -23,18 +24,36 @@
  * ceiling, because that one is about the container's bill and the container
  * does both jobs.
  *
- * A wrong or missing phrase is a plain 403, every time. It is never counted,
- * never delayed, and never locks anybody out. That is deliberate: the school
- * leaves Cloudflare through one public address, so anything that punishes "this
- * IP" punishes the whole class, and one student could take the room offline
- * with a few clicks. A wrong phrase costs one cached KV read and two hashes,
- * the phrase expires within hours, and the container never starts — so there is
- * nothing here worth buying with a shared-fate outage.
+ * A wrong or missing phrase is a plain 403. It is never delayed and it never
+ * spends anybody's compile budget. What stops a stranger guessing phrases all
+ * day is check 3, the per-address brake: every request that carries a phrase,
+ * right or wrong, counts once against its public address, and past 120 a
+ * minute the address gets a 429 BEFORE the phrase is compared. Counting right
+ * and wrong alike is the point: a guesser who is refused cannot tell a right
+ * guess from a wrong one, so the refusal really does end the guessing.
  *
- * The limiters run AFTER the phrase check, which is what makes that safe: a
- * wrong phrase never reaches a counter, so no amount of wrong guessing can
- * spend anyone's compile budget. Only a compile that was actually going to run
- * is counted, whether it then succeeds or fails to compile.
+ * Why 120, and why that is safe for a school. The school leaves Cloudflare
+ * through one public address, so anything that punishes "this IP" punishes the
+ * whole class. The brake is therefore set to exactly the bill guard's number
+ * (check 6), which already caps everybody together at 120 compiles and formats
+ * a minute: a class can never be held to less by its own address than the site
+ * already allows it. That is the rule for this brake, and the reason the
+ * two numbers must be raised together. One honest gap: a request that the
+ * per-client limit later refuses was still counted here, so one student
+ * hammering Compile far past their own six a minute spends the address's 120
+ * faster than the bill guard would. The editor sends one compile at a time, so
+ * that takes a determined student, and it costs the room a minute, not the
+ * day. A student with the phrase could already do the same to the bill guard
+ * with invented client ids. What it buys: 120 guesses a minute
+ * against about 750 million generated phrases (web/public/phrase-words.js), and
+ * the phrase expires within hours. The brake is a Workers Rate Limiting binding
+ * (PHRASE_LIMITER in wrangler.jsonc), counted per Cloudflare location, which is
+ * the right shape for a brake and costs no Durable Object call.
+ *
+ * The per-client and global limiters still run AFTER the phrase check, so a
+ * wrong phrase never reaches them and no amount of wrong guessing can spend
+ * anyone's compile budget. Only a compile that was actually going to run is
+ * counted there, whether it then succeeds or fails to compile.
  *
  * The counters live in the `Counters` Durable Object — deliberately not the
  * compile container's, whose sleep clock restarts on every touch — and are
@@ -59,7 +78,16 @@ export type GateKind = "compile" | "format";
 export interface CompileEnv {
 	ALLOWED_CIDRS?: string;
 	CLASS_KV: KVNamespace;
+	/** The per-address brake, check 3. See wrangler.jsonc "ratelimits". */
+	PHRASE_LIMITER: RateLimit;
 }
+
+/**
+ * How long the per-address 429 tells the page to wait. The binding counts in
+ * one-minute windows and does not say how much of this one is left, so the
+ * honest answer is the whole window.
+ */
+const PHRASE_LIMIT_RETRY_SECONDS = 60;
 
 /**
  * The two counters in the `Counters` Durable Object, as this module wants to
@@ -158,7 +186,63 @@ function tooLarge(): GateVerdict {
 	);
 }
 
-/** POST /api/compile: the five checks, with the compile bucket and wording. */
+/**
+ * The request body, or null the moment it passes `max` bytes.
+ *
+ * Not `request.arrayBuffer()`: that reads everything before anyone can count
+ * it, so a chunked upload with no Content-Length could make the Worker hold as
+ * much as the sender cares to send. Here the rest is cancelled, unread, as
+ * soon as the running total goes over.
+ */
+async function readCapped(request: Request, max: number): Promise<ArrayBuffer | null> {
+	if (request.body === null) return new ArrayBuffer(0);
+
+	const reader = request.body.getReader();
+	const pieces: Uint8Array[] = [];
+	let total = 0;
+	for (;;) {
+		const { done, value } = await reader.read();
+		if (done) break;
+		const piece: Uint8Array = value;
+		total += piece.byteLength;
+		if (total > max) {
+			// Nothing is waiting on the rest of the upload; a cancel that fails
+			// changes nothing about the answer.
+			await reader.cancel().catch(() => undefined);
+			return null;
+		}
+		pieces.push(piece);
+	}
+
+	const joined = new Uint8Array(total);
+	let at = 0;
+	for (const piece of pieces) {
+		joined.set(piece, at);
+		at += piece.byteLength;
+	}
+	return joined.buffer;
+}
+
+/**
+ * Count one phrase-carrying request against its public address and say whether
+ * it may go on. See check 3 in the notes at the top.
+ *
+ * If the binding itself fails, the request goes on. That is the same choice
+ * the rest of this file makes: a fault in a fuse must never refuse a class that
+ * typed the phrase right. It is logged, loudly, because while it lasts the
+ * phrase is unbraked.
+ */
+async function addressMayTry(env: CompileEnv, ip: string): Promise<boolean> {
+	try {
+		const outcome = await env.PHRASE_LIMITER.limit({ key: ip === "" ? "unknown" : ip });
+		return outcome.success;
+	} catch (error) {
+		console.error(JSON.stringify({ message: "phrase limiter failed; not braking", error: String(error) }));
+		return true;
+	}
+}
+
+/** POST /api/compile: the six checks, with the compile bucket and wording. */
 export async function gateCompile(
 	request: Request,
 	env: CompileEnv,
@@ -167,7 +251,7 @@ export async function gateCompile(
 	return await gate(request, env, counters, "compile");
 }
 
-/** POST /api/format: the same five checks, with the format bucket and wording. */
+/** POST /api/format: the same six checks, with the format bucket and wording. */
 export async function gateFormat(
 	request: Request,
 	env: CompileEnv,
@@ -182,13 +266,14 @@ async function gate(
 	counters: CompileCounters,
 	kind: GateKind,
 ): Promise<GateVerdict> {
-	// 1. Size. A declared oversize is answered before a byte is read; the real
-	// byte count is checked after, because a chunked upload declares nothing.
+	// 1. Size. A declared oversize is answered before a byte is read; a chunked
+	// upload declares nothing, so the body is read a piece at a time and the
+	// reading stops the moment it passes the cap.
 	const declared = Number(request.headers.get("content-length"));
 	if (Number.isFinite(declared) && declared > MAX_COMPILE_BYTES) return tooLarge();
 
-	const body = await request.arrayBuffer();
-	if (body.byteLength > MAX_COMPILE_BYTES) return tooLarge();
+	const body = await readCapped(request, MAX_COMPILE_BYTES);
+	if (body === null) return tooLarge();
 
 	// 2. The optional in-person lock. An empty ALLOWED_CIDRS switches it off.
 	const ip = request.headers.get("cf-connecting-ip") ?? "";
@@ -197,8 +282,24 @@ async function gate(
 		return refuse(json(403, { ok: false, error: "uploadmycode only works from school." }));
 	}
 
-	// 3. The class phrase. Wrong is 403, always, immediately, uncounted.
+	// 3. The per-address brake, BEFORE the phrase is compared, counting right
+	// and wrong alike. A request with no phrase at all is not a guess and is
+	// refused at step 4 without being counted.
 	const supplied = normalizePhrase(request.headers.get("x-class-phrase"));
+	if (supplied !== "" && !(await addressMayTry(env, ip))) {
+		return refuse(
+			json(
+				429,
+				{
+					ok: false,
+					error: "That is a lot of tries from your network in one minute. Wait a minute and try again.",
+				},
+				{ "retry-after": String(PHRASE_LIMIT_RETRY_SECONDS) },
+			),
+		);
+	}
+
+	// 4. The class phrase. Wrong is 403, immediately, and spends no budget.
 	const active = await readActivePhrase(env);
 	if (active === null) {
 		return refuse(json(403, { ok: false, error: "No class phrase is active. Ask your teacher." }));
@@ -209,7 +310,7 @@ async function gate(
 		);
 	}
 
-	// 4. This browser's own budget for this kind of request — six compiles a
+	// 5. This browser's own budget for this kind of request — six compiles a
 	// minute, or twelve formats. Only requests that got past the phrase are
 	// counted, so a class fumbling the phrase never spends its own budget.
 	const client = await counters.checkClientRate(
@@ -225,7 +326,7 @@ async function gate(
 		);
 	}
 
-	// 5. The bill guard. Last, so a client already over its own limit does not
+	// 6. The bill guard. Last, so a client already over its own limit does not
 	// spend the shared budget on the way to being refused anyway.
 	const everyone = await counters.checkGlobalRate();
 	if (!everyone.allowed) {
