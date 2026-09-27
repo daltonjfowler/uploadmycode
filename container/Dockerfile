@@ -172,10 +172,16 @@ RUN for b in general sensorkit; do mkdir -p "$BUILD_ROOT/$b/sketch"; done \
 WORKDIR /app
 # package.json only marks server.js as an ES module. It has no dependencies, so
 # there is no npm install step. .clang-format is the Auto indent style and is
-# read from /app at request time, not baked into the binary. Copied last so
-# editing any of the three does not invalidate the toolchain or warm-up layers
+# read from /app at request time, not baked into the binary. sketch-guard.js is
+# the check that refuses a sketch naming a file outside itself. Copied last so
+# editing any of these does not invalidate the toolchain or warm-up layers
 # above.
-COPY --chown=uploader:uploader package.json server.js .clang-format /app/
+COPY --chown=uploader:uploader package.json server.js sketch-guard.js .clang-format /app/
+
+# server.js runs every compile under prlimit (util-linux, already in the base
+# image) so one sketch cannot eat the instance's memory. Checked here so an
+# image without it fails to build instead of quietly compiling unlimited.
+RUN prlimit --version
 
 ENV PORT=8080
 EXPOSE 8080

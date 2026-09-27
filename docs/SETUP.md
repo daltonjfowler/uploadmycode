@@ -115,6 +115,15 @@ is ever misconfigured, a class is not stuck.
 workers.dev URL. Names are scoped to your account, so keeping it collides with nobody. Change it if
 you want a different URL; nothing else in the repo depends on it.
 
+### The phrase brake's namespace id — only if it clashes
+
+`"ratelimits"` holds one Workers Rate Limiting binding, `PHRASE_LIMITER`, the per-address brake
+on guessing the class phrase (DEPLOY.md section 4a). Its `namespace_id`, `"20260930"`, must be
+unique among the rate limiters in *your* Cloudflare account. On a fresh account it is. If you
+already use that number for another Worker's limiter, change it to any other positive integer you
+have not used. Leave `limit` equal to `GLOBAL_COMPILE_MAX_PER_MINUTE` in `src/ratelimit.ts`; a
+test fails if the two differ.
+
 If you edit `wrangler.jsonc`, run `npm run types` afterwards to regenerate
 `worker-configuration.d.ts`, or `npm run typecheck` may complain about a binding it has not heard
 of.

@@ -20,7 +20,7 @@ Five things, about a minute, before the first student compiles.
 
 1. Open <https://uploadmycode.com/teacher.html>. The teacher key is remembered per browser, so on
    your own laptop the page already knows it.
-2. Press **Generate**, or type your own phrase.
+2. Press **Generate**, or type your own phrase of at least 12 characters.
 3. Pick how long it lasts: 1 period (90 min), half day (4 h), or full day (8 h).
 4. Press **Set phrase**. The phrase appears in large type with a countdown. Project that, or write
    it on the board. Press **Pop out** for a small window holding nothing but the phrase, drag it
@@ -205,25 +205,33 @@ is refusing everyone and the Worker log says so.
 
 ## 4. What actually guards a compile
 
-`POST /api/compile` runs five checks before it will hand anything to the container. The order is
+`POST /api/compile` runs six checks before it will hand anything to the container. The order is
 the design, and it lives in one file, `src/compile-gate.ts`. `POST /api/format` — the **Auto
-indent** button — runs the very same five, in the very same order, out of the very same file; only
-step 4 differs, and only in which bucket it spends and what the 429 says (section 4a):
+indent** button — runs the very same six, in the very same order, out of the very same file; only
+step 5 differs, and only in which bucket it spends and what the 429 says (section 4a):
 
 1. **Size.** Over 100 KB → 413. Answered from `Content-Length` before the body is read where
-   possible, and re-checked against the real byte count after, so a chunked upload cannot slip past.
+   possible. A chunked upload declares no length, so the body is read a piece at a time and the
+   read stops, with the 413, the moment it passes 100 KB; the rest is never read.
 2. **School IP lock.** Off unless `ALLOWED_CIDRS` is set (section 6).
-3. **Class phrase.** Read from KV, compared in constant time after both sides are normalized.
+3. **Per-address brake.** Every request that carries a phrase, right or wrong, counts once against
+   its public address: 120 a minute, then 429 "That is a lot of tries from your network in one
+   minute" *before the phrase is compared*. 120 is exactly the global ceiling in step 6, on
+   purpose (section 4a).
+4. **Class phrase.** Read from KV, compared in constant time after both sides are normalized.
    Missing or expired → 403 "No class phrase is active"; wrong → 403 "Wrong class phrase". A wrong
-   phrase is *only ever* a 403: never counted, never delayed, never a lockout (section 4a).
-4. **Per-client rate limit.** Six compiles — or twelve Auto indents — a minute for the
+   phrase is never delayed and never spends anybody's compiles (section 4a).
+5. **Per-client rate limit.** Six compiles — or twelve Auto indents — a minute for the
    `x-client-id` the browser sends, counted in two separate maps in the `Counters` Durable
    Object, with a `Retry-After` header on the 429. It runs after the phrase check on purpose, so
    wrong guesses can never spend anybody's compiles.
-5. **Global ceiling.** 120 requests a minute across everyone, compiles and formats together → 429.
+6. **Global ceiling.** 120 requests a minute across everyone, compiles and formats together → 429.
    The bill guard.
 
-Only after all five is the container touched.
+Only after all six is the container touched — and a compile that clears them all is still turned
+away with 503 "The compiler is very busy. Try again in a minute." if 40 compiles are already in
+flight (`MAX_QUEUE_DEPTH` in `src/queue.ts`), so one student cannot stack up minute-long compiles in
+front of the whole class.
 
 A phrase is valid only while `Date.now() < expiresAt`. KV's own `expirationTtl` is set as well, but
 a KV read can be served from a per-location cache for up to 60 seconds, so the Worker never trusts
@@ -254,24 +262,59 @@ Very little was bought by them anyway:
   The container never starts either way, so no wrong guess costs compute.
 - **The teacher key is 192 bits of randomness.** What stops a brute force is the length of the key,
   not a counter. There is no number of guesses per hour that matters at that size.
-- **The phrase is not a password.** It is three words, it is written on the board, and it expires
-  within hours. It keeps the rest of the internet off the compiler; it was never meant to hold
-  against somebody sitting in the room.
+- **The phrase is not a password.** It is written on the board and it expires within hours. It
+  keeps the rest of the internet off the compiler; it was never meant to hold against somebody
+  sitting in the room.
+
+**But the phrase does have to hold against the rest of the internet**, and until September 2026
+nothing limited wrong phrases at all, while a generated phrase was three words from a 78-word
+list: about 456 thousand phrases, few enough for a script to try every one in an afternoon. Two
+things changed:
+
+- **Generated phrases are much bigger.** Three different words from a 204-word list plus a
+  two-digit number, like `otter-maple-rocket-47`: about 750 million phrases (a little over 2^29).
+  The list is `web/public/phrase-words.js`, with its rules at the top (plain, kid-safe, no names,
+  no sound-alikes); `web/test/phrase-words.test.mjs` fails if it ever drops below 2^28. A phrase
+  a teacher types by hand must be **at least 12 characters** (`MIN_PHRASE_LENGTH` in
+  `src/phrase.ts`); the teacher page and the Worker both say so. A short phrase already live when
+  that rule was deployed keeps working until it expires.
+- **The per-address brake** (step 3 in section 4). Every phrase-carrying request, right or wrong,
+  counts against its public address, and past 120 a minute the address gets a 429 before the
+  phrase is compared, so a refused guesser cannot tell a right guess from a wrong one. At 120 a
+  minute, trying half of 750 million phrases takes about six years; a phrase lasts hours.
+
+The brake is per IP, which this section just finished warning about, so here is why it is safe.
+It is set to **exactly** the global ceiling, 120 a minute, and the global ceiling already caps
+the whole school at 120 compiles and formats a minute. So a class is never held to less by its
+own address than the site already allows everybody together. That is the rule for this number:
+**never set the brake below the global ceiling, and raise the two together.** One honest gap: a
+request the per-client limit refuses still counted against the brake, so one student hammering
+Compile far past their own six a minute can spend the school's 120 faster than the ceiling alone
+would. The editor sends one compile at a time, so that takes a determined student, and it costs the
+room one minute, not the day. A student who knows the phrase could already do the same to the
+global ceiling with invented client ids.
+
+The brake is a Workers Rate Limiting binding (`PHRASE_LIMITER` in `wrangler.jsonc`, namespace id
+`20260930`), counted per Cloudflare location and costing no Durable Object call. If the binding
+ever fails, requests go through and the Worker logs "phrase limiter failed; not braking": a fault
+in a fuse never locks a class out.
 
 ### What is actually enforced
 
 | Guard | Limit | Then | Message |
 |---|---|---|---|
-| Wrong class phrase | none | 403, every time, straight away | "Wrong class phrase. Ask your teacher for today's phrase." |
+| Wrong class phrase | none of its own | 403, straight away | "Wrong class phrase. Ask your teacher for today's phrase." |
+| Phrase-carrying requests, per public address | 120 per minute, right and wrong alike | 429 for up to a minute, before the phrase is compared | "That is a lot of tries from your network in one minute. Wait a minute and try again." |
 | Wrong teacher key | none, per person | 403 after a fixed 300 ms | "Wrong teacher key." |
 | Wrong teacher keys, everywhere | more than 100 in 15 minutes | wrong keys get 429 for 15 minutes — **a correct key still gets in** | "Too many wrong keys from everywhere right now. Try again in N minutes. The right key still works." |
 | Compiles, per client id | 6 per minute | 429 until the window slides | "That is a lot of compiles in one minute. Wait N seconds…" |
 | **Auto indent (`/api/format`), per client id** | **12 per minute** | 429 until the window slides | "That is a lot of tidying in one minute. Wait a moment and try again." |
 | Requests to either endpoint, everyone | 120 per minute | 429 until the window slides | "The compiler is very busy right now. Wait a minute and try again." |
+| Compiles in flight, everyone | 40 at once | 503 until one finishes | "The compiler is very busy. Try again in a minute." |
 
-Every 429 carries `Retry-After` in seconds. There is no `x-lockout` header any more: a 429 from
-`/api/compile` is now always about pace, never about the phrase, so the editor no longer has to
-tell two kinds of 429 apart.
+Every 429 carries `Retry-After` in seconds, and so does the 503. There is no `x-lockout` header any
+more: a 429 from `/api/compile` is always about pace, never about whether the phrase was right, so
+the editor never has to tell two kinds of 429 apart.
 
 **The per-client limit.** The editor mints one random id the first time it is used
 (`crypto.randomUUID()`), keeps it in `localStorage` under `uno-ide.v1.client-id`, and sends it
@@ -287,7 +330,7 @@ bucket with the same six a minute. That is where `curl` lands. No student ever d
 
 **The Auto indent limit.** `POST /api/format` is the toolbar's **Auto indent** button: it sends the
 sketch to the same container, which runs `clang-format` over it and hands the tidied text back. It
-goes through the *same five checks in the same order* as a compile — the 413 and the two phrase 403s
+goes through the *same six checks in the same order* as a compile — the 413 and the two phrase 403s
 are word for word identical — with two differences. It spends a **bucket of its own, 12 a minute per
 client id** (`fmt client <id>`, or `fmt anon <ip>` for anything with no usable id), so no amount of
 tidying can ever eat the six compiles a student still needs; and it counts toward the same global
@@ -310,11 +353,12 @@ however much junk anybody else is sending. That ordering is the whole safety arg
 `test/teacher-guard.test.mjs` pins it by asserting the guard class has no method a correct key can
 reach.
 
-**If a class cannot compile, the phrase is the only thing that can be wrong.** Set it again from
-`/teacher.html`. Nothing else can put the room in a bad state: there is no lockout to wait out and
-no counter that needs forgiving.
+**If a class cannot compile, the phrase is almost always what is wrong.** Set it again from
+`/teacher.html`. The only other thing that can hold the room up is the per-address brake, and it
+clears itself within a minute: there is no lockout to wait out and no counter that needs forgiving.
 
-All of it is counted in the `Counters` Durable Object — one named instance every request shares —
+All of it except the per-address brake is counted in the `Counters` Durable Object — one named
+instance every request shares —
 which makes the counts site-wide rather than per Worker isolate. It is deliberately *not* the
 compile container's object; section 7 explains why that mattered to the bill. Nothing is written to
 storage: if that object is ever evicted the counts reset, which is an acceptable trade for a fuse.
@@ -326,7 +370,35 @@ The numbers live in two files, with tests beside each:
 | 6 compiles/minute/client, 120/minute total, the client-id shape | `src/ratelimit.ts` | `test/ratelimit.test.mjs` |
 | 12 formats/minute/client, and the `fmt ` bucket prefix | `src/ratelimit.ts` | `test/format-gate.test.mjs` |
 | more than 100 wrong teacher keys / 15 minutes | `src/teacher-guard.ts` | `test/teacher-guard.test.mjs` |
-| the order of the five checks, for both endpoints | `src/compile-gate.ts` | `test/compile-gate.test.mjs`, `test/format-gate.test.mjs` |
+| the order of the six checks, for both endpoints; the brake equals the ceiling | `src/compile-gate.ts`, `wrangler.jsonc` | `test/compile-gate.test.mjs`, `test/format-gate.test.mjs` |
+| 12-character minimum for a phrase a teacher sets | `src/phrase.ts` | `test/phrase.test.mjs` |
+| the Generate word list, at least 2^28 phrases | `web/public/phrase-words.js` | `web/test/phrase-words.test.mjs` |
+| 40 compiles in flight at most | `src/queue.ts` | `test/queue.test.mjs` |
+| no `#include` of an absolute or `..` path, no `.incbin` | `container/sketch-guard.js` | `test/sketch-guard.test.mjs` |
+
+### Inside the container
+
+Every sketch is untrusted code handed to a compiler, so `container/server.js` adds three things
+of its own. Changing any of them needs a new container image, which `wrangler deploy` builds and
+rolls out.
+
+- **Resource limits.** Every compile runs under `prlimit --data=768MiB --cpu=45`, inherited by
+  every avr-gcc process. Without it, `#include "/dev/zero"` or a macro that multiplies itself
+  makes cc1plus grow until the 1 GiB instance's OOM killer picks something, possibly the server
+  itself. With it, cc1plus stops and the student reads "This sketch needs more memory to compile
+  than the compiler is allowed". (`--data`, not `--as`: arduino-cli is a Go program and crashes
+  under an address-space limit.) The 60-second timeout stays, and now kills the compiler
+  processes arduino-cli started as well as arduino-cli.
+- **Each sketch is deleted when its compile ends.** The build directories are kept between
+  compiles as a cache, and until September 2026 the last student's sketch sat in them, readable by
+  the next sketch with `#include "/opt/arduino/build/..."`. Now the sketch, arduino-cli's copies of
+  it and the linked program are removed after every compile; only the compiled core and library
+  objects stay. Measured locally, it costs nothing when each compile is a different sketch, as in a
+  class; only compiling an unchanged SensorKit sketch twice in a row is slower (~6 s, was ~3.5 s).
+- **A sketch that names a file outside itself is refused** before it compiles: an `#include` of an
+  absolute path or any `..`, a computed `#include MACRO`, or the assembler's `.incbin` /
+  `.include`. The editor points at the line. This is the second layer; the deletion above is the
+  real fix.
 
 ### Optional: a Cloudflare Rate Limiting rule on `/api/teacher/*`
 

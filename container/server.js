@@ -26,15 +26,23 @@
  * and making Auto indent wait behind somebody's 3-second compile would make the
  * button feel broken. It has its own small allowance instead: two at a time, so
  * a burst of tidying still cannot take the CPU away from a running compile.
+ *
+ * Every sketch is untrusted, and three things keep one from hurting the class:
+ * each compile runs under memory and CPU limits (COMPILE_MEMORY_LIMIT_BYTES),
+ * each sketch's files are deleted the moment its compile ends (forgetSketch),
+ * and a sketch that names a file outside itself is refused before it compiles
+ * (sketch-guard.js).
  */
 
 import { spawn } from "node:child_process";
-import { realpathSync } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { existsSync, realpathSync } from "node:fs";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { sketchProblem } from "./sketch-guard.js";
 
 /** Uno boards, forever. See PLAN.md. */
 const FQBN = "arduino:avr:uno";
@@ -63,6 +71,40 @@ const CLANG_FORMAT_STYLE = fileURLToPath(new URL("./.clang-format", import.meta.
  * lesson than a fast one and a better one than a false failure.
  */
 const COMPILE_TIMEOUT_MS = 60_000;
+/**
+ * Resource limits on every compile, set with prlimit on arduino-cli and
+ * inherited by every avr-gcc, cc1plus and linker it starts. Without them one
+ * sketch could take the whole instance down: `#include "/dev/zero"` makes
+ * cc1plus read forever, and a macro or template that multiplies itself makes
+ * it allocate forever, until the kernel's OOM killer picks something to kill
+ * on a 1 GiB instance — possibly this server, which is PID 1.
+ *
+ * Memory is limited as RLIMIT_DATA (--data), not RLIMIT_AS (--as). arduino-cli
+ * is a Go program and Go reserves far more address space than it ever uses;
+ * measured with arduino-cli 1.5.1, --as=768M makes it crash before it compiles
+ * anything. --data counts only memory a process can actually write, which is
+ * exactly what a runaway cc1plus grows, and 768 MiB of it is far more than an
+ * honest compile needs (the SensorKit warm-up and the tests all passed under
+ * it) while leaving room for this server inside 1 GiB. Past it, cc1plus stops with "out of memory".
+ *
+ * CPU is a backstop, not the timeout: on a quarter of a vCPU, 45 CPU-seconds
+ * is far more than the 60 s wall-clock COMPILE_TIMEOUT_MS allows. It is there
+ * so a compiler process that somehow outlives the timeout still ends itself.
+ */
+const COMPILE_MEMORY_LIMIT_BYTES = 768 * 1024 * 1024;
+const COMPILE_CPU_LIMIT_SECONDS = 45;
+/**
+ * The image has prlimit (util-linux, part of Debian's base; the Dockerfile
+ * checks it is there). A Windows dev box does not, and compiles unlimited, as
+ * it always has. The startup log line says which one this is.
+ */
+const PRLIMIT = process.platform === "linux" && existsSync("/usr/bin/prlimit") ? "/usr/bin/prlimit" : null;
+/**
+ * On Linux arduino-cli gets a process group of its own, so a timeout can kill
+ * it and every compiler process under it in one go. Killing arduino-cli alone
+ * could leave cc1plus running, still eating the CPU the next student needed.
+ */
+const KILL_WHOLE_GROUP = process.platform !== "win32";
 /** Formatting is whitespace work. If it has not finished by now it never will. */
 const FORMAT_TIMEOUT_MS = 10_000;
 /** A sketch that reaches this is not a sketch. The Worker caps request size too. */
@@ -169,8 +211,22 @@ function runArduinoCli(args) {
 	return new Promise((resolve) => {
 		// No shell: args are passed as an array, so sketch text can never become
 		// part of a command line. On Windows, spawn walks PATH and PATHEXT, which
-		// is how "arduino-cli" finds arduino-cli.exe.
-		const child = spawn(ARDUINO_CLI, args, { stdio: ["ignore", "pipe", "pipe"] });
+		// is how "arduino-cli" finds arduino-cli.exe. prlimit sets the limits on
+		// itself and then becomes arduino-cli, so the child's pid is arduino-cli's.
+		const child =
+			PRLIMIT === null
+				? spawn(ARDUINO_CLI, args, { stdio: ["ignore", "pipe", "pipe"], detached: KILL_WHOLE_GROUP })
+				: spawn(
+						PRLIMIT,
+						[
+							`--data=${COMPILE_MEMORY_LIMIT_BYTES}`,
+							`--cpu=${COMPILE_CPU_LIMIT_SECONDS}`,
+							"--",
+							ARDUINO_CLI,
+							...args,
+						],
+						{ stdio: ["ignore", "pipe", "pipe"], detached: KILL_WHOLE_GROUP },
+					);
 
 		let stdout = "";
 		let stderr = "";
@@ -179,7 +235,7 @@ function runArduinoCli(args) {
 
 		const timer = setTimeout(() => {
 			timedOut = true;
-			child.kill("SIGKILL");
+			killCompile(child);
 		}, COMPILE_TIMEOUT_MS);
 
 		const finish = (result) => {
@@ -213,6 +269,40 @@ function runArduinoCli(args) {
 }
 
 /**
+ * Kill a compile and, on Linux, every compiler process it started.
+ * @param {import("node:child_process").ChildProcess} child
+ */
+function killCompile(child) {
+	if (KILL_WHOLE_GROUP && child.pid !== undefined) {
+		try {
+			// A negative pid is the whole process group spawn made for it.
+			process.kill(-child.pid, "SIGKILL");
+			return;
+		} catch {
+			// The group is already gone, or never formed. Fall back to the one.
+		}
+	}
+	child.kill("SIGKILL");
+}
+
+/**
+ * The sentence for a compile that a resource limit stopped, or null when the
+ * compiler failed for an ordinary reason. cc1plus says "out of memory" when it
+ * hits COMPILE_MEMORY_LIMIT_BYTES, and gcc reports the CPU limit as a signal.
+ * @param {string} output
+ * @returns {string | null}
+ */
+function limitMessage(output) {
+	if (/out of memory|virtual memory exhausted|cannot allocate memory/i.test(output)) {
+		return "This sketch needs more memory to compile than the compiler is allowed. Look for a huge array, a macro that repeats itself, or an #include of something that is not a header.";
+	}
+	if (/CPU time limit exceeded/i.test(output)) {
+		return "This sketch took too long to compile and was stopped.";
+	}
+	return null;
+}
+
+/**
  * Cut the throwaway temp directory out of compiler output so students see
  * "sketch.ino:5:3: error: ..." and not the server's file system.
  * @param {string} text
@@ -240,11 +330,6 @@ function toPosix(p) {
 }
 
 /**
- * Compile one sketch. Never rejects.
- * @param {string} code
- * @returns {Promise<{ ok: true, hex: string } | { ok: false, stderr: string }>}
- */
-/**
  * Which build bucket a sketch uses. Sketches that include Arduino SensorKit share
  * one bucket; everything else shares the other. See BUILD_ROOT for why.
  * @param {string} code
@@ -254,6 +339,47 @@ function buildBucket(code) {
 	return /#\s*include\s*[<"]\s*Arduino_SensorKit\.h/i.test(code) ? "sensorkit" : "general";
 }
 
+/**
+ * Delete everything in a bucket that came from the sketch just compiled: the
+ * sketch itself, arduino-cli's copies of it under build/sketch (the merged
+ * source, the object file, the dependency lists), and the linked program in
+ * build/ and out/. What stays is what the cache is for — the compiled core and
+ * libraries, and the small files that say which ones were used — none of which
+ * holds a line a student wrote.
+ *
+ * This is what stops one student's compile reading another's sketch: until it
+ * existed the last sketch sat here, and `#include "/opt/arduino/build/..."`
+ * could pull it into the next compile. See container/sketch-guard.js for the
+ * second layer. Measured locally on the image at a quarter of a vCPU: when each
+ * compile is a different sketch, as in a class, this costs nothing (plain
+ * ~2.5 s, SensorKit ~6 s, the same as before). What it does lose is the
+ * shortcut for compiling an UNCHANGED SensorKit sketch twice in a row, which
+ * went from ~3.5 s to ~6 s.
+ *
+ * Never throws. A failure is logged loudly, because while it lasts the last
+ * sketch is still on disk.
+ * @param {string} bucketDir
+ */
+async function forgetSketch(bucketDir) {
+	const buildPath = path.join(bucketDir, "build");
+	try {
+		await rm(path.join(bucketDir, "sketch", "sketch.ino"), { force: true });
+		await rm(path.join(buildPath, "sketch"), { recursive: true, force: true });
+		await rm(path.join(bucketDir, "out"), { recursive: true, force: true });
+		const linked = await readdir(buildPath).catch(() => []);
+		for (const name of linked) {
+			if (name.startsWith("sketch.ino.")) await rm(path.join(buildPath, name), { force: true });
+		}
+	} catch (error) {
+		console.error(JSON.stringify({ event: "sketch-cleanup-failed", error: String(error) }));
+	}
+}
+
+/**
+ * Compile one sketch. Never rejects.
+ * @param {string} code
+ * @returns {Promise<{ ok: true, hex: string } | { ok: false, stderr: string }>}
+ */
 async function compile(code) {
 	// One compile runs at a time (see enqueue), so a fixed, reused directory per
 	// bucket is safe: nothing else is writing sketch.ino or reading the hex.
@@ -292,6 +418,10 @@ async function compile(code) {
 			};
 		}
 		if (!result.ok) {
+			// A resource limit gets one plain sentence; gcc's own words for it are
+			// written for compiler people.
+			const limited = limitMessage(result.stderr);
+			if (limited !== null) return { ok: false, stderr: limited };
 			// arduino-cli puts compiler errors on stderr; fall back to stdout so a
 			// surprising failure is never reported as an empty message.
 			const message = stripTempPaths(result.stderr || result.stdout, bucketDir);
@@ -306,9 +436,12 @@ async function compile(code) {
 		}
 	} catch (error) {
 		return { ok: false, stderr: `Compile server error: ${String(error)}` };
+	} finally {
+		// The hex, if any, is already read into the answer. The build directory
+		// itself stays: it is the cache, reused by the next compile in the same
+		// bucket and reset only when the container restarts. Only the sketch goes.
+		await forgetSketch(bucketDir);
 	}
-	// No cleanup on purpose: the build directory is the cache. It is reused by the
-	// next compile in the same bucket and reset only when the container restarts.
 }
 
 // ------------------------------------------------------------------ formatting
@@ -569,6 +702,14 @@ async function handleCompile(req, res) {
 	const code = await readCodeRequest(req, res, "stderr");
 	if (code === null) return;
 
+	// Refused before it joins the line: there is nothing to wait for.
+	const problem = sketchProblem(code);
+	if (problem !== null) {
+		console.log(JSON.stringify({ event: "compile-refused", reason: "file outside the sketch" }));
+		send(res, 200, { ok: false, stderr: problem });
+		return;
+	}
+
 	const started = Date.now();
 	const result = await enqueue(() => compile(code));
 	console.log(
@@ -637,7 +778,7 @@ const server = createServer((req, res) => {
 
 // 0.0.0.0, not localhost: the Cloudflare Container reaches this from outside.
 server.listen(PORT, "0.0.0.0", () => {
-	console.log(JSON.stringify({ event: "listening", port: PORT, fqbn: FQBN }));
+	console.log(JSON.stringify({ event: "listening", port: PORT, fqbn: FQBN, limits: PRLIMIT !== null }));
 });
 
 // THE September 2026 bill fix. This process is PID 1 in the container, and
