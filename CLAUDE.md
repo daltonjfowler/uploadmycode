@@ -24,3 +24,6 @@ Rules for every session in this repo:
    before writing Worker code.
 7. T3 and T4 gates need real hardware; the worker writes exact manual test steps for Dalton
    instead of claiming the gate passed.
+
+Wrong-guess lockout (`src/lockout.ts`, Cache API, falls open): 5 wrong phrases or teacher keys in a
+row per IP lock 5 s, doubling to a 300 s cap; checked before the compare, cleared by a right answer.

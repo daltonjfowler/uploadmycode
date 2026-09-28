@@ -31,6 +31,12 @@
 	 * key in the box is wrong, not that you are locked out.
 	 */
 	function busyText(body) {
+		// The short per-address lockout after five wrong keys in a row. Unlike
+		// the site-wide guard, this one refuses even the right key until the
+		// wait is over, and its sentence says how long.
+		if (body && body.error === "locked" && typeof body.message === "string") {
+			return body.message;
+		}
 		return body && body.error
 			? body.error
 			: "Too many wrong keys from everywhere right now. Try again in 15 minutes. The right key still works.";

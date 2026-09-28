@@ -124,7 +124,7 @@ export async function requestCompile(
 		};
 	}
 
-	const reply = body as { ok?: unknown; hex?: unknown; stderr?: unknown; error?: unknown };
+	const reply = body as { ok?: unknown; hex?: unknown; stderr?: unknown; error?: unknown; message?: unknown };
 
 	if (reply.ok === true && typeof reply.hex === "string") {
 		return { kind: "success", hex: reply.hex };
@@ -136,6 +136,12 @@ export async function requestCompile(
 	// error means the compiler never ran. The Worker's sentence is always shown
 	// as it was written: 403 phrase, 413 too big, 429 too fast, 503 over capacity.
 	if (typeof reply.error === "string") {
+		// The growing wrong-phrase lockout. Its sentence is in `message`, and it
+		// is NOT a phrase problem: the stored phrase is kept and nobody is
+		// re-asked, so a locked student just waits and presses the button again.
+		if (response.status === 429 && reply.error === "locked" && typeof reply.message === "string") {
+			return { kind: "service-error", message: reply.message };
+		}
 		if (response.status === 403) return { kind: "phrase-required", message: reply.error };
 		return response.status === 503
 			? { kind: "busy", message: reply.error }

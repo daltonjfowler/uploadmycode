@@ -6,7 +6,8 @@
 	var KEY_STORAGE = "uploadmycode.teacherKey";
 	/* Five seconds. A GET with the right key is never rate limited: see the
 	   teacher gate in src/worker.ts, where a correct key is compared first and
-	   nothing is counted for it. */
+	   nothing is counted for it. The one exception is the short wrong-key
+	   lockout on this address (at most 300 s), which apply() rides out. */
 	var POLL_MS = 5000;
 
 	var body = document.body;
@@ -34,6 +35,11 @@
 	var offline = false;
 	/* One request at a time, so a slow answer cannot stack up behind the timer. */
 	var polling = false;
+	/* A key the Worker refused. Not sent again: a projector re-sending a wrong
+	   key every five seconds would keep the school's address in the wrong-key
+	   lockout (src/lockout.ts) and hold the teacher page out with it. A new
+	   key saved on the teacher page is different, so polling resumes. */
+	var refusedKey = "";
 
 	function loadKey() {
 		try {
@@ -156,6 +162,15 @@
 		 * which a correct key never meets, so it means the same thing here. Both
 		 * are fixed on the teacher page and nowhere else, so both say so.
 		 */
+		/* The short per-address lockout refuses even a right key until its wait
+		   ends, so it says nothing about the key. Keep what is on screen and
+		   try again on the next poll. */
+		if (result.status === 429 && result.body && result.body.error === "locked") {
+			offline = true;
+			draw();
+			return;
+		}
+
 		if (result.status === 403 || result.status === 429) {
 			offline = false;
 			state = "nokey";
@@ -174,7 +189,7 @@
 		if (polling) return;
 
 		var key = loadKey();
-		if (key === "") {
+		if (key === "" || key === refusedKey) {
 			offline = false;
 			state = "nokey";
 			expiresAt = 0;
@@ -185,6 +200,7 @@
 		polling = true;
 		fetchPhrase(key).then(function (result) {
 			polling = false;
+			if (result.status === 403) refusedKey = key;
 			apply(result);
 		});
 	}

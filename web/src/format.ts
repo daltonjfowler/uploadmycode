@@ -63,7 +63,7 @@ export async function requestFormat(code: string, phrase: string): Promise<Forma
 		};
 	}
 
-	const reply = body as { ok?: unknown; code?: unknown; error?: unknown };
+	const reply = body as { ok?: unknown; code?: unknown; error?: unknown; message?: unknown };
 
 	if (reply.ok === true && typeof reply.code === "string") {
 		return { kind: "formatted", code: reply.code };
@@ -71,6 +71,12 @@ export async function requestFormat(code: string, phrase: string): Promise<Forma
 	// The server's sentence is always shown as it was written: 403 phrase,
 	// 413 too big, 429 too much tidying, 503 over capacity.
 	if (typeof reply.error === "string") {
+		// The growing wrong-phrase lockout. Its sentence is in `message`, and it
+		// is NOT a phrase problem: the stored phrase is kept and nobody is
+		// re-asked, so a locked student just waits and presses the button again.
+		if (response.status === 429 && reply.error === "locked" && typeof reply.message === "string") {
+			return { kind: "service-error", message: reply.message };
+		}
 		if (response.status === 403) return { kind: "phrase-required", message: reply.error };
 		return response.status === 503
 			? { kind: "busy", message: reply.error }

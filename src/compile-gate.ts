@@ -8,6 +8,8 @@
  *   1. size          over 100 KB is refused before anything else runs
  *   2. school        the optional ALLOWED_CIDRS lock, off unless the var is set
  *   3. per address   120 phrase-carrying requests a minute per public address
+ *   3b. lockout      5 wrong phrases in a row locks this address 5 s, then
+ *                    doubling to at most 300 s (src/lockout.ts)
  *   4. phrase        today's class phrase from KV, compared in constant time
  *   5. per client    six compiles, or twelve formats, a minute for this browser
  *   6. everybody     the bill guard: 120 requests a minute in total, both kinds
@@ -65,6 +67,14 @@
 import { ipAllowed, parseCidrList, type Cidr } from "./cidr.ts";
 import { constantTimeEquals } from "./constant-time.ts";
 import { json } from "./http.ts";
+import {
+	cacheLockoutStore,
+	clearLock,
+	lockedResponse,
+	readLock,
+	recordWrong,
+	type LockoutStore,
+} from "./lockout.ts";
 import { activeRecord, normalizePhrase, PHRASE_KEY, type PhraseRecord } from "./phrase.ts";
 import { formatRateLimitKey, rateLimitKey, type RateVerdict } from "./ratelimit.ts";
 
@@ -247,8 +257,9 @@ export async function gateCompile(
 	request: Request,
 	env: CompileEnv,
 	counters: CompileCounters,
+	lockout: LockoutStore = cacheLockoutStore(),
 ): Promise<GateVerdict> {
-	return await gate(request, env, counters, "compile");
+	return await gate(request, env, counters, "compile", lockout);
 }
 
 /** POST /api/format: the same six checks, with the format bucket and wording. */
@@ -256,8 +267,9 @@ export async function gateFormat(
 	request: Request,
 	env: CompileEnv,
 	counters: CompileCounters,
+	lockout: LockoutStore = cacheLockoutStore(),
 ): Promise<GateVerdict> {
-	return await gate(request, env, counters, "format");
+	return await gate(request, env, counters, "format", lockout);
 }
 
 async function gate(
@@ -265,6 +277,7 @@ async function gate(
 	env: CompileEnv,
 	counters: CompileCounters,
 	kind: GateKind,
+	lockout: LockoutStore,
 ): Promise<GateVerdict> {
 	// 1. Size. A declared oversize is answered before a byte is read; a chunked
 	// upload declares nothing, so the body is read a piece at a time and the
@@ -299,16 +312,28 @@ async function gate(
 		);
 	}
 
+	// 3b. The growing lockout, still BEFORE the compare: a locked address is
+	// refused without its phrase ever being looked at. Only a request that
+	// carries a phrase is a guess, so only those are checked or counted.
+	const now = Date.now();
+	const lock = supplied === "" ? null : await readLock(lockout, "phrase", ip, now);
+	if (lock !== null && lock.retryAfterSeconds > 0) {
+		return refuse(lockedResponse(lock.retryAfterSeconds));
+	}
+
 	// 4. The class phrase. Wrong is 403, immediately, and spends no budget.
 	const active = await readActivePhrase(env);
 	if (active === null) {
 		return refuse(json(403, { ok: false, error: "No class phrase is active. Ask your teacher." }));
 	}
 	if (!(await constantTimeEquals(supplied, active.phrase))) {
+		if (lock !== null) await recordWrong(lockout, "phrase", ip, lock, now);
 		return refuse(
 			json(403, { ok: false, error: "Wrong class phrase. Ask your teacher for today's phrase." }),
 		);
 	}
+
+	if (lock !== null) await clearLock(lockout, "phrase", ip, lock);
 
 	// 5. This browser's own budget for this kind of request — six compiles a
 	// minute, or twelve formats. Only requests that got past the phrase are
