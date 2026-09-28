@@ -357,7 +357,7 @@ body.resizing {
 }
 
 .brand img {
-	border-radius: 8px;
+	border-radius: 16px;
 }
 
 .grow {
@@ -851,6 +851,11 @@ button.link {
    narrowest phones a group may still wrap inside itself, which beats a toolbar
    wider than the screen. */
 @media (max-width: 640px) {
+	.brand img {
+		width: 56px;
+		height: 56px;
+		border-radius: 12px;
+	}
 	.field span {
 		display: none;
 	}
