@@ -28,13 +28,13 @@ export const DEFAULT_TTL_SECONDS = 5400;
 /** Long enough for four or five words, short enough to read off a projector. */
 export const MAX_PHRASE_LENGTH = 64;
 /**
- * The shortest phrase a teacher may SET. A short phrase is a guessable one: a
- * guesser starts with short dictionary words, and "robots" falls to those long
- * before the per-address limit in src/compile-gate.ts has a say. Twelve is
- * "two words and a number" long, and every phrase the teacher page's Generate
- * button makes is longer. Counted once spaces are tidied, like everything here.
+ * The shortest phrase a teacher may SET: anything that is not empty once
+ * spaces are tidied. Dalton's call (2026-09-28): a short phrase is the
+ * teacher's choice to make, and the per-address limit in src/compile-gate.ts
+ * still slows guessing. Every phrase the Generate button makes is long and
+ * hard to guess.
  */
-export const MIN_PHRASE_LENGTH = 12;
+export const MIN_PHRASE_LENGTH = 1;
 
 /** What the teacher endpoint stores in KV under PHRASE_KEY. */
 export interface PhraseRecord {
@@ -56,18 +56,18 @@ export function normalizePhrase(raw: unknown): string {
 }
 
 /**
- * Whether a teacher may set this phrase: long enough not to be guessed, short
- * enough to read off a projector. Only the teacher endpoint asks this.
+ * Whether a teacher may set this phrase: not empty, and short enough to read
+ * off a projector. Only the teacher endpoint asks this.
  */
 export function isUsablePhrase(normalized: string): boolean {
 	return normalized.length >= MIN_PHRASE_LENGTH && normalized.length <= MAX_PHRASE_LENGTH;
 }
 
 /**
- * Whether a phrase already in KV still counts. Looser than `isUsablePhrase` on
- * purpose: a short phrase set before the twelve-character rule existed keeps
- * working until it expires (twelve hours at most), rather than refusing a
- * class mid-lesson on the morning the rule is deployed.
+ * Whether a phrase already in KV still counts: not empty and not over the
+ * limit. The same rule as `isUsablePhrase` now that any length is allowed,
+ * kept separate so a future tightening of what a teacher may set never
+ * refuses a phrase that is already live mid-lesson.
  */
 function isStoredPhrase(normalized: string): boolean {
 	return normalized.length > 0 && normalized.length <= MAX_PHRASE_LENGTH;

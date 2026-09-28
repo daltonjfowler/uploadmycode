@@ -23,13 +23,6 @@
 	var generatePhrase = window.uploadmycodePhrase.generatePhrase;
 
 	/**
-	 * The Worker refuses a phrase shorter than this (MIN_PHRASE_LENGTH in
-	 * src/phrase.ts), because a short phrase is a guessable one. Checked
-	 * here too so the teacher hears why before anything is sent.
-	 */
-	var MIN_PHRASE_LENGTH = 12;
-
-	/**
 	 * The Worker's own 429 sentence, verbatim, minutes and all.
 	 *
 	 * There is only one thing that answers 429 here: the site-wide
@@ -220,16 +213,6 @@
 		var phrase = phraseInput.value.trim();
 		if (phrase === "") {
 			say("Type a phrase, or press Generate.", "error");
-			return;
-		}
-		if (normalize(phrase).length < MIN_PHRASE_LENGTH) {
-			say(
-				"That phrase is too short to be safe. Use at least " +
-					MIN_PHRASE_LENGTH +
-					" characters (three words and a number is plenty), or press Generate.",
-				"error"
-			);
-			phraseInput.focus();
 			return;
 		}
 		var ttl = Number(durationSelect.value);

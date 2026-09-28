@@ -20,7 +20,7 @@ Five things, about a minute, before the first student compiles.
 
 1. Open <https://uploadmycode.com/teacher.html>. The teacher key is remembered per browser, so on
    your own laptop the page already knows it.
-2. Press **Generate**, or type your own phrase of at least 12 characters.
+2. Press **Generate**, or type any phrase you like.
 3. Pick how long it lasts: 1 period (90 min), half day (4 h), or full day (8 h).
 4. Press **Set phrase**. The phrase appears in large type with a countdown. Project that, or write
    it on the board. Press **Pop out** for a small window holding nothing but the phrase, drag it
@@ -275,9 +275,9 @@ things changed:
   two-digit number, like `otter-maple-rocket-47`: about 750 million phrases (a little over 2^29).
   The list is `web/public/phrase-words.js`, with its rules at the top (plain, kid-safe, no names,
   no sound-alikes); `web/test/phrase-words.test.mjs` fails if it ever drops below 2^28. A phrase
-  a teacher types by hand must be **at least 12 characters** (`MIN_PHRASE_LENGTH` in
-  `src/phrase.ts`); the teacher page and the Worker both say so. A short phrase already live when
-  that rule was deployed keeps working until it expires.
+  a teacher types by hand can be any length up to 64 characters (`MIN_PHRASE_LENGTH` is 1 in
+  `src/phrase.ts`): a 12-character minimum was dropped on 2026-09-28, Dalton's call. A short
+  phrase is the teacher's choice; the brake below still slows guessing.
 - **The per-address brake** (step 3 in section 4). Every phrase-carrying request, right or wrong,
   counts against its public address, and past 120 a minute the address gets a 429 before the
   phrase is compared, so a refused guesser cannot tell a right guess from a wrong one. At 120 a
@@ -371,7 +371,7 @@ The numbers live in two files, with tests beside each:
 | 12 formats/minute/client, and the `fmt ` bucket prefix | `src/ratelimit.ts` | `test/format-gate.test.mjs` |
 | more than 100 wrong teacher keys / 15 minutes | `src/teacher-guard.ts` | `test/teacher-guard.test.mjs` |
 | the order of the six checks, for both endpoints; the brake equals the ceiling | `src/compile-gate.ts`, `wrangler.jsonc` | `test/compile-gate.test.mjs`, `test/format-gate.test.mjs` |
-| 12-character minimum for a phrase a teacher sets | `src/phrase.ts` | `test/phrase.test.mjs` |
+| a phrase a teacher sets: 1 to 64 characters, no minimum beyond not empty (Dalton's call, 2026-09-28) | `src/phrase.ts` | `test/phrase.test.mjs` |
 | the Generate word list, at least 2^28 phrases | `web/public/phrase-words.js` | `web/test/phrase-words.test.mjs` |
 | 40 compiles in flight at most | `src/queue.ts` | `test/queue.test.mjs` |
 | no `#include` of an absolute or `..` path, no `.incbin` | `container/sketch-guard.js` | `test/sketch-guard.test.mjs` |

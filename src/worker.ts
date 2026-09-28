@@ -349,7 +349,7 @@ async function teacherPhrase(request: Request, env: Env): Promise<Response> {
 				MIN_PHRASE_LENGTH +
 				" to " +
 				MAX_PHRASE_LENGTH +
-				" characters long. Press Generate for one that is.",
+				" characters long.",
 		});
 	}
 

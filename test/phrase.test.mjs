@@ -44,26 +44,25 @@ test("anything that is not a string normalizes to the empty phrase", () => {
 	assert.equal(normalizePhrase("   "), "");
 });
 
-test("a teacher may set a phrase only from twelve characters up to the limit", () => {
-	assert.equal(MIN_PHRASE_LENGTH, 12);
+test("a teacher may set any phrase from one character up to the limit (Dalton's call)", () => {
+	assert.equal(MIN_PHRASE_LENGTH, 1);
 	assert.equal(isUsablePhrase(""), false);
-	assert.equal(isUsablePhrase("a"), false);
-	assert.equal(isUsablePhrase("robots"), false, "one short word is guessable");
-	assert.equal(isUsablePhrase("x".repeat(MIN_PHRASE_LENGTH - 1)), false);
-	assert.equal(isUsablePhrase("x".repeat(MIN_PHRASE_LENGTH)), true);
+	assert.equal(isUsablePhrase("a"), true);
+	assert.equal(isUsablePhrase("robots"), true);
 	assert.equal(isUsablePhrase("otter-maple-rocket-47"), true, "a generated phrase");
 	assert.equal(isUsablePhrase("x".repeat(MAX_PHRASE_LENGTH)), true);
 	assert.equal(isUsablePhrase("x".repeat(MAX_PHRASE_LENGTH + 1)), false);
 });
 
-test("the length is counted after tidying, so padding with spaces does not help", () => {
-	assert.equal(isUsablePhrase(normalizePhrase("   red   fox    ")), false, '"red fox" is 7');
-	assert.equal(isUsablePhrase(normalizePhrase("  Red Fox Jumps 42 ")), true);
+test("the length is counted after tidying, so only spaces is still empty", () => {
+	assert.equal(isUsablePhrase(normalizePhrase("     ")), false, "blank is refused");
+	assert.equal(isUsablePhrase(normalizePhrase("   red   fox    ")), true, '"red fox" is 7');
+	assert.equal(isUsablePhrase(normalizePhrase(" " + "x".repeat(MAX_PHRASE_LENGTH) + "  ")), true);
 });
 
 test("a short phrase already in KV keeps working until it expires", () => {
-	// Set before the twelve-character rule existed. Refusing it on the morning
-	// the rule is deployed would lock a class out mid-lesson.
+	// Any length is allowed; a stored phrase is only refused when empty or
+	// over the limit.
 	assert.deepEqual(activeRecord({ phrase: "blue", expiresAt: 1000 }, 0), {
 		phrase: "blue",
 		expiresAt: 1000,
