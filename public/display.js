@@ -7,7 +7,7 @@
 	/* Five seconds. A GET with the right key is never rate limited: see the
 	   teacher gate in src/worker.ts, where a correct key is compared first and
 	   nothing is counted for it. The one exception is the short wrong-key
-	   lockout on this address (at most 300 s), which apply() rides out. */
+	   lockout on this device (at most 300 s), which apply() rides out. */
 	var POLL_MS = 5000;
 
 	var body = document.body;
@@ -36,7 +36,7 @@
 	/* One request at a time, so a slow answer cannot stack up behind the timer. */
 	var polling = false;
 	/* A key the Worker refused. Not sent again: a projector re-sending a wrong
-	   key every five seconds would keep the school's address in the wrong-key
+	   key every five seconds would keep this device in the wrong-key
 	   lockout (src/lockout.ts) and hold the teacher page out with it. A new
 	   key saved on the teacher page is different, so polling resumes. */
 	var refusedKey = "";
@@ -184,7 +184,7 @@
 		 * which a correct key never meets, so it means the same thing here. Both
 		 * are fixed on the teacher page and nowhere else, so both say so.
 		 */
-		/* The short per-address lockout refuses even a right key until its wait
+		/* The short per-device lockout refuses even a right key until its wait
 		   ends, so it says nothing about the key. Keep what is on screen and
 		   try again on the next poll. */
 		if (result.status === 429 && result.body && result.body.error === "locked") {

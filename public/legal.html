@@ -44,7 +44,7 @@
   <h2>Privacy</h2>
   <ul>
     <li>Your code leaves this computer only when you press <strong>Compile</strong> or <strong>Auto indent</strong>. The site never asks for your name.</li>
-    <li><strong>Compile</strong> sends your code to the compile server. The server writes it to a working file, builds it, and sends back the program or the error messages. That working file and the built program are not deleted straight away: the next compile overwrites them, and they are wiped when the server shuts down, about 5 minutes after its last compile. Your code is not saved anywhere else and is not written to the server's logs.</li>
+    <li><strong>Compile</strong> sends your code to the compile server. The server writes it to a working file, builds it, and sends back the program or the error messages. That working file and the built program are deleted as soon as the compile finishes. Your code is not saved anywhere else and is not written to the server's logs.</li>
     <li><strong>Auto indent</strong> sends your code to the same server, which tidies it in memory and sends it back without writing it to disk. If tidying fails, the first part of the tool's error message goes into the server log, and that message can quote a line of your code.</li>
     <li>The class phrase the teacher sets is kept on the server, with the time it ends, until it runs out (12 hours at most) or the teacher ends it. Nothing else about the class is kept there.</li>
     <li>To share the compiler fairly, the server counts each browser's compiles for one minute, using a random id the browser made (or the network address if there is no id). Those counts are held in memory only and never saved.</li>

@@ -50,6 +50,8 @@ and a Chromebook that goes back in the cart carries nothing into tomorrow.
 |---|---|
 | No class phrase is active. Ask your teacher. | Nothing is set, or it expired. Set one. |
 | Wrong class phrase. Ask your teacher for today's phrase. | Typo, or yesterday's phrase in a tab that was never closed. Retype it. |
+| Too many wrong tries. Wait N seconds and try again. | That Chromebook typed a wrong phrase five times in a row. Only that one is locked, for 5 seconds at first and never more than 5 minutes (section 4a). Wait, then type the right phrase. |
+| That is a lot of tries from your network in one minute… | The whole school sent more than 120 phrase-carrying requests in a minute. Clears within a minute. |
 | That is a lot of compiles in one minute. Wait N seconds… | That Chromebook has compiled six times in a minute. Wait. |
 | That is a lot of tidying in one minute. Wait a moment… | That Chromebook has pressed **Auto indent** twelve times in a minute. Their compiles are untouched. |
 | The compiler is very busy right now. Wait a minute… | The whole site is at its ceiling of 120 compiles a minute. Rare; wait. |
@@ -218,6 +220,10 @@ step 5 differs, and only in which bucket it spends and what the 429 says (sectio
    its public address: 120 a minute, then 429 "That is a lot of tries from your network in one
    minute" *before the phrase is compared*. 120 is exactly the global ceiling in step 6, on
    purpose (section 4a).
+
+   Then the **per-device lockout** (step 3b in `src/compile-gate.ts`): a device that has sent five
+   wrong phrases in a row is refused with a 429 for a few seconds, before its phrase is compared
+   (section 4a).
 4. **Class phrase.** Read from KV, compared in constant time after both sides are normalized.
    Missing or expired → 403 "No class phrase is active"; wrong → 403 "Wrong class phrase". A wrong
    phrase is never delayed and never spends anybody's compiles (section 4a).
@@ -253,7 +259,8 @@ There used to be per-IP lockouts here: ten wrong phrases in ten minutes locked t
 compiling, five wrong teacher keys locked it out of `/teacher.html`. On paper they slowed a
 guesser down. In a classroom they handed one bored student a switch that turns off compiling for
 thirty classmates — or locks the teacher out of his own phrase page — in about fifteen clicks. They
-are gone. Do not put them back.
+are gone. Do not put them back per IP. The short lockout that came back later counts per
+*device*, so one student can only lock their own Chromebook (below).
 
 Very little was bought by them anyway:
 
@@ -317,17 +324,19 @@ and never be locked; the per-IP phrase brake above is what slows scripts.
 | Guard | Limit | Then | Message |
 |---|---|---|---|
 | Wrong class phrase | none of its own | 403, straight away | "Wrong class phrase. Ask your teacher for today's phrase." |
+| Wrong class phrases in a row, per device | 5 | 429 for 5 s, doubling each further wrong try to at most 300 s, before the phrase is compared | "Too many wrong tries. Wait N seconds and try again." |
 | Phrase-carrying requests, per public address | 120 per minute, right and wrong alike | 429 for up to a minute, before the phrase is compared | "That is a lot of tries from your network in one minute. Wait a minute and try again." |
-| Wrong teacher key | none, per person | 403 after a fixed 300 ms | "Wrong teacher key." |
+| Wrong teacher key | none of its own | 403 after a fixed 300 ms | "Wrong teacher key." |
+| Wrong teacher keys in a row, per device | 5 | 429 for 5 s, doubling to at most 300 s, before the key is compared | "Too many wrong tries. Wait N seconds and try again." |
 | Wrong teacher keys, everywhere | more than 100 in 15 minutes | wrong keys get 429 for 15 minutes — **a correct key still gets in** | "Too many wrong keys from everywhere right now. Try again in N minutes. The right key still works." |
 | Compiles, per client id | 6 per minute | 429 until the window slides | "That is a lot of compiles in one minute. Wait N seconds…" |
 | **Auto indent (`/api/format`), per client id** | **12 per minute** | 429 until the window slides | "That is a lot of tidying in one minute. Wait a moment and try again." |
 | Requests to either endpoint, everyone | 120 per minute | 429 until the window slides | "The compiler is very busy right now. Wait a minute and try again." |
 | Compiles in flight, everyone | 40 at once | 503 until one finishes | "The compiler is very busy. Try again in a minute." |
 
-Every 429 carries `Retry-After` in seconds, and so does the 503. There is no `x-lockout` header any
-more: a 429 from `/api/compile` is always about pace, never about whether the phrase was right, so
-the editor never has to tell two kinds of 429 apart.
+Every 429 carries `Retry-After` in seconds, and so does the 503. There is no `x-lockout` header.
+A device lockout is the one 429 that is about wrong answers rather than pace, and its body says so
+with `"error": "locked"` and a ready-made `message`, which the editor shows as it is.
 
 **The per-client limit.** The editor mints one random id the first time it is used
 (`crypto.randomUUID()`), keeps it in `localStorage` under `uno-ide.v1.client-id`, and sends it
@@ -368,11 +377,11 @@ reach.
 
 **If a class cannot compile, the phrase is almost always what is wrong.** Set it again from
 `/teacher.html`. The only other thing that can hold the room up is the per-address brake, and it
-clears itself within a minute: there is no lockout to wait out and no counter that needs forgiving.
+clears itself within a minute. The per-device lockout holds up one Chromebook, never the room, for
+at most 5 minutes; typing the right phrase once it ends clears its counter.
 
-All of it except the per-address brake is counted in the `Counters` Durable Object — one named
-instance every request shares —
-which makes the counts site-wide rather than per Worker isolate. It is deliberately *not* the
+All of it except the per-address brake and the per-device lockout is counted in the `Counters`
+Durable Object — one named instance every request shares — which makes the counts site-wide rather than per Worker isolate. It is deliberately *not* the
 compile container's object; section 7 explains why that mattered to the bill. Nothing is written to
 storage: if that object is ever evicted the counts reset, which is an acceptable trade for a fuse.
 

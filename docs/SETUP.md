@@ -192,7 +192,8 @@ If all five pass, you have a working instance.
 Optional, but the defaults are the author's:
 
 - The footer of the editor (`web/index.html`) and the diagnostics page
-  (`web/public/serial-test.html`) say "Internal district tool" and link to the author's site. Edit
+  (`web/public/serial-test.html`) say "Internal district tool" and link to the author's site, and
+  the privacy page (`web/public/legal.html`) names the author as the person to contact. Edit
   those, then `npm run build` and deploy again.
 - `public/` is build output and is committed to the repo, which is what `wrangler deploy` uploads.
   Always `npm run build` after touching anything in `web/`, or you will deploy the old page.

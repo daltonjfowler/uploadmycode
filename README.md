@@ -14,40 +14,53 @@ same tool on every desk in under a minute.
 
 ## Screenshot
 
-<img src="docs/screenshot-editor.png" width="800" alt="The editor page at Chromebook size: a one-row toolbar with the sketch dropdown and a File menu, a library dropdown, Find and replace, Auto indent and a Settings menu; Compile and Upload buttons; a CodeMirror editor holding the default setup and loop sketch; an output panel; and a collapsed serial monitor">
+<img src="docs/screenshot-editor.png" width="800" alt="The editor page in the dark theme: a one-row toolbar with the robot logo, the sketch dropdown and a File menu, a library dropdown, Find and replace, Auto indent and a Settings menu; Compile and Upload buttons; a CodeMirror editor holding the default setup and loop sketch; an output panel; a collapsed serial monitor; and a footer with the Teacher, Privacy and legal, and Open source links">
 
-The editor page at Chromebook resolution (1366x768), before any sketch is compiled. Compile and Upload sit top right, the output panel and serial monitor sit below the editor.
+The editor page on the live site (1400x900, dark theme), before any sketch is compiled. Compile and Upload sit top right, the output panel and serial monitor sit below the editor.
 
 ## What it does
 
-- **Editor** — CodeMirror 6 with C++ highlighting, autocomplete for the common board API, and a
-  library dropdown that inserts the right `#include`.
+- **Editor** — CodeMirror 6 with C++ highlighting, autocomplete for the common board API, a
+  library dropdown that inserts the right `#include`, Find and replace, and an **Auto indent**
+  button that tidies the sketch with `clang-format` in the container. Light, dark or system theme.
 - **Compile** — one POST to the server. Compiler errors come back parsed: a clickable row that
-  jumps to the line, and the offending line highlighted in the editor.
+  jumps to the line, the offending line highlighted in the editor, and a plain-English hint under
+  the common ones. When the class compiles at once, the output panel says how many sketches are
+  in the line.
 - **Upload** — the browser flashes the board itself over Web Serial (STK500v1 against the Optiboot
   bootloader, 115200 baud), with a page-by-page progress bar. Upload is only enabled for hex that
   was built from the exact text on screen.
-- **Serial monitor** — nine baud rates, autoscroll, timestamps, a send box. It hands the port to
-  the flasher when an upload starts and takes it back afterwards, so a student never has to
-  disconnect anything.
+- **Serial monitor** — nine baud rates, autoscroll, timestamps, a send box, and a **Plot** view
+  that graphs the numbers as they arrive. It hands the port to the flasher when an upload starts
+  and takes it back afterwards, so a student never has to disconnect anything.
 - **Sketches** — named, autosaved to `localStorage`, downloadable and importable as `.ino`. No
   server-side storage, no student accounts, no PII.
 - **A rolling class phrase** — the teacher sets today's phrase, with an expiry, from a `/teacher`
-  page guarded by a secret. Nobody compiles without it. Students type it once per tab and it dies
-  with the tab.
+  page guarded by a secret. **Generate** makes a long random one, or the teacher types any phrase
+  up to 64 characters. **Pop out** opens a `/display` window with just the phrase and its
+  countdown, for the projector. Nobody compiles without the phrase. Students type it once per tab
+  and it dies with the tab.
+- **Wrong-guess lockout, per device** — five wrong phrases in a row lock that one Chromebook for
+  5 seconds, doubling to at most 5 minutes. The teacher key has its own counter with the same
+  numbers. It counts per device, never per address, because a whole school shares one address:
+  one student can never lock out the room or the teacher.
 - **Cost caps** — two small container instances (the second wakes only during a burst and sleeps
   again), scale-to-zero, a per-browser rate limit, a global ceiling, a request-size cap, a cap
-  on how many compiles may wait, and a compile timeout with memory and CPU limits. All of it so a
-  runaway loop cannot run up a bill overnight, or stall the class.
+  on how many compiles may wait, and a compile timeout with memory and CPU limits. Each sketch is
+  deleted from the container once it has compiled. All of it so a runaway loop cannot run up a
+  bill overnight, or stall the class.
 - **Libraries** — a fixed allowlist baked into the container image, so a compile never touches the
   network. Servo, LiquidCrystal, LiquidCrystal I2C, Stepper and Arduino SensorKit (the Seeed Grove
   sensor kit) ship by default. The SensorKit's own dependencies, DHT20 and the LIS3DHTR
   accelerometer, are pinned and baked in alongside it.
+- **Privacy and legal** — a `/legal` page, linked from every footer, says what the site keeps, where
+  and for how long, and who made it. Sketches stay in the browser; there are no accounts.
 
 ## The live site
 
-<https://uploadmycode.com> is the author's own instance, for one teacher's classes. It is not a
-public service: every compile needs that day's class phrase, so the site will look broken to anyone
+<https://uploadmycode.com> is the author's own instance. It is an internal district tool made by
+[Dalton Fowler](https://daltonjfowler.com), a teacher, for use in class. It is not a public
+service: every compile needs that day's class phrase, so the site will look broken to anyone
 who is not in the room. It is up here as a working reference, not as something to sign up for.
 
 **To use this, run your own copy.** [docs/SETUP.md](docs/SETUP.md) walks a stranger through it end
@@ -71,10 +84,10 @@ npm run deploy      # npm run build, then wrangler deploy (needs Docker running)
 ## Running the compile server without Docker
 
 `container/server.js` is the same file the image runs, and it runs directly on Windows. Useful for
-frontend work: `npm run dev:web` proxies `/api/compile` to it. Nothing here is committed: `tools/`
-(`/api/format` proxies here too; Auto indent needs `clang-format` on PATH locally — without it only
-formatting fails, compiles are unaffected.)
-is gitignored, and the versions must match the pins at the top of `container/Dockerfile`.
+frontend work: `npm run dev:web` proxies `/api/compile` and `/api/format` to it. Auto indent needs
+`clang-format` on PATH locally; without it only formatting fails, and compiles are unaffected.
+Nothing here is committed: `tools/` is gitignored, and the versions must match the pins at the top
+of `container/Dockerfile`.
 
 ```powershell
 $tools = "$PWD\tools"
@@ -112,8 +125,8 @@ setup: see [docs/SETUP.md](docs/SETUP.md), Part B.
 
 - [docs/SETUP.md](docs/SETUP.md) — **run your own copy.** Start here if this repo is new to you.
 - [docs/DEPLOY.md](docs/DEPLOY.md) — the operator manual for the author's live instance: the daily
-  phrase routine, the teacher key, what guards a compile, adding a library, `ALLOWED_CIDRS`, cost
-  caps and billing alerts. Most of it applies to any instance.
+  phrase routine, the teacher key, what guards a compile (including the per-device lockout),
+  adding a library, `ALLOWED_CIDRS`, cost caps and billing alerts. Most of it applies to any instance.
 - [PLAN.md](PLAN.md) — architecture, the locked decisions, and the task list the project was built
   from. Read it before changing anything structural.
 - [CREDITS.md](CREDITS.md) — every open-source project this tool is built on, with links, verified
