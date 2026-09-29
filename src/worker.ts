@@ -41,7 +41,7 @@ import {
 	readActivePhrase,
 	type CompileCounters,
 } from "./compile-gate.ts";
-import { constantTimeEquals } from "./constant-time.ts";
+import { anyKeyEquals } from "./constant-time.ts";
 import { httpsRedirect, withSecurityHeaders } from "./headers.ts";
 import { json } from "./http.ts";
 import {
@@ -270,13 +270,15 @@ function countersStub(env: Env): DurableObjectStub<Counters> {
 // ---------------------------------------------------------------- teacher key
 
 async function teacherAuthorized(request: Request, env: Env): Promise<boolean> {
-	const expected = env.TEACHER_KEY ?? "";
+	// TEACHER_KEY_2: an optional second teacher (a student teacher); delete that secret to remove them.
+	const second = (env as { TEACHER_KEY_2?: string }).TEACHER_KEY_2;
+	const keys = [env.TEACHER_KEY, second].filter((k): k is string => !!k);
 	// No secret uploaded means no teacher endpoint at all. Never fall open.
-	if (expected === "") {
+	if (!keys.length) {
 		console.error(JSON.stringify({ message: "TEACHER_KEY is not set; teacher endpoint refused" }));
 		return false;
 	}
-	return await constantTimeEquals(request.headers.get("x-teacher-key") ?? "", expected);
+	return await anyKeyEquals(request.headers.get("x-teacher-key") ?? "", keys);
 }
 
 /**
