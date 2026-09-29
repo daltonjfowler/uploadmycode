@@ -48,6 +48,7 @@ import {
 	cacheLockoutStore,
 	clearLock,
 	lockedResponse,
+	lockSubject,
 	readLock,
 	recordWrong,
 } from "./lockout.ts";
@@ -282,11 +283,12 @@ async function teacherAuthorized(request: Request, env: Env): Promise<boolean> {
  * The door on every /api/teacher/* request. Returns the refusal to send, or
  * null when the key was right and the request may go on.
  *
- * First the short per-address lockout (src/lockout.ts): five wrong keys in a
- * row from one address lock it for 5 s, doubling to at most 300 s, and a
- * locked address is refused before its key is compared. Dalton's call
- * (2026-09-28). Note it can hold the teacher out for that wait if somebody on
- * the school's address has just typed wrong keys; the cap keeps that short.
+ * First the short per-device lockout (src/lockout.ts): five wrong keys in a
+ * row from one device (its x-device-id; the address only when none is sent)
+ * lock that device for 5 s, doubling to at most 300 s, and a locked device is
+ * refused before its key is compared. Dalton's call (2026-09-28). Per device,
+ * so a student typing wrong keys locks only their own Chromebook, never the
+ * teacher's.
  * Then the key, in constant time. Only a wrong key touches the coarse
  * site-wide guard, and only a wrong key can ever be refused by it. See
  * src/teacher-guard.ts.
@@ -295,14 +297,15 @@ async function teacherGate(request: Request, env: Env): Promise<Response | null>
 	const ip = request.headers.get("cf-connecting-ip") ?? "";
 	const lockout = cacheLockoutStore();
 	const now = Date.now();
-	const lock = await readLock(lockout, "teacher", ip, now);
+	const subject = lockSubject(request.headers.get("x-device-id"), ip);
+	const lock = await readLock(lockout, "teacher", subject, now);
 	if (lock.retryAfterSeconds > 0) return lockedResponse(lock.retryAfterSeconds);
 
 	if (await teacherAuthorized(request, env)) {
-		await clearLock(lockout, "teacher", ip, lock);
+		await clearLock(lockout, "teacher", subject, lock);
 		return null;
 	}
-	await recordWrong(lockout, "teacher", ip, lock, now);
+	await recordWrong(lockout, "teacher", subject, lock, now);
 
 	const guard = await countersStub(env).recordWrongTeacherKey();
 	await sleep(TEACHER_REJECT_DELAY_MS);

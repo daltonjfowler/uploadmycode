@@ -8,7 +8,7 @@
  *   1. size          over 100 KB is refused before anything else runs
  *   2. school        the optional ALLOWED_CIDRS lock, off unless the var is set
  *   3. per address   120 phrase-carrying requests a minute per public address
- *   3b. lockout      5 wrong phrases in a row locks this address 5 s, then
+ *   3b. lockout      5 wrong phrases in a row locks this DEVICE 5 s, then
  *                    doubling to at most 300 s (src/lockout.ts)
  *   4. phrase        today's class phrase from KV, compared in constant time
  *   5. per client    six compiles, or twelve formats, a minute for this browser
@@ -71,6 +71,7 @@ import {
 	cacheLockoutStore,
 	clearLock,
 	lockedResponse,
+	lockSubject,
 	readLock,
 	recordWrong,
 	type LockoutStore,
@@ -312,11 +313,14 @@ async function gate(
 		);
 	}
 
-	// 3b. The growing lockout, still BEFORE the compare: a locked address is
-	// refused without its phrase ever being looked at. Only a request that
+	// 3b. The growing lockout, still BEFORE the compare: a locked device is
+	// refused without its phrase ever being looked at. Keyed per device (the
+	// page's x-device-id), falling back to the address only for requests that
+	// send none, so one student can never lock the room. Only a request that
 	// carries a phrase is a guess, so only those are checked or counted.
 	const now = Date.now();
-	const lock = supplied === "" ? null : await readLock(lockout, "phrase", ip, now);
+	const subject = lockSubject(request.headers.get("x-device-id"), ip);
+	const lock = supplied === "" ? null : await readLock(lockout, "phrase", subject, now);
 	if (lock !== null && lock.retryAfterSeconds > 0) {
 		return refuse(lockedResponse(lock.retryAfterSeconds));
 	}
@@ -327,13 +331,15 @@ async function gate(
 		return refuse(json(403, { ok: false, error: "No class phrase is active. Ask your teacher." }));
 	}
 	if (!(await constantTimeEquals(supplied, active.phrase))) {
-		if (lock !== null) await recordWrong(lockout, "phrase", ip, lock, now);
+		// The 5th wrong try still gets this 403, so the page forgets a stale
+		// phrase; the lock applies from the next try.
+		if (lock !== null) await recordWrong(lockout, "phrase", subject, lock, now);
 		return refuse(
 			json(403, { ok: false, error: "Wrong class phrase. Ask your teacher for today's phrase." }),
 		);
 	}
 
-	if (lock !== null) await clearLock(lockout, "phrase", ip, lock);
+	if (lock !== null) await clearLock(lockout, "phrase", subject, lock);
 
 	// 5. This browser's own budget for this kind of request — six compiles a
 	// minute, or twelve formats. Only requests that got past the phrase are

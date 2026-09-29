@@ -110,9 +110,31 @@
 		else subEl.textContent = "Expires in " + left + " s.";
 	}
 
+	/** This browser's device id (same key as web/src/device.ts) for the per-device lockout. */
+	var device = null;
+	function deviceId() {
+		if (device) return device;
+		try {
+			var stored = window.localStorage.getItem("umc.device");
+			if (stored && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(stored)) return (device = stored);
+		} catch (e) {
+			// Site data blocked: one id for this page load.
+		}
+		var hex = Array.prototype.map.call(crypto.getRandomValues(new Uint8Array(16)), function (b) {
+			return ("0" + b.toString(16)).slice(-2);
+		}).join("");
+		device = hex.slice(0, 8) + "-" + hex.slice(8, 12) + "-" + hex.slice(12, 16) + "-" + hex.slice(16, 20) + "-" + hex.slice(20);
+		try {
+			window.localStorage.setItem("umc.device", device);
+		} catch (e) {
+			// Ignored: the in-memory id still works.
+		}
+		return device;
+	}
+
 	/** One GET. Resolves to { status, body } and never rejects. */
 	function fetchPhrase(key) {
-		return fetch(API, { method: "GET", headers: { "x-teacher-key": key } }).then(
+		return fetch(API, { method: "GET", headers: { "x-teacher-key": key, "x-device-id": deviceId() } }).then(
 			function (response) {
 				return response.json().then(
 					function (parsed) {

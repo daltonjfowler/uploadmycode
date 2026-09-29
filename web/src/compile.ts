@@ -36,6 +36,7 @@
  * also mean the line of waiting compiles is full; its sentence says so too.
  */
 
+import { loadDeviceId } from "./device.ts";
 import { loadClientId } from "./storage.ts";
 
 export type CompileOutcome =
@@ -103,6 +104,7 @@ export async function requestCompile(
 				"content-type": "application/json",
 				"x-class-phrase": phrase,
 				"x-client-id": loadClientId(),
+				"x-device-id": loadDeviceId(),
 				"x-compile-token": token,
 			},
 			body: JSON.stringify({ code }),

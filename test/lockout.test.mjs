@@ -19,6 +19,7 @@ import {
 	lockedResponse,
 	lockKey,
 	lockSecondsFor,
+	lockSubject,
 	MAX_LOCK_SECONDS,
 	memoryLockoutStore,
 	readLock,
@@ -67,11 +68,21 @@ test("afterWrong counts up and sets the end of the lock from now", () => {
 	assert.deepEqual(record, { failures: 5, lockedUntil: 6000 });
 });
 
-test("the store key is per kind and per address", () => {
-	assert.notEqual(lockKey("phrase", IP), lockKey("teacher", IP));
-	assert.notEqual(lockKey("phrase", IP), lockKey("phrase", "198.51.100.8"));
-	assert.ok(lockKey("phrase", IP).startsWith("https://lockout.internal/phrase/"));
-	assert.equal(lockKey("teacher", ""), "https://lockout.internal/teacher/unknown");
+test("the store key is per kind and per device (Dalton 2026-09-28: kids never lock each other out)", () => {
+	const a = lockSubject("11111111-2222-4333-8444-555555555555", IP);
+	const b = lockSubject("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", IP);
+	assert.equal(a, "device:11111111-2222-4333-8444-555555555555");
+	assert.notEqual(lockKey("phrase", a), lockKey("phrase", b), "two devices on one school IP are counted apart");
+	assert.notEqual(lockKey("phrase", a), lockKey("teacher", a));
+	assert.ok(lockKey("phrase", a).startsWith("https://lockout.internal/phrase/"));
+});
+
+test("no usable device id (only scripts send none) falls back to the IP", () => {
+	assert.equal(lockSubject(" 11111111-2222-4333-8444-555555555555 ".toUpperCase(), IP), "device:11111111-2222-4333-8444-555555555555");
+	for (const junk of [undefined, null, "", "not-a-uuid", "11111111222243338444555555555555", "11111111-2222-4333-8444-55555555555g", "11111111-2222-4333-8444-555555555555x"]) {
+		assert.equal(lockSubject(junk, IP), `ip:${IP}`, String(junk));
+	}
+	assert.equal(lockSubject(null, ""), "ip:unknown");
 });
 
 test("the locked reply is a 429 with the wait in the body and the header", async () => {

@@ -299,15 +299,18 @@ The brake is a Workers Rate Limiting binding (`PHRASE_LIMITER` in `wrangler.json
 ever fails, requests go through and the Worker logs "phrase limiter failed; not braking": a fault
 in a fuse never locks a class out.
 
-**The one short lockout that is back (2026-09-28, Dalton's call).** Five wrong class phrases in a
-row from one address lock that address for 5 seconds; each further wrong try after a lock ends
-doubles it (10, 20, 40, 80, 160 s), capped at 300 s. The teacher key has its own separate counter
-with the same numbers. While locked, every try gets a 429 `{ "error": "locked", "retryAfter", "message" }`
-without being compared, even a correct one. A correct answer clears that address's counter. It is
+**The one short lockout that is back (2026-09-28, Dalton's call), per DEVICE, never per address.**
+Five wrong class phrases in a row from one device lock that device for 5 seconds; each further
+wrong try after a lock ends doubles it (10, 20, 40, 80, 160 s), capped at 300 s. The teacher key has
+its own separate counter with the same numbers. The device is the page's own random id
+(`x-device-id`, localStorage `umc.device`, `web/src/device.ts`); a request without a usable id (only
+scripts) is counted by address instead. So one student mistyping locks only their Chromebook, never
+the room or the teacher. While locked, every try gets a 429 `{ "error": "locked", "retryAfter", "message" }`
+without being compared, even a correct one. A correct answer clears that device's counter. It is
 kept in the Cache API (`caches.default`, per Cloudflare location, no KV writes) in `src/lockout.ts`;
-if the cache fails, it falls open. On the shared school address this lands on the whole room, which
-is why the waits are seconds and the cap is five minutes. On a `workers.dev` hostname the Cache API
-does nothing, so there the lockout is off.
+if the cache fails, it falls open. On a `workers.dev` hostname the Cache API does nothing, so there
+the lockout is off. Dalton accepted the trade-off knowingly: a script can send a new id every try
+and never be locked; the per-IP phrase brake above is what slows scripts.
 
 ### What is actually enforced
 

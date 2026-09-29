@@ -7,7 +7,8 @@
  * gone on purpose. A school egresses through ONE public address, so "this IP"
  * and "the whole school" are the same thing, and any per-IP penalty is a
  * shared-fate outage that one bored student can hand to thirty classmates, or
- * to the teacher, in a few clicks. Wrong answers are cheap here anyway: a
+ * to the teacher, in a few clicks. (The short lockout in src/lockout.ts counts
+ * per DEVICE for exactly that reason.) Wrong answers are cheap here anyway: a
  * cached KV read and a hash, with the container never touched. See
  * docs/DEPLOY.md, "Abuse protection".
  *

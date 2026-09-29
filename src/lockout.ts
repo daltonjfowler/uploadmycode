@@ -1,23 +1,30 @@
 /**
- * A short, growing lockout on wrong guesses, per public address and per
- * secret: one counter for the class phrase, a separate one for the teacher key.
+ * A short, growing lockout on wrong guesses, per DEVICE and per secret: one
+ * counter for the class phrase, a separate one for the teacher key.
  *
- *   5 wrong in a row from one address  -> that address waits 5 s
+ *   5 wrong in a row from one device   -> that device waits 5 s
  *   each further wrong try after that  -> the wait doubles: 10, 20, 40, 80, 160
  *   and never more than                -> 300 s
- *   a correct answer from that address -> the counter is cleared
+ *   a correct answer from that device  -> the counter is cleared
+ *
+ * A device is the random id every page keeps in localStorage ("umc.device")
+ * and sends as `x-device-id`. Keyed per device, not per address, because the
+ * school shares ONE public address: a per-address lock would let one student
+ * lock out the whole room, or the teacher (Dalton, 2026-09-28: "I don't want
+ * kids to lock it"). A student who fumbles only locks their own Chromebook. A
+ * request with no usable id (a script, curl) falls back to its address, which
+ * is the case the lockout is for: brute force from outside.
  *
  * While an address is locked every try is refused WITHOUT being compared, so a
  * guesser learns nothing during the wait. Tries refused while locked are not
  * counted, so hammering the button does not push the end of the wait out.
  *
- * Dalton asked for this (2026-09-28) against outside brute force of a short
- * phrase. Keep the waits short: the school shares ONE public address, so this
- * lock lands on the whole room. Five seconds is a pause, not an outage; the cap
- * keeps the worst case to five minutes.
+ * A script can mint a fresh id per request and dodge the device counter; the
+ * per-address brake in src/compile-gate.ts and the site-wide teacher-key guard
+ * are still there for that, unchanged.
  *
  * Stored in the Cache API (caches.default), not KV: free, no write quota, and
- * per Cloudflare location is fine because one address reaches one location.
+ * per Cloudflare location is fine because one device reaches one location.
  * Every storage call is wrapped: if the cache fails, the lockout falls open and
  * the site behaves exactly as it did before this file existed. A fault in a
  * fuse must never refuse a class that typed the phrase right.
@@ -55,9 +62,22 @@ export interface LockoutStore {
 	delete(key: string): Promise<void>;
 }
 
-/** The store key for one address and kind. */
-export function lockKey(kind: LockKind, ip: string): string {
-	return "https://lockout.internal/" + kind + "/" + encodeURIComponent(ip === "" ? "unknown" : ip);
+/** A device id: a UUID, 8-4-4-4-12 hex. Checked strictly because it becomes a cache key. */
+const DEVICE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/**
+ * Who a counter belongs to: `device:<uuid>` for a usable `x-device-id`
+ * (lowercased), otherwise `ip:<address>`. The prefixes keep the two apart.
+ */
+export function lockSubject(deviceId: string | null | undefined, ip: string): string {
+	const id = typeof deviceId === "string" ? deviceId.trim().toLowerCase() : "";
+	if (DEVICE_ID_PATTERN.test(id)) return "device:" + id;
+	return "ip:" + (ip === "" ? "unknown" : ip);
+}
+
+/** The store key for one subject (see lockSubject) and kind. */
+export function lockKey(kind: LockKind, subject: string): string {
+	return "https://lockout.internal/" + kind + "/" + encodeURIComponent(subject);
 }
 
 /**
@@ -97,7 +117,7 @@ export function parseRecord(value: unknown): LockRecord | null {
 export interface LockState {
 	/** What was stored, or null. Kept so a correct answer only clears what exists. */
 	record: LockRecord | null;
-	/** Seconds until this address may try again. 0 when it may try now. */
+	/** Seconds until this device may try again. 0 when it may try now. */
 	retryAfterSeconds: number;
 }
 
@@ -107,11 +127,11 @@ export interface LockState {
 export async function readLock(
 	store: LockoutStore,
 	kind: LockKind,
-	ip: string,
+	subject: string,
 	now: number,
 ): Promise<LockState> {
 	try {
-		const record = parseRecord(await store.get(lockKey(kind, ip)));
+		const record = parseRecord(await store.get(lockKey(kind, subject)));
 		return { record, retryAfterSeconds: secondsLeft(record, now) };
 	} catch (error) {
 		console.error(JSON.stringify({ message: "lockout read failed; not locking", kind, error: String(error) }));
@@ -123,35 +143,35 @@ export async function readLock(
 export async function recordWrong(
 	store: LockoutStore,
 	kind: LockKind,
-	ip: string,
+	subject: string,
 	state: LockState,
 	now: number,
 ): Promise<LockRecord> {
 	const next = afterWrong(state.record, now);
 	try {
-		await store.put(lockKey(kind, ip), next);
+		await store.put(lockKey(kind, subject), next);
 	} catch (error) {
 		console.error(JSON.stringify({ message: "lockout write failed", kind, error: String(error) }));
 	}
 	return next;
 }
 
-/** A correct answer: forget this address's wrong tries, if it had any. */
+/** A correct answer: forget this device's wrong tries, if it had any. */
 export async function clearLock(
 	store: LockoutStore,
 	kind: LockKind,
-	ip: string,
+	subject: string,
 	state: LockState,
 ): Promise<void> {
 	if (state.record === null) return;
 	try {
-		await store.delete(lockKey(kind, ip));
+		await store.delete(lockKey(kind, subject));
 	} catch (error) {
 		console.error(JSON.stringify({ message: "lockout clear failed", kind, error: String(error) }));
 	}
 }
 
-/** The 429 a locked address gets, without its answer ever being compared. */
+/** The 429 a locked device gets, without its answer ever being compared. */
 export function lockedResponse(retryAfterSeconds: number): Response {
 	return json(
 		429,

@@ -20,6 +20,7 @@
  * out of a budget separate from its compiles.
  */
 
+import { loadDeviceId } from "./device.ts";
 import { loadClientId } from "./storage.ts";
 
 export type FormatOutcome =
@@ -43,6 +44,7 @@ export async function requestFormat(code: string, phrase: string): Promise<Forma
 				"content-type": "application/json",
 				"x-class-phrase": phrase,
 				"x-client-id": loadClientId(),
+				"x-device-id": loadDeviceId(),
 			},
 			body: JSON.stringify({ code }),
 		});

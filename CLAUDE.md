@@ -26,4 +26,6 @@ Rules for every session in this repo:
    instead of claiming the gate passed.
 
 Wrong-guess lockout (`src/lockout.ts`, Cache API, falls open): 5 wrong phrases or teacher keys in a
-row per IP lock 5 s, doubling to a 300 s cap; checked before the compare, cleared by a right answer.
+row per DEVICE (`x-device-id`, `web/src/device.ts`; no id = per IP) lock 5 s, doubling to a 300 s cap;
+checked before the compare, cleared by a right answer. Never key it per IP (Dalton 2026-09-28: a
+school shares one IP).
