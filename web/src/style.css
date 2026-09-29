@@ -357,7 +357,7 @@ body.resizing {
 }
 
 .brand img {
-	border-radius: 16px;
+	border-radius: 12px;
 }
 
 .grow {
@@ -852,9 +852,9 @@ button.link {
    wider than the screen. */
 @media (max-width: 640px) {
 	.brand img {
-		width: 56px;
-		height: 56px;
-		border-radius: 12px;
+		width: 42px;
+		height: 42px;
+		border-radius: 9px;
 	}
 	.field span {
 		display: none;
