@@ -174,10 +174,15 @@
 		</p>
 
 		<h2>Teacher key</h2>
-		<div class="row">
+		<form id="key-form" class="row">
+			<!-- a fixed user name, so the browser's password manager can save and fill the key -->
+			<input type="text" name="username" autocomplete="username" value="teacher" hidden />
 			<div>
 				<label for="key">Kept in this browser only</label>
-				<input id="key" type="password" autocomplete="off" placeholder="teacher key" />
+				<input id="key" name="password" type="password" autocomplete="current-password" placeholder="teacher key" />
+			</div>
+			<div class="fixed">
+				<button type="submit">Open</button>
 			</div>
 			<div class="fixed">
 				<button id="remember" type="button">Remember on this machine</button>
@@ -185,7 +190,7 @@
 			<div class="fixed">
 				<button id="forget" type="button" class="link">Forget key on this device</button>
 			</div>
-		</div>
+		</form>
 
 		<h2>Today's phrase</h2>
 		<div class="row">

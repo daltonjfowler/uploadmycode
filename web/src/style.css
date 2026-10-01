@@ -404,6 +404,18 @@ select {
 	max-width: 9rem;
 }
 
+/* Teacher in the toolbar: a link that looks like its buttons. */
+.toplink {
+	font-size: 0.85rem;
+	color: var(--fg);
+	text-decoration: none;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 5px;
+	padding: 0.28rem 0.6rem;
+}
+
+.toplink:hover,
 button:hover:not(:disabled),
 select:hover {
 	border-color: var(--accent);
