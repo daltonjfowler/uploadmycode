@@ -157,10 +157,22 @@
 		countdown.textContent = "Ends in " + parts.join(" ") + ".";
 	}
 
+	// Once a key works, ask the browser's password manager to keep it
+	// (Chrome and Edge show "Save password?").
+	var offered = false;
+	function offerToSaveKey() {
+		if (offered || !window.PasswordCredential || !navigator.credentials) return;
+		offered = true;
+		navigator.credentials
+			.store(new window.PasswordCredential({ id: "teacher", password: currentKey(), name: "Teacher key" }))
+			.catch(function () {});
+	}
+
 	function handle(result, okText) {
 		if (result.status === 200) {
 			show(result.body);
 			say(okText, "ok");
+			offerToSaveKey();
 			return;
 		}
 		if (result.status === 403) {
@@ -324,8 +336,9 @@
 	phraseInput.addEventListener("keydown", function (event) {
 		if (event.key === "Enter") document.getElementById("set").click();
 	});
-	keyInput.addEventListener("keydown", function (event) {
-		if (event.key === "Enter") document.getElementById("refresh").click();
+	document.getElementById("key-form").addEventListener("submit", function (event) {
+		event.preventDefault();
+		document.getElementById("refresh").click();
 	});
 
 	keyInput.value = loadKey();
