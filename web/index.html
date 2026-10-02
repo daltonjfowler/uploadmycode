@@ -59,6 +59,7 @@
 				>
 					⚙️ Settings
 				</button>
+				<button id="help" type="button" title="How to code, upload and use the serial monitor">ⓘ Help</button>
 				<a class="toplink" href="/teacher.html" title="For teachers: the class phrase and settings">Teacher</a>
 
 				<!-- One group so a wrapping toolbar never splits the two buttons from
@@ -106,6 +107,35 @@
 					<button id="theme-toggle" type="button">🖥️ System</button>
 				</div>
 			</div>
+
+			<dialog id="help-dialog" class="dialog">
+				<form method="dialog">
+					<h2>How to code</h2>
+					<ol class="steps">
+						<li><strong>Write your sketch.</strong> Pick a sketch from the <em>Sketch</em> list, or <em>File → New sketch</em>. It saves itself in this browser as you type. <em>File → Download .ino file</em> keeps a copy.</li>
+						<li><strong>Compile.</strong> Press <em>Compile</em> (or <kbd>Ctrl</kbd>+<kbd>Enter</kbd>). The first time, type the class phrase from the board. Errors show in <em>Output</em>: click one to jump to that line.</li>
+						<li><strong>Plug in the Uno</strong> with its USB cable.</li>
+						<li><strong>Upload.</strong> Press <em>Upload</em>. The first time, pick the board in the window that opens and press <em>Connect</em>.</li>
+						<li><strong>Watch it run.</strong> Open the <em>Serial monitor</em> at the bottom to see what your sketch prints. Set the baud rate to match <code>Serial.begin()</code>. <em>📈 Plot</em> draws the numbers as a graph.</li>
+					</ol>
+					<h3>Handy keys</h3>
+					<table class="keys">
+						<tr><td>Compile</td><td><kbd>Ctrl</kbd>+<kbd>Enter</kbd></td></tr>
+						<tr><td>Find &amp; replace</td><td><kbd>Ctrl</kbd>+<kbd>F</kbd>, then <kbd>F3</kbd> for the next one</td></tr>
+						<tr><td>Undo / redo</td><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> · <kbd>Ctrl</kbd>+<kbd>Y</kbd></td></tr>
+						<tr><td>Tidy the spacing</td><td><em>Auto indent</em> (Undo puts it back)</td></tr>
+						<tr><td>Add a library</td><td>Pick it from the library list. It adds the <code>#include</code> line.</td></tr>
+					</table>
+					<h3>Upload trouble</h3>
+					<ul class="steps">
+						<li>Board not in the list? Try another USB cable or port. Some cables only charge.</li>
+						<li>Close any other tab that is using the board.</li>
+						<li>Upload is greyed out? Compile first. It only uploads what is on screen right now.</li>
+					</ul>
+					<p class="note">Your sketches stay in this browser. A sketch is sent to the server only to compile, then deleted. <a href="/legal" target="_blank" rel="noopener">Privacy &amp; legal</a></p>
+					<div class="dialog-actions"><button class="primary" value="close">Got it</button></div>
+				</form>
+			</dialog>
 
 			<main id="editor" class="editor"></main>
 

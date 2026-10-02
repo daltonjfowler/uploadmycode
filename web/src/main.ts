@@ -1244,6 +1244,12 @@ document.addEventListener("visibilitychange", () => {
 	if (document.visibilityState === "hidden") persist();
 });
 
+const helpDialog = document.getElementById("help-dialog") as HTMLDialogElement;
+document.getElementById("help")?.addEventListener("click", () => {
+	helpDialog.showModal();
+	helpDialog.scrollTop = 0; // focus lands on Got it, at the bottom; start reading at the top
+});
+
 // Ctrl-Enter (Cmd-Enter on a Mac) compiles, like the Arduino IDE's verify.
 window.addEventListener("keydown", (event) => {
 	if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
