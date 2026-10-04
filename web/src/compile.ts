@@ -95,6 +95,8 @@ export async function requestCompile(
 	code: string,
 	phrase: string,
 	token: string,
+	/** The student's own libraries (user-libraries.ts), sent as text with the sketch. */
+	libraries: readonly { name: string; files: { path: string; text: string }[] }[] = [],
 ): Promise<CompileOutcome> {
 	let response: Response;
 	try {
@@ -107,7 +109,7 @@ export async function requestCompile(
 				"x-device-id": loadDeviceId(),
 				"x-compile-token": token,
 			},
-			body: JSON.stringify({ code }),
+			body: JSON.stringify(libraries.length ? { code, libraries: libraries.map(({ name, files }) => ({ name, files })) } : { code }),
 		});
 	} catch {
 		return {

@@ -35,6 +35,8 @@ const MONITOR_VIEW_KEY = "uno-ide.v1.monitor-view";
 const CLIENT_ID_KEY = "uno-ide.v1.client-id";
 // public/theme-boot.js reads this key by name too; keep the two in step.
 const THEME_KEY = "uno-ide.v1.theme";
+/** The student's own libraries (user-libraries.ts), as JSON. Up to 512 KB of text. */
+const USER_LIBRARIES_KEY = "uno-ide.v1.user-libraries";
 const PANEL_HEIGHT_KEYS = {
 	output: "uno-ide.v1.output-height",
 	monitor: "uno-ide.v1.monitor-height",
@@ -111,6 +113,14 @@ export function loadSketches(): Sketch[] {
 
 export function saveSketches(sketches: Sketch[]): void {
 	writeKey(SKETCHES_KEY, JSON.stringify(sketches));
+}
+
+export function loadUserLibrariesRaw(): string | null {
+	return readKey(USER_LIBRARIES_KEY);
+}
+
+export function saveUserLibrariesRaw(json: string): void {
+	writeKey(USER_LIBRARIES_KEY, json);
 }
 
 export function loadCurrentName(): string | null {

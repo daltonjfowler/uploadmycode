@@ -20,6 +20,7 @@ import { errorLines, firstErrorSummary, parseCompileErrors, type CompileError } 
 import { formatEdit, requestFormat } from "./format.ts";
 import { HexParseError, parseIntelHex } from "./flash/intel-hex.ts";
 import { findIncludeLine, insertInclude, LIBRARIES } from "./libraries.ts";
+import { addLibrary, LibraryProblem, libraryBytes, parseStoredLibraries, readLibrary, type UserLibrary } from "./user-libraries.ts";
 import { initMenus } from "./menus.ts";
 import {
 	findGrantedUnoPort,
@@ -56,6 +57,7 @@ import {
 	loadMonitorView,
 	loadPanelHeight,
 	loadSketches,
+	loadUserLibrariesRaw,
 	saveAutocompleteEnabled,
 	saveCurrentName,
 	saveMonitorBaud,
@@ -63,6 +65,7 @@ import {
 	saveMonitorView,
 	savePanelHeight,
 	saveSketches,
+	saveUserLibrariesRaw,
 	starterLibrary,
 	uniqueName,
 	type MonitorView,
@@ -449,7 +452,7 @@ async function compileSketch(): Promise<void> {
 
 	const startedAt = performance.now();
 	try {
-		const outcome = await requestCompile(code, phrase, token);
+		const outcome = await requestCompile(code, phrase, token, userLibraries);
 		stopPolling();
 
 		if (outcome.kind === "success") {
@@ -1171,11 +1174,73 @@ importInput.addEventListener("change", async () => {
 function renderLibraryList(): void {
 	const placeholder = new Option(LIBRARY_PLACEHOLDER, "", true, true);
 	placeholder.disabled = true;
+	const own = document.createElement("optgroup");
+	own.label = "Your own libraries";
+	own.append(
+		...userLibraries.map((lib) => new Option(`${lib.name} - your library`, lib.header)),
+		new Option("➕ Add your own library (.zip)…", ADD_LIBRARY),
+	);
+	if (userLibraries.length) own.append(new Option("Manage your libraries…", MANAGE_LIBRARIES));
 	librarySelect.replaceChildren(
 		placeholder,
 		...LIBRARIES.map((library) => new Option(`${library.label} - ${library.note}`, library.header)),
+		own,
 	);
 }
+
+// ---------------------------------------------------- the student's own libraries
+
+const ADD_LIBRARY = ":add"; // a colon is never in a header name
+const MANAGE_LIBRARIES = ":manage";
+let userLibraries: UserLibrary[] = parseStoredLibraries(loadUserLibrariesRaw());
+const userLibFile = el<HTMLInputElement>("userlib-file");
+const userLibsDialog = el<HTMLDialogElement>("userlibs-dialog");
+
+function saveUserLibraries(next: UserLibrary[]): void {
+	userLibraries = next;
+	saveUserLibrariesRaw(JSON.stringify(next));
+	clearCompiledHex(); // the program on hand was built with the old libraries
+	renderLibraryList();
+	renderUserLibs();
+}
+
+function renderUserLibs(): void {
+	const list = el<HTMLUListElement>("userlibs-list");
+	if (!userLibraries.length) {
+		list.replaceChildren(Object.assign(document.createElement("li"), { className: "empty", textContent: "None yet." }));
+		return;
+	}
+	list.replaceChildren(...userLibraries.map((lib) => {
+		const li = document.createElement("li");
+		const words = document.createElement("span");
+		words.append(Object.assign(document.createElement("strong"), { textContent: lib.name }));
+		words.append(Object.assign(document.createElement("small"), {
+			textContent: `#include <${lib.header}> · ${lib.files.length} file${lib.files.length === 1 ? "" : "s"} · ${Math.max(1, Math.round(libraryBytes(lib) / 1024))} KB`,
+		}));
+		const remove = Object.assign(document.createElement("button"), { type: "button", textContent: "Remove" });
+		remove.addEventListener("click", () => saveUserLibraries(userLibraries.filter((l) => l !== lib)));
+		li.append(words, remove);
+		return li;
+	}));
+}
+
+userLibFile.addEventListener("change", async () => {
+	const picked = [...(userLibFile.files ?? [])];
+	userLibFile.value = ""; // picking the same file again still fires this
+	if (!picked.length) return;
+	try {
+		const lib = await readLibrary(picked);
+		const { list, replaced } = addLibrary(userLibraries, lib);
+		saveUserLibraries(list);
+		if (userLibsDialog.open) return;
+		includeHeader(lib.header, `${replaced ? "Updated" : "Added"} your library ${lib.name}.`);
+	} catch (error) {
+		const message = error instanceof LibraryProblem ? error.message : "That file could not be read as a library.";
+		showNotice("Library not added", message);
+	}
+});
+
+el<HTMLButtonElement>("userlibs-add").addEventListener("click", () => userLibFile.click());
 
 librarySelect.addEventListener("change", () => {
 	const header = librarySelect.value;
@@ -1183,7 +1248,17 @@ librarySelect.addEventListener("change", () => {
 	// library twice in a row still fires this.
 	librarySelect.selectedIndex = 0;
 	if (header === "") return;
+	if (header === ADD_LIBRARY) return userLibFile.click();
+	if (header === MANAGE_LIBRARIES) {
+		renderUserLibs();
+		userLibsDialog.showModal();
+		return;
+	}
+	includeHeader(header);
+});
 
+/** Put `#include <header>` in the sketch, or point at the line that has it. */
+function includeHeader(header: string, done?: string): void {
 	const code = editor.getCode();
 	const added = insertInclude(code, header);
 
@@ -1192,8 +1267,8 @@ librarySelect.addEventListener("change", () => {
 		// highlight is then doing the pointing, with no new machinery for it.
 		const existing = findIncludeLine(code, header);
 		showNotice(
-			"Already included",
-			`This sketch already has #include <${header}> on line ${existing}.`,
+			done ? "Library added" : "Already included",
+			`${done ? `${done} ` : ""}This sketch already has #include <${header}> on line ${existing}.`,
 		);
 		editor.goToLine(existing, 0);
 		editor.focus();
@@ -1203,8 +1278,9 @@ librarySelect.addEventListener("change", () => {
 	// One transaction, so one Ctrl-Z takes the line back out again.
 	editor.replaceCode(added.code, added.line);
 	clearErrorRows();
+	if (done) showNotice("Library added", `${done} Its #include <${header}> is on line ${added.line}.`);
 	editor.focus();
-});
+}
 
 initMenus();
 initThemeButton(el<HTMLButtonElement>("theme-toggle"));

@@ -131,7 +131,10 @@ USER uploader
 # first student after a container cold start reuses them instead of building cold.
 #
 # The paths, the sketch folder name and the build/output layout must match what
-# server.js uses, or the reuse is lost. general warms the AVR core with a Blink;
+# server.js uses, or the reuse is lost. That includes --libraries: server.js
+# passes its (usually empty) uploaded-libraries folder on every compile, and
+# arduino-cli rebuilds the whole core when that flag comes or goes.
+# general warms the AVR core with a Blink;
 # sensorkit warms the whole Arduino SensorKit stack — its bundled U8g2 is the
 # slow half of a SensorKit compile and the reason this bucket exists.
 #
@@ -146,26 +149,26 @@ USER uploader
 # itself. Two compiles leave the directory settled, so the first student is
 # already on the cheap path. The second sketch is the editor's own starting
 # template, which is what a fresh sketch really looks like.
-RUN for b in general sensorkit; do mkdir -p "$BUILD_ROOT/$b/sketch"; done \
+RUN for b in general sensorkit; do mkdir -p "$BUILD_ROOT/$b/sketch" "$BUILD_ROOT/$b/libraries"; done \
 	&& printf 'void setup() { pinMode(LED_BUILTIN, OUTPUT); }\nvoid loop() { digitalWrite(LED_BUILTIN, HIGH); delay(1000); digitalWrite(LED_BUILTIN, LOW); delay(1000); }\n' \
 		> "$BUILD_ROOT/general/sketch/sketch.ino" \
 	&& arduino-cli compile --fqbn arduino:avr:uno \
-		--build-path "$BUILD_ROOT/general/build" --output-dir "$BUILD_ROOT/general/out" \
+		--build-path "$BUILD_ROOT/general/build" --output-dir "$BUILD_ROOT/general/out" --libraries "$BUILD_ROOT/general/libraries" \
 		"$BUILD_ROOT/general/sketch" \
 	&& printf 'void setup() {\n  // put your setup code here, to run once:\n\n}\n\nvoid loop() {\n  // put your main code here, to run repeatedly:\n\n}\n' \
 		> "$BUILD_ROOT/general/sketch/sketch.ino" \
 	&& arduino-cli compile --fqbn arduino:avr:uno \
-		--build-path "$BUILD_ROOT/general/build" --output-dir "$BUILD_ROOT/general/out" \
+		--build-path "$BUILD_ROOT/general/build" --output-dir "$BUILD_ROOT/general/out" --libraries "$BUILD_ROOT/general/libraries" \
 		"$BUILD_ROOT/general/sketch" \
 	&& printf '#include "Arduino_SensorKit.h"\nvoid setup() { Environment_I2C.begin(); Pressure.begin(); Accelerometer.begin(); Oled.begin(); }\nvoid loop() { Serial.println(Accelerometer.readX()); }\n' \
 		> "$BUILD_ROOT/sensorkit/sketch/sketch.ino" \
 	&& arduino-cli compile --fqbn arduino:avr:uno \
-		--build-path "$BUILD_ROOT/sensorkit/build" --output-dir "$BUILD_ROOT/sensorkit/out" \
+		--build-path "$BUILD_ROOT/sensorkit/build" --output-dir "$BUILD_ROOT/sensorkit/out" --libraries "$BUILD_ROOT/sensorkit/libraries" \
 		"$BUILD_ROOT/sensorkit/sketch" \
 	&& printf '#include <Arduino_SensorKit.h>\n\nvoid setup() {\n  // put your setup code here, to run once:\n\n}\n\nvoid loop() {\n  // put your main code here, to run repeatedly:\n\n}\n' \
 		> "$BUILD_ROOT/sensorkit/sketch/sketch.ino" \
 	&& arduino-cli compile --fqbn arduino:avr:uno \
-		--build-path "$BUILD_ROOT/sensorkit/build" --output-dir "$BUILD_ROOT/sensorkit/out" \
+		--build-path "$BUILD_ROOT/sensorkit/build" --output-dir "$BUILD_ROOT/sensorkit/out" --libraries "$BUILD_ROOT/sensorkit/libraries" \
 		"$BUILD_ROOT/sensorkit/sketch"
 
 # --- the server -------------------------------------------------------------
@@ -176,7 +179,7 @@ WORKDIR /app
 # the check that refuses a sketch naming a file outside itself. Copied last so
 # editing any of these does not invalidate the toolchain or warm-up layers
 # above.
-COPY --chown=uploader:uploader package.json server.js sketch-guard.js .clang-format /app/
+COPY --chown=uploader:uploader package.json server.js sketch-guard.js user-libraries.js .clang-format /app/
 
 # server.js runs every compile under prlimit (util-linux, already in the base
 # image) so one sketch cannot eat the instance's memory. Checked here so an

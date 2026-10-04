@@ -125,7 +125,7 @@ export const HINT_RULES: readonly HintRule[] = [
 	rule(
 		"missing-library",
 		/[\w.+-]+\.h: No such file or directory/,
-		"That library is not installed here. Pick it from the Library menu, or check the spelling.",
+		"Not installed here. Pick it in the Library menu, add its .zip there, or check spelling.",
 	),
 
 	rule(

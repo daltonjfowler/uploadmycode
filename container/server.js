@@ -6,7 +6,8 @@
  * dependencies, so there is nothing to install or keep up to date.
  *
  *   GET  /health   -> { ok: true }
- *   POST /compile  -> body { "code": "<sketch source>" }
+ *   POST /compile  -> body { "code": "<sketch source>", "libraries"?: [...] }
+ *                     (libraries: the student's own, see user-libraries.js)
  *                     200 { ok: true,  hex: "<Intel HEX text>" }
  *                     200 { ok: false, stderr: "<compiler errors>" }
  *   POST /format   -> body { "code": "<sketch source>" }
@@ -43,6 +44,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { sketchProblem } from "./sketch-guard.js";
+import { checkLibraries, forgetLibraries, writeLibraries } from "./user-libraries.js";
 
 /** Uno boards, forever. See PLAN.md. */
 const FQBN = "arduino:avr:uno";
@@ -109,6 +111,11 @@ const KILL_WHOLE_GROUP = process.platform !== "win32";
 const FORMAT_TIMEOUT_MS = 10_000;
 /** A sketch that reaches this is not a sketch. The Worker caps request size too. */
 const MAX_BODY_BYTES = 256 * 1024;
+/**
+ * A compile also carries the student's own libraries (up to 512 KB of text,
+ * user-libraries.js), and JSON escaping makes that a little bigger again.
+ */
+const MAX_COMPILE_BODY_BYTES = 900 * 1024;
 /**
  * Formatting only moves whitespace about, so the answer cannot be much bigger
  * than the sketch that went in. Double the body cap is generous and still
@@ -376,11 +383,12 @@ async function forgetSketch(bucketDir) {
 }
 
 /**
- * Compile one sketch. Never rejects.
+ * Compile one sketch, with the student's own libraries if they sent any. Never rejects.
  * @param {string} code
+ * @param {import("./user-libraries.js").UserLibrary[]} libraries
  * @returns {Promise<{ ok: true, hex: string } | { ok: false, stderr: string }>}
  */
-async function compile(code) {
+async function compile(code, libraries) {
 	// One compile runs at a time (see enqueue), so a fixed, reused directory per
 	// bucket is safe: nothing else is writing sketch.ino or reading the hex.
 	const bucketDir = path.join(BUILD_ROOT, buildBucket(code));
@@ -389,9 +397,18 @@ async function compile(code) {
 	const buildPath = path.join(bucketDir, "build");
 	const outDir = path.join(bucketDir, "out");
 	const hexPath = path.join(outDir, "sketch.ino.hex");
+	// Uploaded libraries go here for this one compile. arduino-cli is pointed at
+	// this folder on EVERY compile, empty or not, and so is the Dockerfile's
+	// warm-up: measured with arduino-cli 1.5.1, adding or dropping --libraries
+	// between two compiles counts as changed build options and rebuilds the whole
+	// core (28 files), while changing what is inside the folder costs only the
+	// library's own files.
+	const librariesDir = path.join(bucketDir, "libraries");
 
 	try {
 		await mkdir(sketchDir, { recursive: true });
+		await forgetLibraries(librariesDir, buildPath);
+		await writeLibraries(librariesDir, libraries);
 		await writeFile(path.join(sketchDir, "sketch.ino"), code, "utf8");
 		// The directory is reused, so a previous compile's hex may still be here.
 		// Remove it first: a failure that writes no hex must never be answered
@@ -408,6 +425,8 @@ async function compile(code) {
 			buildPath,
 			"--output-dir",
 			outDir,
+			"--libraries",
+			librariesDir,
 			sketchDir,
 		]);
 
@@ -424,7 +443,9 @@ async function compile(code) {
 			if (limited !== null) return { ok: false, stderr: limited };
 			// arduino-cli puts compiler errors on stderr; fall back to stdout so a
 			// surprising failure is never reported as an empty message.
-			const message = stripTempPaths(result.stderr || result.stdout, bucketDir);
+			const message = stripTempPaths(result.stderr || result.stdout, bucketDir)
+				// An uploaded library's file as the student knows it: MyLib/MyLib.cpp.
+				.replace(/libraries[\\/]user_([\w.-]+)[\\/]src[\\/]([^\s:]+)/g, (_, lib, file) => `${lib}/${file.replace(/\\/g, "/")}`);
 			return { ok: false, stderr: message || "Compile failed." };
 		}
 
@@ -439,8 +460,12 @@ async function compile(code) {
 	} finally {
 		// The hex, if any, is already read into the answer. The build directory
 		// itself stays: it is the cache, reused by the next compile in the same
-		// bucket and reset only when the container restarts. Only the sketch goes.
+		// bucket and reset only when the container restarts. Only the sketch and
+		// the student's own libraries go.
 		await forgetSketch(bucketDir);
+		await forgetLibraries(librariesDir, buildPath).catch((error) => {
+			console.error(JSON.stringify({ event: "library-cleanup-failed", error: String(error) }));
+		});
 	}
 }
 
@@ -610,18 +635,19 @@ function send(res, status, body) {
 }
 
 /**
- * Read the whole request body, refusing anything oversized.
+ * Read the whole request body, refusing anything over `max` bytes.
  * @param {import("node:http").IncomingMessage} req
+ * @param {number} max
  * @returns {Promise<string>}
  */
-function readBody(req) {
+function readBody(req, max) {
 	return new Promise((resolve, reject) => {
 		/** @type {Buffer[]} */
 		const chunks = [];
 		let size = 0;
 		req.on("data", (chunk) => {
 			size += chunk.length;
-			if (size > MAX_BODY_BYTES) {
+			if (size > max) {
 				// Stop reading but leave the socket alive long enough to answer.
 				// Destroying here would reach the browser as a network error
 				// instead of the 413, and the student would learn nothing.
@@ -655,25 +681,26 @@ function rejectTooLarge(req, res, key) {
 }
 
 /**
- * Read and check a `{ "code": "..." }` body. Returns the sketch, or null after
- * having already answered the request with the reason it was refused.
+ * Read and check a `{ "code": "..." }` body. Returns the parsed body, or null
+ * after having already answered the request with the reason it was refused.
  * @param {import("node:http").IncomingMessage} req
  * @param {import("node:http").ServerResponse} res
  * @param {"stderr" | "error"} key
- * @returns {Promise<string | null>}
+ * @param {number} max  bytes
+ * @returns {Promise<{ code: string, libraries?: unknown } | null>}
  */
-async function readCodeRequest(req, res, key) {
+async function readCodeRequest(req, res, key, max) {
 	// Cheap path first: a declared Content-Length lets us answer before reading
 	// a single byte, which is the only way the client reliably sees the 413.
 	const declared = Number(req.headers["content-length"]);
-	if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
+	if (Number.isFinite(declared) && declared > max) {
 		rejectTooLarge(req, res, key);
 		return null;
 	}
 
 	let body;
 	try {
-		body = await readBody(req);
+		body = await readBody(req, max);
 	} catch {
 		// Chunked upload, or a lying Content-Length.
 		rejectTooLarge(req, res, key);
@@ -691,7 +718,7 @@ async function readCodeRequest(req, res, key) {
 		send(res, 400, { ok: false, [key]: 'Request body must be {"code": "..."}.' });
 		return null;
 	}
-	return parsed.code;
+	return parsed;
 }
 
 /**
@@ -699,8 +726,9 @@ async function readCodeRequest(req, res, key) {
  * @param {import("node:http").ServerResponse} res
  */
 async function handleCompile(req, res) {
-	const code = await readCodeRequest(req, res, "stderr");
-	if (code === null) return;
+	const body = await readCodeRequest(req, res, "stderr", MAX_COMPILE_BODY_BYTES);
+	if (body === null) return;
+	const code = body.code;
 
 	// Refused before it joins the line: there is nothing to wait for.
 	const problem = sketchProblem(code);
@@ -709,11 +737,17 @@ async function handleCompile(req, res) {
 		send(res, 200, { ok: false, stderr: problem });
 		return;
 	}
+	const checked = checkLibraries(body.libraries);
+	if ("problem" in checked) {
+		console.log(JSON.stringify({ event: "compile-refused", reason: "library" }));
+		send(res, 200, { ok: false, stderr: checked.problem });
+		return;
+	}
 
 	const started = Date.now();
-	const result = await enqueue(() => compile(code));
+	const result = await enqueue(() => compile(code, checked.libraries));
 	console.log(
-		JSON.stringify({ event: "compile", ok: result.ok, ms: Date.now() - started }),
+		JSON.stringify({ event: "compile", ok: result.ok, ms: Date.now() - started, libraries: checked.libraries.length }),
 	);
 	send(res, 200, result);
 }
@@ -723,8 +757,9 @@ async function handleCompile(req, res) {
  * @param {import("node:http").ServerResponse} res
  */
 async function handleFormat(req, res) {
-	const code = await readCodeRequest(req, res, "error");
-	if (code === null) return;
+	const body = await readCodeRequest(req, res, "error", MAX_BODY_BYTES);
+	if (body === null) return;
+	const code = body.code;
 
 	const started = Date.now();
 	const result = await format(code);

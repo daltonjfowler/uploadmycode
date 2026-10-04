@@ -5,7 +5,7 @@
  * The order is the design, so it is written once, here, and worker.ts just runs
  * the answer:
  *
- *   1. size          over 100 KB is refused before anything else runs
+ *   1. size          over 900 KB (a format: 100 KB) is refused before anything else runs
  *   2. school        the optional ALLOWED_CIDRS lock, off unless the var is set
  *   3. per address   120 phrase-carrying requests a minute per public address
  *   3b. lockout      5 wrong phrases in a row locks this DEVICE 5 s, then
@@ -80,7 +80,12 @@ import { activeRecord, normalizePhrase, PHRASE_KEY, type PhraseRecord } from "./
 import { formatRateLimitKey, rateLimitKey, type RateVerdict } from "./ratelimit.ts";
 
 /** Cost cap from PLAN.md. A request this big is not a sketch. */
-export const MAX_COMPILE_BYTES = 100 * 1024;
+export const MAX_FORMAT_BYTES = 100 * 1024;
+/**
+ * A compile also carries the student's own libraries (container/user-libraries.js
+ * allows 512 KB of text), so its cap is bigger. Matches the container's own.
+ */
+export const MAX_COMPILE_BYTES = 900 * 1024;
 
 /** Which of the two jobs is being asked for. */
 export type GateKind = "compile" | "format";
@@ -193,7 +198,7 @@ function refuse(response: Response): GateVerdict {
 
 function tooLarge(): GateVerdict {
 	return refuse(
-		json(413, { ok: false, error: "That sketch is too big to compile. The limit is 100 KB." }),
+		json(413, { ok: false, error: "That sketch is too big. Keep the sketch under 100 KB and your own libraries under 512 KB." }),
 	);
 }
 
@@ -283,10 +288,11 @@ async function gate(
 	// 1. Size. A declared oversize is answered before a byte is read; a chunked
 	// upload declares nothing, so the body is read a piece at a time and the
 	// reading stops the moment it passes the cap.
+	const max = kind === "compile" ? MAX_COMPILE_BYTES : MAX_FORMAT_BYTES;
 	const declared = Number(request.headers.get("content-length"));
-	if (Number.isFinite(declared) && declared > MAX_COMPILE_BYTES) return tooLarge();
+	if (Number.isFinite(declared) && declared > max) return tooLarge();
 
-	const body = await readCapped(request, MAX_COMPILE_BYTES);
+	const body = await readCapped(request, max);
 	if (body === null) return tooLarge();
 
 	// 2. The optional in-person lock. An empty ALLOWED_CIDRS switches it off.

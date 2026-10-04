@@ -120,7 +120,7 @@ test("an unknown type points at spelling and at the Library menu", () => {
 test("a header that is not there", () => {
 	assert.equal(
 		hintForLine("sketch.ino:1:10: fatal error: Servoo.h: No such file or directory"),
-		"That library is not installed here. Pick it from the Library menu, or check the spelling.",
+		"Not installed here. Pick it in the Library menu, add its .zip there, or check spelling.",
 	);
 });
 

@@ -14,8 +14,8 @@
     <!-- Blocking on purpose: sets data-theme before the first paint. -->
     <script src="/theme-boot.js"></script>
   <script src="/logo-alive.js" defer></script>
-  <script type="module" crossorigin src="/assets/index-CzmIXKP4.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-CMWTRwTG.css">
+  <script type="module" crossorigin src="/assets/index-CJUrruMn.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-BugAVwND.css">
 </head>
 	<body>
 		<div class="app">
@@ -110,6 +110,19 @@
 				</div>
 			</div>
 
+			<input type="file" id="userlib-file" accept=".zip,.h,.hpp,.c,.cpp,application/zip" multiple hidden>
+			<dialog id="userlibs-dialog" class="dialog">
+				<form method="dialog">
+					<h2>Your libraries</h2>
+					<p>Libraries you added yourself. They stay in this browser and are sent with every compile. Add a library's <code>.zip</code> (the green <em>Code → Download ZIP</em> button on GitHub), or its <code>.h</code> and <code>.cpp</code> files.</p>
+					<ul id="userlibs-list" class="userlibs"></ul>
+					<div class="dialog-actions">
+						<button type="button" id="userlibs-add">Add a library…</button>
+						<button class="primary" value="close">Done</button>
+					</div>
+				</form>
+			</dialog>
+
 			<dialog id="help-dialog" class="dialog">
 				<form method="dialog">
 					<h2>How to code</h2>
@@ -126,7 +139,7 @@
 						<tr><td>Find &amp; replace</td><td><kbd>Ctrl</kbd>+<kbd>F</kbd>, then <kbd>F3</kbd> for the next one</td></tr>
 						<tr><td>Undo / redo</td><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> · <kbd>Ctrl</kbd>+<kbd>Y</kbd></td></tr>
 						<tr><td>Tidy the spacing</td><td><em>Auto indent</em> (Undo puts it back)</td></tr>
-						<tr><td>Add a library</td><td>Pick it from the library list. It adds the <code>#include</code> line.</td></tr>
+						<tr><td>Add a library</td><td>Pick it from the library list. It adds the <code>#include</code> line. Not in the list? <em>Add your own library</em> takes its <code>.zip</code>.</td></tr>
 					</table>
 					<h3>Upload trouble</h3>
 					<ul class="steps">

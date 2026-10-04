@@ -463,6 +463,31 @@ select {
 .dialog .note a {
 	color: inherit;
 }
+.userlibs {
+	list-style: none;
+	padding: 0;
+	margin: 12px 0;
+}
+
+.userlibs li {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 8px 0;
+	border-bottom: 1px solid var(--border, #d0d7de);
+}
+
+.userlibs li.empty {
+	color: var(--muted, #6b7280);
+	justify-content: flex-start;
+}
+
+.userlibs small {
+	display: block;
+	color: var(--muted, #6b7280);
+}
+
 .dialog-actions {
 	display: flex;
 	justify-content: flex-end;

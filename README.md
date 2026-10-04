@@ -52,7 +52,11 @@ The editor page on the live site (1400x900, dark theme), before any sketch is co
 - **Libraries** — a fixed allowlist baked into the container image, so a compile never touches the
   network. Servo, LiquidCrystal, LiquidCrystal I2C, Stepper and Arduino SensorKit (the Seeed Grove
   sensor kit) ship by default. The SensorKit's own dependencies, DHT20 and the LIS3DHTR
-  accelerometer, are pinned and baked in alongside it.
+  accelerometer, are pinned and baked in alongside it. Students can also add their own: **Library →
+  Add your own library** takes a library `.zip` (or loose `.h`/`.cpp` files), keeps it in that
+  browser, and sends its source with each compile. The container writes it next to the sketch for
+  that one compile, checks every file the way it checks a sketch, and deletes it afterwards
+  (`container/user-libraries.js`).
 - **Privacy and legal** — a `/legal` page, linked from every footer, says what the site keeps, where
   and for how long, and who made it. Sketches stay in the browser; there are no accounts.
 
