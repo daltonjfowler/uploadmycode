@@ -1,12 +1,19 @@
 # CLAUDE.md — uploadmycode
 
-Classroom tool: browser IDE for Uno boards, for Chromebooks. Compile on a Cloudflare Container
-(`arduino-cli`), flash the Uno from the browser via Web Serial. Uno only, ever.
+Classroom tool: browser IDE for Uno boards and (when a teacher switches it on) ESP32 boards. Compile on a
+Cloudflare Container (`arduino-cli`), flash from the browser via Web Serial. "Uno only, ever" was lifted by Dalton
+on 2026-10-10: ESP32 is a teacher toggle (`src/boards.ts`), compiled by a separate `Esp32Container`
+(`container/Dockerfile.esp32`, same server.js with BOARD=esp32), flashed with esptool-js (`web/src/flash/esp32.ts`).
+The ESP32 Wi-Fi safety failsafe (`container/esp32-guard.js`: no deauth / beacon spam / sniffing / Marauder; text
+check plus a symbol check of the linked .elf) is on unless a teacher switches it off, and that override always
+expires. Never weaken it, and never let a student request set `x-allow-wifi-tools`: only the Worker sets it.
+User-facing name (Dalton 2026-10-10): "Arduino UNO and ESP32 tool", used as a description; the site name stays
+uploadmycode.
 
 Public repo, MIT licensed. Do not put anything in it that is specific to Dalton's account or
 school: no keys, no phrase values, no district name. `docs/SETUP.md` is the doc a stranger reads;
 `docs/DEPLOY.md` is the operator manual for Dalton's own instance. Keep "Arduino" out of
-user-facing prose — the hardware is "the Uno" or "Uno boards" — but leave real names and
+user-facing prose, except the "Arduino UNO and ESP32 tool" description and board picker Dalton asked for — the hardware is "the Uno" or "Uno boards" — but leave real names and
 identifiers alone (`arduino-cli`, `arduino:avr:uno`, `ARDUINO_*` env vars, code identifiers,
 download URLs). See the "Trademarks and licensing" section of README.md.
 
@@ -29,3 +36,9 @@ Wrong-guess lockout (`src/lockout.ts`, Cache API, falls open): 5 wrong phrases o
 row per DEVICE (`x-device-id`, `web/src/device.ts`; no id = per IP) lock 5 s, doubling to a 300 s cap;
 checked before the compare, cleared by a right answer. Never key it per IP (Dalton 2026-09-28: a
 school shares one IP).
+
+## Code navigation: Serena (Dalton 2026-10-10)
+Use the Serena MCP tools by default in this repo. Start with `activate_project` on this repo's root folder
+(config in `.serena/project.yml`), then `get_symbols_overview` / `find_symbol` / `find_referencing_symbols`
+to read, and `replace_symbol_body` / `replace_content` / `insert_*_symbol` to edit. Plain Read/Grep only for
+non-code files or quick discovery.

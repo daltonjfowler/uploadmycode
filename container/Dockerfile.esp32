@@ -1,0 +1,100 @@
+# uploadmycode ESP32 compile service: the same server.js as the Uno image
+# (Dockerfile), started with BOARD=esp32, plus the Espressif ESP32 core.
+#
+# A separate image and a separate, bigger container class (wrangler.jsonc
+# Esp32Container), so the Uno compiler never changes and the ESP32 one only
+# wakes when a teacher has switched ESP32 on.
+#
+# Only the classic ESP32 (ESP32-WROOM / ESP32 DevKit) is kept. The core
+# installs toolchains and prebuilt libraries for every Espressif chip, about
+# 1.7 GB of downloads; everything another chip needs is deleted in the same
+# RUN that installs it, so it never lands in an image layer.
+
+FROM --platform=linux/amd64 debian:bookworm-slim@sha256:88200866dfff7ea7f5cbcb6ec7c8a701889efe6fe859fe64d6990e4b07ea4171
+
+ARG NODE_VERSION=24.19.0
+ARG NODE_SHA256=14b342e71204f811bde6153be8e04b62aef63c236fef92b55f9c83154b409647
+ARG ARDUINO_CLI_VERSION=1.5.1
+ARG ARDUINO_CLI_SHA256=28a8e119c498a25607821c36cb2dc49e8463941b261a0d99091baa7bc692dd2b
+ARG ESP32_CORE_VERSION=3.3.12
+ARG ESP32_INDEX=https://espressif.github.io/arduino-esp32/package_esp32_index.json
+ARG SERVO_VERSION=3.2.1
+ARG LCD_I2C_VERSION=1.1.2
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# python3: the core's esptool turns the linked program into the .bin files.
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends \
+		ca-certificates \
+		curl \
+		libstdc++6 \
+		python3 \
+		xz-utils \
+	&& rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL -o /tmp/node.tar.xz \
+		"https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
+	&& echo "${NODE_SHA256}  /tmp/node.tar.xz" | sha256sum -c - \
+	&& tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 --no-same-owner \
+	&& rm /tmp/node.tar.xz \
+	&& node --version
+
+RUN curl -fsSL -o /tmp/arduino-cli.tar.gz \
+		"https://github.com/arduino/arduino-cli/releases/download/v${ARDUINO_CLI_VERSION}/arduino-cli_${ARDUINO_CLI_VERSION}_Linux_64bit.tar.gz" \
+	&& echo "${ARDUINO_CLI_SHA256}  /tmp/arduino-cli.tar.gz" | sha256sum -c - \
+	&& tar -xzf /tmp/arduino-cli.tar.gz -C /usr/local/bin arduino-cli \
+	&& rm /tmp/arduino-cli.tar.gz \
+	&& arduino-cli version
+
+ENV ARDUINO_DIRECTORIES_DATA=/opt/arduino/data \
+	ARDUINO_DIRECTORIES_USER=/opt/arduino/user \
+	ARDUINO_DIRECTORIES_DOWNLOADS=/opt/arduino/downloads \
+	ARDUINO_BUILD_CACHE_PATH=/opt/arduino/cache \
+	ARDUINO_BOARD_MANAGER_ADDITIONAL_URLS=${ESP32_INDEX} \
+	BUILD_ROOT=/opt/arduino/build \
+	BOARD=esp32
+
+# Install, then delete what the classic ESP32 never uses: the RISC-V toolchain,
+# the debuggers, and the prebuilt libraries for the other chips. One RUN, so the
+# deleted files never reach a layer. esp32-nm is the symbol lister server.js
+# uses to check the linked program (see esp32-guard.js).
+RUN arduino-cli core update-index \
+	&& arduino-cli core install "esp32:esp32@${ESP32_CORE_VERSION}" \
+	&& arduino-cli lib install "ESP32Servo@${SERVO_VERSION}" \
+	&& arduino-cli lib install "LiquidCrystal I2C@${LCD_I2C_VERSION}" \
+	&& cd /opt/arduino/data/packages/esp32/tools \
+	&& rm -rf esp-rv32 riscv32-esp-elf-gdb xtensa-esp-elf-gdb openocd-esp32 dfu-util \
+		esp32c3-libs esp32c5-libs esp32c6-libs esp32h2-libs esp32p4-libs esp32p4_es-libs esp32s2-libs esp32s3-libs \
+	&& rm -rf /opt/arduino/downloads \
+	&& ln -s "$(find /opt/arduino/data/packages/esp32/tools/esp-x32 -name 'xtensa-esp32-elf-nm' | head -n 1)" /usr/local/bin/esp32-nm \
+	&& esp32-nm --version | head -n 1 \
+	&& du -sh /opt/arduino/data \
+	&& arduino-cli core list \
+	&& arduino-cli lib list \
+	&& useradd --create-home --home-dir /home/uploader --shell /usr/sbin/nologin --uid 10001 uploader \
+	&& mkdir -p /opt/arduino/cache /app \
+	&& chown -R uploader:uploader /opt/arduino /app
+# (chown in the same RUN as the install: a chown -R in a RUN of its own copies
+# all 1.6 GB of toolchain into a second layer.)
+
+ENV HOME=/home/uploader
+USER uploader
+
+# Warm-up compiles: every library combination in esp32-buckets.js WARM_SETS,
+# twice each, into the folders server.js will use (see esp32-warmup.mjs). The
+# FQBN here must match ESP32_FQBN in server.js. Copied before the server so
+# editing server.js does not throw these layers away.
+ARG FQBN=esp32:esp32:esp32:FlashMode=dio
+WORKDIR /app
+COPY --chown=uploader:uploader package.json esp32-buckets.js esp32-warmup.mjs /app/
+RUN node /app/esp32-warmup.mjs "$FQBN" && du -sh "$BUILD_ROOT"
+
+COPY --chown=uploader:uploader server.js sketch-guard.js user-libraries.js esp32-guard.js /app/
+
+RUN prlimit --version
+
+ENV PORT=8080
+EXPOSE 8080
+
+CMD ["node", "/app/server.js"]

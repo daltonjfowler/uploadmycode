@@ -179,7 +179,7 @@ WORKDIR /app
 # the check that refuses a sketch naming a file outside itself. Copied last so
 # editing any of these does not invalidate the toolchain or warm-up layers
 # above.
-COPY --chown=uploader:uploader package.json server.js sketch-guard.js user-libraries.js .clang-format /app/
+COPY --chown=uploader:uploader package.json server.js sketch-guard.js user-libraries.js esp32-guard.js esp32-buckets.js .clang-format /app/
 
 # server.js runs every compile under prlimit (util-linux, already in the base
 # image) so one sketch cannot eat the instance's memory. Checked here so an

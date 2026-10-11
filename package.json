@@ -24,6 +24,7 @@
     "@codemirror/state": "6.7.2",
     "@codemirror/view": "6.43.10",
     "@lezer/highlight": "1.2.3",
+    "esptool-js": "0.7.0",
     "typescript": "5.9.3",
     "vite": "8.2.2",
     "wrangler": "4.142.0"

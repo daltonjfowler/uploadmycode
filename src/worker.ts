@@ -41,6 +41,7 @@ import {
 	readActivePhrase,
 	type CompileCounters,
 } from "./compile-gate.ts";
+import { boardFromHeader, BOARDS_KEY, boardSettings, boardsRecordFor, type BoardSettings } from "./boards.ts";
 import { anyKeyEquals } from "./constant-time.ts";
 import { httpsRedirect, withSecurityHeaders } from "./headers.ts";
 import { json } from "./http.ts";
@@ -61,7 +62,7 @@ import {
 	PHRASE_KEY,
 	type PhraseRecord,
 } from "./phrase.ts";
-import { CompileQueue, CONTAINER_COUNT, isUsableToken, type Admission } from "./queue.ts";
+import { CompileQueue, CONTAINER_COUNT, ESP32_CONTAINER_COUNT, isUsableToken, type Admission } from "./queue.ts";
 import {
 	FORMAT_RATE_LIMIT_MAX,
 	GLOBAL_COMPILE_KEY,
@@ -127,6 +128,26 @@ export class CompilerContainer extends Container {
 }
 
 /**
+ * The ESP32 compiler (container/Dockerfile.esp32): the same server.js with
+ * BOARD=esp32, on a bigger instance (wrangler.jsonc). Only reached for a compile
+ * that asked for ESP32 while a teacher has ESP32 switched on (src/boards.ts), so
+ * it sleeps, and bills nothing, on every day ESP32 is not in use. Same rules as
+ * CompilerContainer above: container concerns only.
+ */
+export class Esp32Container extends Container {
+	override defaultPort = 8080;
+	override sleepAfter = "5m";
+
+	override onError(error: unknown): Response {
+		console.error(JSON.stringify({ message: "esp32 container error", error: String(error) }));
+		return json(503, {
+			ok: false,
+			error: "The ESP32 compiler is busy or starting up. Wait a few seconds and try again.",
+		});
+	}
+}
+
+/**
  * Every counter on the site: the three rate limiters and the teacher-key guard.
  *
  * A plain Durable Object with NO container. Every request names the same
@@ -164,6 +185,8 @@ export class Counters extends DurableObject<Env> {
 	);
 	/** Who is waiting for the compiler right now. See src/queue.ts. */
 	readonly #queue = new CompileQueue();
+	/** The ESP32 compiles' own line, over the ESP32 containers. */
+	readonly #esp32Queue = new CompileQueue(ESP32_CONTAINER_COUNT);
 
 	/**
 	 * Count one compile attempt for one client. `key` is built by
@@ -202,13 +225,14 @@ export class Counters extends DurableObject<Env> {
 	 * least-loaded one) and how long the line now is, including this compile —
 	 * or, when the line is full, that this compile must be turned away.
 	 */
-	enterCompileQueue(token: string): Admission {
-		return this.#queue.enter(token, Date.now());
+	enterCompileQueue(token: string, pool: "uno" | "esp32" = "uno"): Admission {
+		return (pool === "esp32" ? this.#esp32Queue : this.#queue).enter(token, Date.now());
 	}
 
 	/** Leave the compile queue. Always called, whatever the compile did. */
 	leaveCompileQueue(token: string): void {
 		this.#queue.leave(token);
+		this.#esp32Queue.leave(token);
 	}
 
 	/**
@@ -218,6 +242,7 @@ export class Counters extends DurableObject<Env> {
 	 */
 	compileQueueStatus(token: string): { waiting: boolean; depth: number } {
 		const now = Date.now();
+		if (this.#esp32Queue.isWaiting(token, now)) return { waiting: true, depth: this.#esp32Queue.depth(now) };
 		return { waiting: this.#queue.isWaiting(token, now), depth: this.#queue.depth(now) };
 	}
 
@@ -247,6 +272,22 @@ function compilerStub(env: Env, index: number): DurableObjectStub<CompilerContai
 	// which must equal CONTAINER_COUNT. The old single "compiler" name is simply
 	// no longer addressed; that instance sleeps and scales to zero on its own.
 	return getContainer(env.COMPILER, `compiler-${index}`);
+}
+
+/** ESP32 compiler `index` (0 .. ESP32_CONTAINER_COUNT-1), named like the UNO ones. */
+function esp32Stub(env: Env, index: number): DurableObjectStub<Esp32Container> {
+	return getContainer(env.ESP32, `esp32-${index}`);
+}
+
+/** The teacher's board switches, as of now. Unreadable KV means ESP32 off, failsafe on. */
+async function readBoards(env: Env): Promise<BoardSettings> {
+	let stored: unknown = null;
+	try {
+		stored = await env.CLASS_KV.get(BOARDS_KEY, "json");
+	} catch (error) {
+		console.error(JSON.stringify({ message: "boards read failed", error: String(error) }));
+	}
+	return boardSettings(stored, Date.now());
 }
 
 /**
@@ -385,6 +426,42 @@ async function teacherPhrase(request: Request, env: Env): Promise<Response> {
 	return json(200, { ok: true, phrase, expiresAt });
 }
 
+/**
+ * GET / POST /api/teacher/boards. The key is already checked.
+ * POST { esp32: boolean, wifiToolsSeconds?: number } — see src/boards.ts.
+ */
+async function teacherBoards(request: Request, env: Env): Promise<Response> {
+	if (request.method === "GET") return json(200, { ok: true, ...(await readBoards(env)) });
+	if (request.method !== "POST") {
+		return json(405, { ok: false, error: "Use GET or POST for /api/teacher/boards." }, { allow: "GET, POST" });
+	}
+	const declared = Number(request.headers.get("content-length"));
+	if (Number.isFinite(declared) && declared > MAX_TEACHER_BYTES) {
+		return json(413, { ok: false, error: "That request is too large." });
+	}
+	let body: unknown;
+	try {
+		body = await request.json();
+	} catch {
+		return json(400, { ok: false, error: "Body must be JSON." });
+	}
+	const now = Date.now();
+	const record = boardsRecordFor(body, now);
+	if (typeof record === "string") return json(400, { ok: false, error: record });
+	await env.CLASS_KV.put(BOARDS_KEY, JSON.stringify(record));
+	console.log(JSON.stringify({ event: "boards-set", esp32: record.esp32, wifiTools: record.wifiToolsUntil > 0 }));
+	return json(200, { ok: true, ...boardSettings(record, now) });
+}
+
+/**
+ * GET /api/boards: which boards the page should offer. No phrase needed: it
+ * says only whether ESP32 is switched on, and never touches a container.
+ */
+async function publicBoards(env: Env): Promise<Response> {
+	const settings = await readBoards(env);
+	return json(200, { ok: true, boards: settings.esp32 ? ["uno", "esp32"] : ["uno"] });
+}
+
 // --------------------------------------------------- compiling and formatting
 
 /**
@@ -396,13 +473,14 @@ async function teacherPhrase(request: Request, env: Env): Promise<Response> {
  * never has to know what a sketch or an Intel HEX file is.
  */
 async function forwardToContainer(
-	container: DurableObjectStub<CompilerContainer>,
+	container: DurableObjectStub<CompilerContainer> | DurableObjectStub<Esp32Container>,
 	path: "/compile" | "/format",
 	body: ArrayBuffer,
+	extraHeaders: Record<string, string> = {},
 ): Promise<Response> {
 	const proxied = new Request("http://compiler" + path, {
 		method: "POST",
-		headers: { "content-type": "application/json" },
+		headers: { "content-type": "application/json", ...extraHeaders },
 		body,
 	});
 
@@ -435,6 +513,14 @@ async function compile(request: Request, env: Env): Promise<Response> {
 	const verdict = await gateCompile(request, env, counters);
 	if (!verdict.ok) return verdict.response;
 
+	const board = boardFromHeader(request.headers.get("x-board"));
+	if (board === null) return json(400, { ok: false, error: "Pick a board: Arduino UNO or ESP32." });
+	// Read only for an ESP32 compile, so the UNO path costs no extra KV read.
+	const boards = board === "esp32" ? await readBoards(env) : null;
+	if (boards !== null && !boards.esp32) {
+		return json(409, { ok: false, error: "ESP32 is switched off right now. Pick Arduino UNO, or ask your teacher to switch ESP32 on." });
+	}
+
 	// The page mints a token per compile and polls /api/queue with it while it
 	// waits. A request without a usable token is given one here, so every
 	// compile stands in the line and none can skip the cap on its length by
@@ -444,10 +530,10 @@ async function compile(request: Request, env: Env): Promise<Response> {
 	// The queue also decides which of the containers this compile runs on. If
 	// the counters call fails the compile still happens, on a random container
 	// rather than none: a fault in the line must never cost somebody their compile.
-	let container = randomContainer();
+	let container = board === "esp32" ? 0 : randomContainer();
 	let tracked = false;
 	try {
-		const assignment = await tally.enterCompileQueue(token);
+		const assignment = await tally.enterCompileQueue(token, board);
 		if (!assignment.admitted) {
 			console.log(JSON.stringify({ event: "compile-refused-queue-full", inLine: assignment.depth }));
 			return json(
@@ -469,6 +555,10 @@ async function compile(request: Request, env: Env): Promise<Response> {
 
 	try {
 		// Only now is the container touched — and only now is its sleep timer renewed.
+		if (boards !== null) {
+			// The failsafe header is set here and only here, from the teacher's switch.
+			return await forwardToContainer(esp32Stub(env, container), "/compile", verdict.body, boards.allowWifiTools ? { "x-allow-wifi-tools": "1" } : {});
+		}
 		return await forwardToContainer(compilerStub(env, container), "/compile", verdict.body);
 	} finally {
 		if (tracked) {
@@ -565,6 +655,13 @@ async function handle(request: Request, env: Env): Promise<Response> {
 		return await format(request, env);
 	}
 
+	if (url.pathname === "/api/boards") {
+		if (request.method !== "GET") {
+			return json(405, { ok: false, error: "Use GET for /api/boards." }, { allow: "GET" });
+		}
+		return await publicBoards(env);
+	}
+
 	if (url.pathname === "/api/queue") {
 		if (request.method !== "GET") {
 			return json(405, { ok: false, error: "Use GET for /api/queue." }, { allow: "GET" });
@@ -580,6 +677,9 @@ async function handle(request: Request, env: Env): Promise<Response> {
 
 		if (url.pathname === "/api/teacher/phrase") {
 			return await teacherPhrase(request, env);
+		}
+		if (url.pathname === "/api/teacher/boards") {
+			return await teacherBoards(request, env);
 		}
 		return json(404, { ok: false, error: "Unknown API route." });
 	}

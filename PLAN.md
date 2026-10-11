@@ -19,7 +19,7 @@ T0–T5 built, tested, committed, and deployed to https://uploadmycode.com. Rema
 
 | Decision | Value |
 |---|---|
-| Board | Uno ONLY. FQBN `arduino:avr:uno` hardcoded server-side. No board picker. |
+| Board | Uno always; ESP32 (`esp32:esp32:esp32:FlashMode=dio`, classic ESP32 only) only while a teacher switches it on. Each container image hardcodes its own FQBN; the picker appears only when ESP32 is on. (Was "Uno ONLY"; lifted by Dalton 2026-10-10.) |
 | Hosting | One Cloudflare Worker project: static assets (frontend) + `/api/*` routes + one Container (compile). |
 | Compile | `arduino-cli` (pinned version) inside a Cloudflare Container. Never in the browser, never WASM. |
 | Upload | Web Serial API + STK500v1 (Optiboot bootloader, 115200 baud). Vendored minimal flasher, no heavyweight flashing dependency. |

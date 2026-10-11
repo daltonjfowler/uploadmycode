@@ -92,6 +92,22 @@
       // instance stays asleep and bills nothing except during a real burst. This
       // MUST equal CONTAINER_COUNT in src/queue.ts; raise the two together.
       "max_instances": 2
+    },
+    {
+      // The ESP32 compiler (container/Dockerfile.esp32). Only woken by an ESP32
+      // compile while a teacher has ESP32 switched on (src/boards.ts), so it bills
+      // nothing on days ESP32 is not used. Bigger than the UNO's: the ESP32
+      // toolchain needs about 1 vCPU and 2 GiB to compile in tens of seconds.
+      // Up to THREE, routed least-loaded like the UNO ones (src/queue.ts
+      // ESP32_CONTAINER_COUNT must equal max_instances): one compile at a time
+      // lands on esp32-0, and the others only wake while several ESP32 compiles
+      // are in flight at once. Disk: a 2.8 GB image plus up to 30 build folders
+      // of 30-70 MB (container/esp32-buckets.js).
+      "class_name": "Esp32Container",
+      "image": "./container/Dockerfile.esp32",
+      "image_build_context": "./container",
+      "instance_type": { "vcpu": 1, "memory_mib": 3072, "disk_mb": 10000 },
+      "max_instances": 3
     }
   ],
 
@@ -100,6 +116,10 @@
       {
         "name": "COMPILER",
         "class_name": "CompilerContainer"
+      },
+      {
+        "name": "ESP32",
+        "class_name": "Esp32Container"
       },
       // The rate limiters and the teacher-key guard, in a Durable Object of
       // their own with NO container attached. They are counted here rather
@@ -122,6 +142,10 @@
     {
       "tag": "v2",
       "new_sqlite_classes": ["Counters"]
+    },
+    {
+      "tag": "v3",
+      "new_sqlite_classes": ["Esp32Container"]
     }
   ]
 }

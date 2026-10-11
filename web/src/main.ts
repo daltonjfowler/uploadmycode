@@ -10,9 +10,11 @@ import "./style.css";
 import {
 	hexProgramBytes,
 	newCompileToken,
+	requestBoards,
 	requestCompile,
 	requestQueueLength,
 } from "./compile.ts";
+import { decodeImage, uploadEsp32 } from "./flash/esp32.ts";
 import { createEditor, type Editor } from "./editor.ts";
 import { hintFor } from "./error-hints.ts";
 import { initThemeButton } from "./theme.ts";
@@ -23,11 +25,12 @@ import { findIncludeLine, insertInclude, LIBRARIES } from "./libraries.ts";
 import { addLibrary, LibraryProblem, libraryBytes, parseStoredLibraries, readLibrary, type UserLibrary } from "./user-libraries.ts";
 import { initMenus } from "./menus.ts";
 import {
-	findGrantedUnoPort,
+	findGrantedBoardPort,
 	isWebSerialAvailable,
 	NO_WEB_SERIAL_MESSAGE,
 	openTransport,
 	requestPort,
+	type BoardKind,
 	type OpenPort,
 	type SerialPortLike,
 } from "./flash/serial.ts";
@@ -43,7 +46,7 @@ import {
 	type LineEnding,
 } from "./monitor.ts";
 import { createPanelResize, MONITOR_LOG_MIN_REM, OUTPUT_MIN_REM } from "./resize.ts";
-import { appState, clearCompiledHex, hasFreshHex, setCompiledHex, type Status } from "./state.ts";
+import { appState, clearCompiledHex, hasFreshHex, setCompiledBin, setCompiledHex, type Status } from "./state.ts";
 import {
 	BLANK_SKETCH,
 	cleanName,
@@ -452,8 +455,20 @@ async function compileSketch(): Promise<void> {
 
 	const startedAt = performance.now();
 	try {
-		const outcome = await requestCompile(code, phrase, token, userLibraries);
+		const outcome = await requestCompile(code, phrase, token, userLibraries, currentBoard);
 		stopPolling();
+
+		if (outcome.kind === "success-esp32") {
+			setCompiledBin(outcome.bin, outcome.address, code);
+			// Base64 is 4/3 of the image (bootloader, partition table and sketch together).
+			const bytes = Math.floor((outcome.bin.length * 3) / 4);
+			setStatus("success", "Compiled");
+			showOutput(
+				`Compiled for ESP32 with no errors.\nProgram image: ${bytes} bytes.\nTook ${elapsedSince(startedAt)}.`,
+				"success",
+			);
+			return;
+		}
 
 		if (outcome.kind === "success") {
 			setCompiledHex(outcome.hex, code);
@@ -626,7 +641,7 @@ async function uploadSketch(): Promise<void> {
 	if (uploading || compiling || formatting) return;
 
 	const code = editor.getCode();
-	if (!hasFreshHex(code) || appState.hex === null) {
+	if (!hasFreshHex(code) || (appState.hex === null && appState.bin === null)) {
 		setStatus("error", "Compile first");
 		showOutput(
 			"This sketch has changed since it was last compiled. Click Compile, then Upload.",
@@ -641,6 +656,12 @@ async function uploadSketch(): Promise<void> {
 		showOutput(NO_WEB_SERIAL_MESSAGE, "error");
 		return;
 	}
+
+	if (appState.bin !== null) {
+		await uploadEsp32Sketch(appState.bin, appState.binAddress);
+		return;
+	}
+	if (appState.hex === null) return;
 
 	// Do the parsing before touching the port: a bad hex should never leave a
 	// board sitting in the bootloader.
@@ -676,7 +697,7 @@ async function uploadSketch(): Promise<void> {
 		resumeMonitor = await monitor.pauseForUpload();
 		refreshMonitorControls();
 
-		const port = sharedPort ?? (await findGrantedUnoPort()) ?? (await requestPort(showAllPorts));
+		const port = sharedPort ?? (await findGrantedBoardPort("uno")) ?? (await requestPort(showAllPorts, "upload", "uno"));
 		sharedPort = port;
 		usedPort = port;
 		showAllPorts = false;
@@ -722,6 +743,119 @@ async function uploadSketch(): Promise<void> {
 		refreshMonitorControls();
 	}
 }
+
+/**
+ * Upload an ESP32 program with esptool-js (flash/esp32.ts). Same shape as the
+ * UNO path above: pause the monitor, find or pick the port, write, give the
+ * port back, and resume the monitor.
+ */
+async function uploadEsp32Sketch(bin: string, address: number): Promise<void> {
+	const image = decodeImage(bin);
+
+	uploading = true;
+	refreshRunButtons();
+	clearErrorRows();
+	statusPill.title = "";
+	setStatus("uploading", "Uploading…");
+	showOutput("Connecting to the ESP32… If nothing happens, hold the BOOT button on the board.", "plain");
+	uploadProgress.hidden = false;
+	uploadBar.max = image.length;
+	uploadBar.value = 0;
+	uploadCount.textContent = "connecting";
+
+	let usedPort: SerialPortLike | null = null;
+	let resumeMonitor = false;
+	try {
+		resumeMonitor = await monitor.pauseForUpload();
+		refreshMonitorControls();
+
+		const port = sharedPort ?? (await findGrantedBoardPort("esp32")) ?? (await requestPort(showAllPorts, "upload", "esp32"));
+		sharedPort = port;
+		usedPort = port;
+		showAllPorts = false;
+
+		const result = await uploadEsp32(port, image, address, (written, total) => {
+			uploadBar.max = total;
+			uploadBar.value = written;
+			uploadCount.textContent = `${Math.round((written / Math.max(1, total)) * 100)}%`;
+		});
+
+		setStatus("success", "Uploaded");
+		showOutput(
+			`Uploaded ${result.bytesWritten} bytes to the ${result.chip} in ${(result.elapsedMs / 1000).toFixed(1)} s.\nThe board is running your sketch now.`,
+			"success",
+		);
+	} catch (cause) {
+		sharedPort = null;
+		const kind = cause instanceof FlashError ? cause.kind : "port";
+		if (kind === "no-port" && !showAllPorts) showAllPorts = true;
+		if (kind === "unsupported") serialHelp.hidden = false;
+		setStatus("error", kind === "no-port" ? "No board" : "Upload failed");
+		showOutput(
+			cause instanceof FlashError
+				? cause.message
+				: `The upload failed: ${cause instanceof Error ? cause.message : String(cause)}`,
+			"error",
+		);
+	} finally {
+		if (resumeMonitor) {
+			await monitor.resumeAfterUpload();
+			if (monitor.getState() === "connected") sharedPort = usedPort;
+		}
+		uploading = false;
+		hideUploadProgress();
+		refreshRunButtons();
+		refreshMonitorControls();
+	}
+}
+
+// ------------------------------------------------------------- board picker
+
+/**
+ * Which board the student is compiling for. Arduino UNO unless the teacher has
+ * switched ESP32 on (GET /api/boards); only then does the picker appear. The
+ * choice is remembered on this computer, but is never trusted: the server
+ * refuses an ESP32 compile while ESP32 is off.
+ */
+const BOARD_KEY = "uno-ide.v1.board";
+const boardSelect = el<HTMLSelectElement>("board-select");
+let currentBoard: BoardKind = "uno";
+
+function setBoard(board: BoardKind): void {
+	if (board === currentBoard) return;
+	currentBoard = board;
+	boardSelect.value = board;
+	try {
+		localStorage.setItem(BOARD_KEY, board);
+	} catch {
+		// Site data blocked: the choice lasts for this page only.
+	}
+	// The compiled program was for the other board, and the port may be too.
+	clearCompiledHex();
+	if (monitor.getState() !== "connected") sharedPort = null;
+	refreshRunButtons();
+	showNotice(board === "esp32" ? "ESP32" : "Arduino UNO", "Board changed. Compile again before you upload.");
+}
+
+boardSelect.addEventListener("change", () => {
+	setBoard(boardSelect.value === "esp32" ? "esp32" : "uno");
+});
+
+void requestBoards().then((boards) => {
+	const esp32 = boards.includes("esp32");
+	boardSelect.hidden = !esp32;
+	if (!esp32) {
+		if (currentBoard !== "uno") setBoard("uno");
+		return;
+	}
+	let remembered: string | null = null;
+	try {
+		remembered = localStorage.getItem(BOARD_KEY);
+	} catch {
+		// Fine: start on the UNO.
+	}
+	if (remembered === "esp32") setBoard("esp32");
+});
 
 // ------------------------------------------------------------ serial monitor
 
@@ -923,7 +1057,7 @@ async function connectMonitor(): Promise<void> {
 	refreshMonitorControls();
 	try {
 		const port =
-			sharedPort ?? (await findGrantedUnoPort()) ?? (await requestPort(showAllPorts, "monitor"));
+			sharedPort ?? (await findGrantedBoardPort(currentBoard)) ?? (await requestPort(showAllPorts, "monitor", currentBoard));
 		sharedPort = port;
 		showAllPorts = false;
 		await monitor.connect(port, selectedBaud());

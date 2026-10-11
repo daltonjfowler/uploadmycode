@@ -88,7 +88,7 @@
 	 * One call to the teacher API. Returns { status, body } and never
 	 * throws, so every caller has one shape to read.
 	 */
-	function call(method, payload) {
+	function call(method, payload, url) {
 		var key = currentKey();
 		if (key === "") {
 			return Promise.resolve({ status: 0, body: { error: "Type the teacher key first." } });
@@ -100,7 +100,7 @@
 			init.body = JSON.stringify(payload);
 		}
 
-		return fetch(API, init).then(
+		return fetch(url || API, init).then(
 			function (response) {
 				return response
 					.json()
@@ -341,6 +341,67 @@
 		document.getElementById("refresh").click();
 	});
 
+	// ---------------------------------------------------------------- boards
+	// ESP32 on/off and the ESP32 Wi-Fi safety failsafe (src/boards.ts).
+
+	var BOARDS_API = "/api/teacher/boards";
+	var boardsNow = document.getElementById("boards-now");
+	var boards = null;
+
+	function showBoards(body) {
+		boards = body;
+		if (!body || typeof body.esp32 !== "boolean") {
+			boardsNow.textContent = "Open with the teacher key to see the board settings.";
+			return;
+		}
+		var text = body.esp32 ? "ESP32 is ON: students see the board picker." : "ESP32 is off: students use Arduino UNO only.";
+		if (body.esp32) {
+			text += body.allowWifiTools
+				? " Wi-Fi safety failsafe is OFF until " + clockTime(body.wifiToolsUntil) + "."
+				: " Wi-Fi safety failsafe is on.";
+		}
+		boardsNow.textContent = text;
+	}
+
+	function setBoards(payload, okText) {
+		call("POST", payload, BOARDS_API).then(function (result) {
+			if (result.status === 200) {
+				showBoards(result.body);
+				say(okText, "ok");
+			} else if (result.status === 429) say(busyText(result.body), "error");
+			else say((result.body && result.body.error) || "Could not change the board settings.", "error");
+		});
+	}
+
+	function loadBoards() {
+		call("GET", null, BOARDS_API).then(function (result) {
+			if (result.status === 200) showBoards(result.body);
+		});
+	}
+
+	document.getElementById("esp32-on").addEventListener("click", function () {
+		setBoards({ esp32: true, wifiToolsSeconds: 0 }, "ESP32 is on. Students may need to reload the page to see the board picker.");
+	});
+	document.getElementById("esp32-off").addEventListener("click", function () {
+		setBoards({ esp32: false }, "ESP32 is off. The failsafe is back on.");
+	});
+	document.getElementById("failsafe-off").addEventListener("click", function () {
+		if (!boards || !boards.esp32) {
+			say("Switch ESP32 on first.", "error");
+			return;
+		}
+		var seconds = Number(document.getElementById("override-duration").value);
+		var ok = window.confirm(
+			"Switch the Wi-Fi safety failsafe OFF?\n\nWhile it is off, students can compile and upload ESP32 sketches that can knock people off Wi-Fi networks, flood fake networks or sniff traffic. Use it only for a supervised lesson on your own test network. It turns itself back on when the time runs out."
+		);
+		if (!ok) return;
+		setBoards({ esp32: true, wifiToolsSeconds: seconds }, "Failsafe is off for now. It turns itself back on at the time shown.");
+	});
+	document.getElementById("failsafe-on").addEventListener("click", function () {
+		setBoards({ esp32: !!(boards && boards.esp32), wifiToolsSeconds: 0 }, "Failsafe is on.");
+	});
+	document.getElementById("refresh").addEventListener("click", loadBoards);
+
 	keyInput.value = loadKey();
 	phraseInput.value = generatePhrase();
 	window.setInterval(tick, 1000);
@@ -349,8 +410,10 @@
 	// A remembered key means we can show what is live without a click.
 	if (keyInput.value !== "") {
 		call("GET", null).then(function (result) {
-			if (result.status === 200) show(result.body);
-			else if (result.status === 403) say("The saved teacher key was refused.", "error");
+			if (result.status === 200) {
+				show(result.body);
+				loadBoards();
+			} else if (result.status === 403) say("The saved teacher key was refused.", "error");
 			else if (result.status === 429) say(busyText(result.body), "error");
 		});
 	}

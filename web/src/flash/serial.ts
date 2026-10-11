@@ -59,22 +59,37 @@ export const NO_WEB_SERIAL_MESSAGE =
 
 // ------------------------------------------------------------------ choosing a port
 
-function looksLikeAnUno(port: SerialPortLike): boolean {
+/** Which board the student is working with. Decides the port filter and the words. */
+export type BoardKind = "uno" | "esp32";
+
+/** USB-serial chips on ESP32 boards: CP210x, CH340/CH9102, FTDI, and Espressif's own USB. */
+const ESP32_VENDORS = [0x10c4, VENDOR_CH340, 0x0403, 0x303a];
+
+function boardVendors(board: BoardKind): number[] {
+	return board === "esp32" ? ESP32_VENDORS : [VENDOR_ARDUINO, VENDOR_CH340];
+}
+
+/** "Uno" or "ESP32", for messages. */
+export function boardName(board: BoardKind): string {
+	return board === "esp32" ? "ESP32" : "Uno";
+}
+
+function looksLikeBoard(port: SerialPortLike, board: BoardKind): boolean {
 	const vendor = port.getInfo().usbVendorId;
-	return vendor === VENDOR_ARDUINO || vendor === VENDOR_CH340;
+	return vendor !== undefined && boardVendors(board).includes(vendor);
 }
 
 /**
  * A port this origin was already given permission for, if exactly one of them
- * looks like an Uno. Chrome remembers the grant, so after the first upload the
- * student is not asked to pick the board again — which is also what lets T4's
- * monitor and the Upload button share one board.
+ * looks like the chosen board. Chrome remembers the grant, so after the first
+ * upload the student is not asked to pick the board again — which is also what
+ * lets T4's monitor and the Upload button share one board.
  */
-export async function findGrantedUnoPort(): Promise<SerialPortLike | null> {
+export async function findGrantedBoardPort(board: BoardKind = "uno"): Promise<SerialPortLike | null> {
 	const serial = serialApi();
 	if (!serial) return null;
 	try {
-		const granted = (await serial.getPorts()).filter(looksLikeAnUno);
+		const granted = (await serial.getPorts()).filter((port) => looksLikeBoard(port, board));
 		return granted.length === 1 ? granted[0]! : null;
 	} catch {
 		return null;
@@ -93,13 +108,12 @@ export async function findGrantedUnoPort(): Promise<SerialPortLike | null> {
 export async function requestPort(
 	showAll: boolean,
 	action: "upload" | "monitor" = "upload",
+	board: BoardKind = "uno",
 ): Promise<SerialPortLike> {
 	const serial = serialApi();
 	if (!serial) throw new FlashError("unsupported", NO_WEB_SERIAL_MESSAGE);
 
-	const filters = showAll
-		? []
-		: [{ usbVendorId: VENDOR_ARDUINO }, { usbVendorId: VENDOR_CH340 }];
+	const filters = showAll ? [] : boardVendors(board).map((usbVendorId) => ({ usbVendorId }));
 
 	try {
 		return await serial.requestPort({ filters });
@@ -107,11 +121,14 @@ export async function requestPort(
 		// Chrome throws the same NotFoundError whether the student pressed Cancel
 		// or the list was empty, so this one message has to cover both.
 		const retry = action === "monitor" ? "click Connect again" : "click Upload again";
+		const name = boardName(board);
+		// ESP32 boards often use a CP2102 chip, which a Windows laptop may have no driver for.
+		const driver = board === "esp32" ? " Still not listed on a Windows laptop: the board's USB chip may need a driver, so ask your teacher." : "";
 		throw new FlashError(
 			"no-port",
 			showAll
-				? `No board chosen. Check the USB cable is plugged into the Uno and into the Chromebook, then ${retry}.`
-				: `No board chosen. Plug the Uno in and ${retry}. The next list shows every port on the computer, so pick the one the board is on.`,
+				? `No board chosen. Check the USB cable is plugged into the ${name} and into the computer, then ${retry}.${driver}`
+				: `No board chosen. Plug the ${name} in and ${retry}. The next list shows every port on the computer, so pick the one the board is on.`,
 		);
 	}
 }

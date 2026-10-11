@@ -90,6 +90,15 @@ export const MAX_QUEUE_DEPTH = 40;
  */
 export const CONTAINER_COUNT = 2;
 
+/**
+ * How many ESP32 compile containers (Esp32Container) there may be. They get a
+ * line of their own (a second CompileQueue in the Counters object), routed the
+ * same least-loaded way, so the 2nd and 3rd only wake while several ESP32
+ * compiles are in flight at once. MUST equal max_instances for Esp32Container
+ * in wrangler.jsonc.
+ */
+export const ESP32_CONTAINER_COUNT = 3;
+
 /** One compile in flight: when it joined, and which container it went to. */
 interface Waiter {
 	joinedAt: number;

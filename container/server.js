@@ -8,8 +8,10 @@
  *   GET  /health   -> { ok: true }
  *   POST /compile  -> body { "code": "<sketch source>", "libraries"?: [...] }
  *                     (libraries: the student's own, see user-libraries.js)
- *                     200 { ok: true,  hex: "<Intel HEX text>" }
+ *                     200 { ok: true,  hex: "<Intel HEX text>" }               Uno
+ *                     200 { ok: true,  bin: "<base64>", address: 0 }          ESP32 (BOARD=esp32)
  *                     200 { ok: false, stderr: "<compiler errors>" }
+ *                     header x-allow-wifi-tools: 1 (ESP32, set only by the Worker) skips esp32-guard.js
  *   POST /format   -> body { "code": "<sketch source>" }
  *                     200 { ok: true,  code: "<the same sketch, tidied>" }
  *                     200 { ok: false, error: "<one plain sentence>" }
@@ -37,17 +39,30 @@
 
 import { spawn } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
-import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { esp32Bucket, headerIndex, imageLibraryRoots, MAX_BUCKETS } from "./esp32-buckets.js";
+import { symbolProblem, wordProblem } from "./esp32-guard.js";
 import { sketchProblem } from "./sketch-guard.js";
 import { checkLibraries, forgetLibraries, writeLibraries } from "./user-libraries.js";
 
-/** Uno boards, forever. See PLAN.md. */
-const FQBN = "arduino:avr:uno";
+/**
+ * Which board this server compiles for, fixed per image: the Uno image leaves
+ * BOARD unset, the ESP32 image (Dockerfile.esp32) sets BOARD=esp32. One server
+ * never compiles for both, so a student cannot pick a board the Worker did not.
+ */
+const ESP32 = process.env.BOARD === "esp32";
+/** Must match the warm-up compiles' FQBN in Dockerfile.esp32. DIO flash works on every ESP32 module. */
+const ESP32_FQBN = "esp32:esp32:esp32:FlashMode=dio";
+const FQBN = ESP32 ? ESP32_FQBN : "arduino:avr:uno";
+/** Lists the linked program's symbols for esp32-guard.js. Dockerfile.esp32 links it. */
+const ESP32_NM = process.env.ESP32_NM || "esp32-nm";
+/** ESP32: which installed library each header belongs to, for the build buckets (esp32-buckets.js). */
+const ESP32_HEADERS = ESP32 ? headerIndex(imageLibraryRoots()) : null;
 /** The container publishes this port; the Worker's Container class targets it. */
 const PORT = Number(process.env.PORT) || 8080;
 /** Resolved from PATH by default. ARDUINO_CLI is an escape hatch for local runs. */
@@ -72,7 +87,8 @@ const CLANG_FORMAT_STYLE = fileURLToPath(new URL("./.clang-format", import.meta.
  * sketch had timed out when nothing was wrong with it. A slow answer is a worse
  * lesson than a fast one and a better one than a false failure.
  */
-const COMPILE_TIMEOUT_MS = 60_000;
+// ESP32: a library combination no folder has seen yet took 160 s on 1 vCPU (esp32-buckets.js).
+const COMPILE_TIMEOUT_MS = ESP32 ? 180_000 : 60_000;
 /**
  * Resource limits on every compile, set with prlimit on arduino-cli and
  * inherited by every avr-gcc, cc1plus and linker it starts. Without them one
@@ -93,8 +109,9 @@ const COMPILE_TIMEOUT_MS = 60_000;
  * is far more than the 60 s wall-clock COMPILE_TIMEOUT_MS allows. It is there
  * so a compiler process that somehow outlives the timeout still ends itself.
  */
-const COMPILE_MEMORY_LIMIT_BYTES = 768 * 1024 * 1024;
-const COMPILE_CPU_LIMIT_SECONDS = 45;
+// ESP32: a much bigger toolchain on a bigger instance (1 vCPU, 3 GiB), so it gets more of both.
+const COMPILE_MEMORY_LIMIT_BYTES = (ESP32 ? 2048 : 768) * 1024 * 1024;
+const COMPILE_CPU_LIMIT_SECONDS = ESP32 ? 175 : 45;
 /**
  * The image has prlimit (util-linux, part of Debian's base; the Dockerfile
  * checks it is there). A Windows dev box does not, and compiles unlimited, as
@@ -342,8 +359,104 @@ function toPosix(p) {
  * @param {string} code
  * @returns {"sensorkit" | "general"}
  */
-function buildBucket(code) {
+function buildBucket(code, libraries = []) {
+	if (ESP32) return esp32Bucket(code, libraries, ESP32_HEADERS);
 	return /#\s*include\s*[<"]\s*Arduino_SensorKit\.h/i.test(code) ? "sensorkit" : "general";
+}
+
+/**
+ * ESP32 only: make room for a new combination's folder by deleting the least
+ * recently used ones past MAX_BUCKETS, and mark `bucket` as just used. Each
+ * folder is 30-70 MB, so 30 of them stay well inside the instance's disk.
+ * Never throws: a full disk shows up as a compile error, not a crash.
+ * @param {string} bucket
+ */
+async function makeRoomForBucket(bucket) {
+	try {
+		const entries = await readdir(BUILD_ROOT, { withFileTypes: true }).catch(() => []);
+		const others = [];
+		for (const entry of entries) {
+			if (!entry.isDirectory() || entry.name === bucket) continue;
+			const info = await stat(path.join(BUILD_ROOT, entry.name)).catch(() => null);
+			if (info) others.push({ name: entry.name, used: info.mtimeMs });
+		}
+		others.sort((a, b) => a.used - b.used);
+		while (others.length >= MAX_BUCKETS) {
+			const oldest = others.shift();
+			await rm(path.join(BUILD_ROOT, oldest.name), { recursive: true, force: true });
+		}
+		const dir = path.join(BUILD_ROOT, bucket);
+		await mkdir(dir, { recursive: true });
+		const now = new Date();
+		await utimes(dir, now, now);
+	} catch (error) {
+		console.error(JSON.stringify({ event: "bucket-prune-failed", error: String(error) }));
+	}
+}
+
+/**
+ * The ESP32 program as one image to write at flash address 0: bootloader,
+ * partition table, boot_app0 and the sketch, merged by the core. Trailing 0xFF
+ * (unwritten flash) is cut, rounded up to a whole 4 KB sector, because the
+ * flasher erases every sector it writes: a 0xFF that belongs to the program is
+ * then still 0xFF in flash.
+ * @param {string} outDir
+ * @returns {Promise<string>} base64
+ */
+async function esp32Image(outDir) {
+	const merged = await readFile(path.join(outDir, "sketch.ino.merged.bin"));
+	let end = merged.length;
+	while (end > 0 && merged[end - 1] === 0xff) end -= 1;
+	end = Math.min(merged.length, Math.ceil(end / 4096) * 4096);
+	return merged.subarray(0, end).toString("base64");
+}
+
+/**
+ * Every symbol the STUDENT'S code defines or calls, for esp32-guard.js: nm over
+ * the compiled objects of the sketch and of their own uploaded libraries
+ * (build/sketch, build/libraries/user_*). A call shows up there as an undefined
+ * reference whatever macro or token-pasting hid its name from the text check.
+ *
+ * Not the linked .elf: Arduino's own Wi-Fi library links
+ * esp_wifi_set_promiscuous, so every Wi-Fi sketch would be refused. The core and
+ * the installed libraries are trusted; only what the student wrote is checked.
+ *
+ * Null when the objects could not be listed, which the caller treats as a
+ * refusal: a failsafe that cannot look says no.
+ * @param {string} buildPath
+ * @returns {Promise<string | null>}
+ */
+async function listSymbols(buildPath) {
+	/** @type {string[]} */
+	const objects = [];
+	const walk = async (dir) => {
+		for (const entry of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
+			const full = path.join(dir, entry.name);
+			if (entry.isDirectory()) await walk(full);
+			else if (entry.name.endsWith(".o")) objects.push(full);
+		}
+	};
+	await walk(path.join(buildPath, "sketch"));
+	for (const entry of await readdir(path.join(buildPath, "libraries"), { withFileTypes: true }).catch(() => [])) {
+		if (entry.isDirectory() && entry.name.startsWith("user_")) await walk(path.join(buildPath, "libraries", entry.name));
+	}
+	// A successful compile always has the sketch's own object; none means something is off.
+	if (objects.length === 0) return null;
+	return new Promise((resolve) => {
+		const child = spawn(ESP32_NM, objects, { stdio: ["ignore", "pipe", "ignore"] });
+		let out = "";
+		const timer = setTimeout(() => child.kill("SIGKILL"), 15_000);
+		child.stdout.setEncoding("utf8");
+		child.stdout.on("data", (chunk) => (out += chunk));
+		child.on("error", () => {
+			clearTimeout(timer);
+			resolve(null);
+		});
+		child.on("close", (code) => {
+			clearTimeout(timer);
+			resolve(code === 0 ? out : null);
+		});
+	});
 }
 
 /**
@@ -386,12 +499,15 @@ async function forgetSketch(bucketDir) {
  * Compile one sketch, with the student's own libraries if they sent any. Never rejects.
  * @param {string} code
  * @param {import("./user-libraries.js").UserLibrary[]} libraries
- * @returns {Promise<{ ok: true, hex: string } | { ok: false, stderr: string }>}
+ * @param {boolean} allowWifiTools  ESP32 only: the teacher switched the failsafe off
+ * @returns {Promise<{ ok: true, hex: string } | { ok: true, bin: string, address: number } | { ok: false, stderr: string }>}
  */
-async function compile(code, libraries) {
+async function compile(code, libraries, allowWifiTools) {
 	// One compile runs at a time (see enqueue), so a fixed, reused directory per
 	// bucket is safe: nothing else is writing sketch.ino or reading the hex.
-	const bucketDir = path.join(BUILD_ROOT, buildBucket(code));
+	const bucket = buildBucket(code, libraries);
+	if (ESP32) await makeRoomForBucket(bucket);
+	const bucketDir = path.join(BUILD_ROOT, bucket);
 	// arduino-cli requires the sketch folder name to match the .ino file name.
 	const sketchDir = path.join(bucketDir, "sketch");
 	const buildPath = path.join(bucketDir, "build");
@@ -433,7 +549,9 @@ async function compile(code, libraries) {
 		if (result.timedOut) {
 			return {
 				ok: false,
-				stderr: `Compile timed out after ${COMPILE_TIMEOUT_MS / 1000} seconds.`,
+				stderr: ESP32
+					? `Compile timed out after ${COMPILE_TIMEOUT_MS / 1000} seconds. This mix of libraries is new to the ESP32 compiler, and the first build of a new mix is slow. Press Compile again: it carries on where it stopped and usually finishes in under a minute.`
+					: `Compile timed out after ${COMPILE_TIMEOUT_MS / 1000} seconds.`,
 			};
 		}
 		if (!result.ok) {
@@ -447,6 +565,22 @@ async function compile(code, libraries) {
 				// An uploaded library's file as the student knows it: MyLib/MyLib.cpp.
 				.replace(/libraries[\\/]user_([\w.-]+)[\\/]src[\\/]([^\s:]+)/g, (_, lib, file) => `${lib}/${file.replace(/\\/g, "/")}`);
 			return { ok: false, stderr: message || "Compile failed." };
+		}
+
+		if (ESP32) {
+			if (!allowWifiTools) {
+				const symbols = await listSymbols(buildPath);
+				const blocked = symbols === null ? "error: Could not check this program, so it was not sent. Try again." : symbolProblem(symbols);
+				if (blocked !== null) {
+					console.log(JSON.stringify({ event: "compile-refused", reason: symbols === null ? "nm failed" : "wifi tools in program" }));
+					return { ok: false, stderr: blocked };
+				}
+			}
+			try {
+				return { ok: true, bin: await esp32Image(outDir), address: 0 };
+			} catch {
+				return { ok: false, stderr: "Compile succeeded but produced no program file." };
+			}
 		}
 
 		try {
@@ -743,9 +877,20 @@ async function handleCompile(req, res) {
 		send(res, 200, { ok: false, stderr: checked.problem });
 		return;
 	}
+	// Only the Worker sets this header, and only while the teacher has the ESP32
+	// failsafe switched off; a student's request never reaches here directly.
+	const allowWifiTools = ESP32 && req.headers["x-allow-wifi-tools"] === "1";
+	if (ESP32 && !allowWifiTools) {
+		const blocked = wordProblem(code, checked.libraries);
+		if (blocked !== null) {
+			console.log(JSON.stringify({ event: "compile-refused", reason: "wifi tools named" }));
+			send(res, 200, { ok: false, stderr: blocked });
+			return;
+		}
+	}
 
 	const started = Date.now();
-	const result = await enqueue(() => compile(code, checked.libraries));
+	const result = await enqueue(() => compile(code, checked.libraries, allowWifiTools));
 	console.log(
 		JSON.stringify({ event: "compile", ok: result.ok, ms: Date.now() - started, libraries: checked.libraries.length }),
 	);

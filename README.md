@@ -8,7 +8,7 @@ the student machine — no IDE, no driver, no extension, no account.
 It exists because managed Chromebooks cannot run a desktop IDE, and a class of thirty needs the
 same tool on every desk in under a minute.
 
-- Uno boards only. The board type is hardcoded server-side; there is no board picker.
+- Uno boards, plus ESP32 boards when a teacher switches ESP32 on (then a board picker appears). Each board's FQBN is fixed in its own compile container. ESP32 sketches that use Wi-Fi attack tools (deauth, beacon spam, packet sniffing, Marauder-style firmware) are refused unless a teacher switches that failsafe off for a while.
 - Runs on Cloudflare Workers + Containers. About $5/month plus pennies of usage for one classroom.
 - Written and maintained by one teacher. The code is kept boring on purpose.
 

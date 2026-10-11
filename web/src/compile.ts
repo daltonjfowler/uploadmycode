@@ -41,6 +41,8 @@ import { loadClientId } from "./storage.ts";
 
 export type CompileOutcome =
 	| { kind: "success"; hex: string }
+	/** ESP32: one base64 image for flash `address`. */
+	| { kind: "success-esp32"; bin: string; address: number }
 	| { kind: "compile-error"; stderr: string }
 	| { kind: "busy"; message: string }
 	/** HTTP 403. The page must ask for the phrase again. */
@@ -91,12 +93,30 @@ export async function requestQueueLength(token: string): Promise<number | null> 
 	}
 }
 
+/**
+ * Which boards the teacher has switched on: always the UNO, and the ESP32 only
+ * while a teacher has it on. Any failure means UNO only, so the page simply
+ * shows no board picker.
+ */
+export async function requestBoards(): Promise<("uno" | "esp32")[]> {
+	try {
+		const response = await fetch("/api/boards");
+		if (!response.ok) return ["uno"];
+		const body = (await response.json()) as { boards?: unknown };
+		return Array.isArray(body.boards) && body.boards.includes("esp32") ? ["uno", "esp32"] : ["uno"];
+	} catch {
+		return ["uno"];
+	}
+}
+
 export async function requestCompile(
 	code: string,
 	phrase: string,
 	token: string,
 	/** The student's own libraries (user-libraries.ts), sent as text with the sketch. */
 	libraries: readonly { name: string; files: { path: string; text: string }[] }[] = [],
+	/** Sent as x-board. ESP32 only works while the teacher has it switched on. */
+	board: "uno" | "esp32" = "uno",
 ): Promise<CompileOutcome> {
 	let response: Response;
 	try {
@@ -108,6 +128,7 @@ export async function requestCompile(
 				"x-client-id": loadClientId(),
 				"x-device-id": loadDeviceId(),
 				"x-compile-token": token,
+				"x-board": board,
 			},
 			body: JSON.stringify(libraries.length ? { code, libraries: libraries.map(({ name, files }) => ({ name, files })) } : { code }),
 		});
@@ -128,10 +149,13 @@ export async function requestCompile(
 		};
 	}
 
-	const reply = body as { ok?: unknown; hex?: unknown; stderr?: unknown; error?: unknown; message?: unknown };
+	const reply = body as { ok?: unknown; hex?: unknown; bin?: unknown; address?: unknown; stderr?: unknown; error?: unknown; message?: unknown };
 
 	if (reply.ok === true && typeof reply.hex === "string") {
 		return { kind: "success", hex: reply.hex };
+	}
+	if (reply.ok === true && typeof reply.bin === "string" && typeof reply.address === "number") {
+		return { kind: "success-esp32", bin: reply.bin, address: reply.address };
 	}
 	// stderr means the compiler ran and had something to say about the sketch.
 	if (typeof reply.stderr === "string") {

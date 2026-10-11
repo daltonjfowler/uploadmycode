@@ -169,6 +169,7 @@
 </head>
 	<body>
 		<h1>uploadmycode - teacher</h1>
+		<p class="sub">Arduino UNO and ESP32 tool.</p>
 		<p class="sub">
 			Set the class phrase. Students type it once per tab; nobody can compile without it.
 		</p>
@@ -234,6 +235,39 @@
 		</div>
 
 		<p id="message" data-tone="plain"></p>
+
+		<h2>Boards</h2>
+		<p class="sub">
+			Arduino UNO is always on. Switch ESP32 on and students get a board picker next to Compile.
+			The ESP32 compiler is a bigger server that only wakes while ESP32 is on, so switch it off when the
+			class is done. A change can take up to a minute to reach every student.
+		</p>
+		<div class="row">
+			<div class="fixed"><button id="esp32-on" type="button">Switch ESP32 on</button></div>
+			<div class="fixed"><button id="esp32-off" type="button">Switch ESP32 off</button></div>
+		</div>
+		<p id="boards-now" class="note">Open with the teacher key to see the board settings.</p>
+
+		<h3>ESP32 Wi-Fi safety failsafe</h3>
+		<p class="sub">
+			On by default. It refuses ESP32 sketches that use Wi-Fi or Bluetooth attack tools: deauth (knocking
+			people off a network), beacon spam, packet sniffing, and firmware like ESP32 Marauder. It checks the
+			sketch, the student's own libraries, and the finished program. It only covers this site: it cannot stop
+			a student flashing such firmware with other software. Switch it off only for a supervised lesson on your
+			own test network; it turns itself back on when the time runs out.
+		</p>
+		<div class="row">
+			<div>
+				<label for="override-duration">Failsafe off for</label>
+				<select id="override-duration">
+					<option value="3600">1 hour</option>
+					<option value="5400">1 period (90 minutes)</option>
+					<option value="14400">Half day (4 hours)</option>
+				</select>
+			</div>
+			<div class="fixed"><button id="failsafe-off" type="button">Switch failsafe off</button></div>
+			<div class="fixed"><button id="failsafe-on" class="primary" type="button">Failsafe back on</button></div>
+		</div>
 
 		<p class="note">
 			Project this page, or just write the phrase on the board. <strong>Pop out</strong> opens
