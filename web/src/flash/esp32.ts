@@ -13,7 +13,13 @@
  */
 
 import { FlashError } from "./stk500v1.ts";
-import type { SerialPortLike } from "./serial.ts";
+import { describeOpenFailure, type SerialPortLike } from "./serial.ts";
+
+/** The DOMException names SerialPort.open() throws. esptool-js's own errors are ESPError. */
+function isPortOpenFailure(cause: unknown): boolean {
+	const name = cause instanceof Error ? cause.name : "";
+	return name === "NetworkError" || name === "InvalidStateError" || name === "SecurityError";
+}
 
 /** Fast and reliable on CP2102 and CH340 boards. The ROM itself starts at 115200. */
 const FLASH_BAUD = 460800;
@@ -52,6 +58,9 @@ export async function uploadEsp32(
 		try {
 			chip = await loader.main();
 		} catch (cause) {
+			// esptool-js opens the port inside main(), so a port that would not
+			// open lands here too. That is "busy or unplugged", not "hold BOOT".
+			if (isPortOpenFailure(cause)) throw new FlashError("busy", describeOpenFailure(cause));
 			throw new FlashError(
 				"sync",
 				"The ESP32 did not answer. Hold the BOOT button on the board, click Upload, and let go when the bar starts moving. " +

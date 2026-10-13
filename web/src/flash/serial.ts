@@ -122,15 +122,36 @@ export async function requestPort(
 		// or the list was empty, so this one message has to cover both.
 		const retry = action === "monitor" ? "click Connect again" : "click Upload again";
 		const name = boardName(board);
-		// ESP32 boards often use a CP2102 chip, which a Windows laptop may have no driver for.
-		const driver = board === "esp32" ? " Still not listed on a Windows laptop: the board's USB chip may need a driver, so ask your teacher." : "";
+		if (board === "esp32") throw new FlashError("no-port", esp32NoPortMessage(showAll, retry));
 		throw new FlashError(
 			"no-port",
 			showAll
-				? `No board chosen. Check the USB cable is plugged into the ${name} and into the computer, then ${retry}.${driver}`
+				? `No board chosen. Check the USB cable is plugged into the ${name} and into the computer, then ${retry}.`
 				: `No board chosen. Plug the ${name} in and ${retry}. The next list shows every port on the computer, so pick the one the board is on.`,
 		);
 	}
+}
+
+/**
+ * Chrome lists a port only once the operating system made one. With an ESP32
+ * that fails far more often than with an Uno: many ESP32 cables carry power
+ * only, and the CP2102 chip on many boards needs a driver on Windows. Neither
+ * can be fixed from a web page, so say exactly what to check.
+ */
+function esp32NoPortMessage(showAll: boolean, retry: string): string {
+	if (!showAll) {
+		return `No board chosen. Plug the ESP32 in and ${retry}. The next list shows every port on the computer, so pick the one the board is on.`;
+	}
+	return [
+		"No ESP32 found. If the list was empty, the computer cannot see the board yet:",
+		"1. Use a USB data cable. Many cables that come with ESP32 boards only charge. Try another cable, and plug straight into the computer, not a hub.",
+		"2. On Windows: right-click Start, open Device Manager, and look under \"Ports (COM & LPT)\". No COM port there, or a yellow warning sign, means the board's USB chip needs a driver.",
+		"   Read the small chip next to the USB socket on the board:",
+		"   CP2102 or CP2104: install the Silicon Labs \"CP210x VCP\" driver (silabs.com).",
+		"   CH340 or CH9102: install the WCH \"CH341SER\" driver (wch-ic.com).",
+		"   Installing a driver needs an administrator, so ask whoever looks after the laptop.",
+		`3. Then unplug the board, plug it back in, and ${retry}.`,
+	].join("\n");
 }
 
 // -------------------------------------------------------------------- the transport
