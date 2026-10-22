@@ -1,2 +1,10 @@
+# The editor and the legal page may be listed. Teacher, API, test and display pages may not
+# (the Worker also sends them X-Robots-Tag: noindex, see src/headers.ts).
 User-agent: *
-Disallow: /
+Allow: /
+Disallow: /api/
+Disallow: /teacher
+Disallow: /serial-test
+Disallow: /display
+
+Sitemap: https://uploadmycode.com/sitemap.xml

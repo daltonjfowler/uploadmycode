@@ -702,10 +702,11 @@ export default {
 		// /api/* is always JSON, so it always gets no-store. Everything else came
 		// from the asset server and its content-type decides whether it gets the
 		// Content-Security-Policy.
-		const kind = new URL(request.url).pathname.startsWith("/api/") ? "json" : "asset";
+		const path = new URL(request.url).pathname;
+		const kind = path.startsWith("/api/") ? "json" : "asset";
 
 		try {
-			return withSecurityHeaders(await handle(request, env), kind);
+			return withSecurityHeaders(await handle(request, env), kind, path);
 		} catch (error) {
 			console.error(
 				JSON.stringify({

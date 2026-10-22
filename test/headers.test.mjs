@@ -19,6 +19,7 @@ import { test } from "node:test";
 import {
 	CONTENT_SECURITY_POLICY,
 	httpsRedirect,
+	indexable,
 	httpsRedirectTarget,
 	PERMISSIONS_POLICY,
 	STRICT_TRANSPORT_SECURITY,
@@ -212,4 +213,32 @@ test("the CSP is strict about script and deliberately loose about style", () => 
 	assert.equal(directives.get("form-action"), "'self'");
 	assert.equal(directives.get("frame-ancestors"), "'none'");
 	assert.ok(directives.has("upgrade-insecure-requests"));
+});
+
+// ------------------------------------------------------------ search engines
+
+const page = (status = 200) =>
+	new Response("<!doctype html>", { status, headers: { "content-type": "text/html; charset=utf-8" } });
+
+test("the editor and the legal page may be listed by search engines", () => {
+	for (const path of ["/", "/index.html", "/legal", "/legal.html", "/robots.txt", "/sitemap.xml"]) {
+		const response = withSecurityHeaders(page(), "asset", path);
+		assert.equal(response.headers.get("x-robots-tag"), null, path);
+		// every other security header is still there
+		assert.equal(response.headers.get("x-frame-options"), "DENY", path);
+		assert.equal(response.headers.get("strict-transport-security"), STRICT_TRANSPORT_SECURITY, path);
+	}
+});
+
+test("teacher, API, test and display pages, icons and errors stay noindex", () => {
+	for (const path of ["/teacher", "/teacher.html", "/serial-test", "/serial-test.html", "/display", "/display.html", "/icon-512.png", "/nope"]) {
+		assert.equal(withSecurityHeaders(page(), "asset", path).headers.get("x-robots-tag"), "noindex, nofollow", path);
+	}
+	assert.equal(withSecurityHeaders(page(), "json", "/api/compile").headers.get("x-robots-tag"), "noindex, nofollow");
+	assert.equal(withSecurityHeaders(page(404), "asset", "/").headers.get("x-robots-tag"), "noindex, nofollow");
+	assert.equal(withSecurityHeaders(page(307), "asset", "/legal.html").headers.get("x-robots-tag"), "noindex, nofollow");
+	// no path at all (a redirect, an unhandled error): private
+	assert.equal(withSecurityHeaders(page(), "asset").headers.get("x-robots-tag"), "noindex, nofollow");
+	assert.equal(httpsRedirect("http://uploadmycode.com/").headers.get("x-robots-tag"), "noindex, nofollow");
+	assert.equal(indexable("/", 500), false);
 });

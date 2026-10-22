@@ -86,10 +86,28 @@ const COMMON_HEADERS: ReadonlyArray<readonly [string, string]> = [
 	["referrer-policy", "strict-origin-when-cross-origin"],
 	["permissions-policy", PERMISSIONS_POLICY],
 	["cross-origin-opener-policy", "same-origin"],
-	// An internal district tool. web/public/robots.txt says the same thing to
-	// crawlers that read it; this says it to the ones that do not.
-	["x-robots-tag", "noindex, nofollow"],
 ];
+
+/**
+ * The pages search engines may list (Dalton 2026-10-21: "open the main pages"):
+ * the editor and the legal page, plus robots.txt and the sitemap that point at
+ * them. Everything else, the teacher page, the API, the serial test, the class
+ * display, icons, scripts and every error, gets `noindex, nofollow`.
+ * web/public/robots.txt says the same thing to crawlers that read it.
+ */
+export const INDEXABLE_PATHS: ReadonlySet<string> = new Set([
+	"/",
+	"/index.html",
+	"/legal",
+	"/legal.html",
+	"/robots.txt",
+	"/sitemap.xml",
+]);
+
+/** True when a successful answer at this path may appear in search results. */
+export function indexable(pathname: string, status: number): boolean {
+	return status >= 200 && status < 300 && INDEXABLE_PATHS.has(pathname);
+}
 
 /** True for `text/html`, with or without a charset. */
 function isHtml(response: Response): boolean {
@@ -105,10 +123,16 @@ function isHtml(response: Response): boolean {
  * Response around the same body is the supported way round that, and it keeps
  * the status, the status text and every header the original had.
  */
-export function withSecurityHeaders(response: Response, kind: ResponseKind): Response {
+export function withSecurityHeaders(response: Response, kind: ResponseKind, pathname = ""): Response {
 	const copy = new Response(response.body, response);
 
 	for (const [name, value] of COMMON_HEADERS) copy.headers.set(name, value);
+	// No path given (a redirect, an error) means private: noindex is the default.
+	if (kind === "json" || !indexable(pathname, copy.status)) {
+		copy.headers.set("x-robots-tag", "noindex, nofollow");
+	} else {
+		copy.headers.delete("x-robots-tag");
+	}
 
 	if (kind === "json") copy.headers.set("cache-control", "no-store");
 	if (kind === "html" || (kind === "asset" && isHtml(copy))) {

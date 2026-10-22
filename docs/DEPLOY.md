@@ -473,7 +473,7 @@ value the asset server answered `/` on its own and the Worker never ran, so noth
 | `Referrer-Policy` | `strict-origin-when-cross-origin` | The class phrase never leaves in a URL. |
 | `Permissions-Policy` | `serial=(self), usb=(), camera=(), microphone=(), geolocation=(), payment=()` | **`serial=(self)` is load-bearing.** Drop it and Upload and the serial monitor stop working. Everything else is off by name. |
 | `Cross-Origin-Opener-Policy` | `same-origin` | A window this site opens cannot reach back into it. |
-| `X-Robots-Tag` | `noindex, nofollow` | Internal district tool. `public/robots.txt` says the same to crawlers that read it. |
+| `X-Robots-Tag` | `noindex, nofollow`, except on `/`, `/legal`, `robots.txt` and `sitemap.xml` | Since 2026-10-21 the editor and the legal page may be listed by search engines (`INDEXABLE_PATHS` in `src/headers.ts`). Teacher, API, test and display pages, icons and every error stay noindex. `public/robots.txt` says the same to crawlers that read it. |
 | `Cache-Control` | `no-store` on `/api/*` only | A phrase or a compiled sketch has no business in a shared cache or on a Chromebook's disk. |
 
 And on HTML only:
