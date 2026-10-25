@@ -14,8 +14,8 @@ FROM --platform=linux/amd64 debian:bookworm-slim@sha256:88200866dfff7ea7f5cbcb6e
 # --- pins -------------------------------------------------------------------
 # Bump a version here and update the matching sha256 from the project's release
 # checksums (nodejs.org/dist/vX/SHASUMS256.txt, arduino-cli's <ver>-checksums.txt).
-ARG NODE_VERSION=24.19.0
-ARG NODE_SHA256=14b342e71204f811bde6153be8e04b62aef63c236fef92b55f9c83154b409647
+ARG NODE_VERSION=24.22.1
+ARG NODE_SHA256=6c172a9ab6718f7b801fb5a7bd486af2ee5e32758086a04b84fcce2aa77095e6
 ARG ARDUINO_CLI_VERSION=1.5.1
 ARG ARDUINO_CLI_SHA256=28a8e119c498a25607821c36cb2dc49e8463941b261a0d99091baa7bc692dd2b
 ARG AVR_CORE_VERSION=1.8.8
