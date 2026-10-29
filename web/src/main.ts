@@ -1460,6 +1460,10 @@ document.getElementById("help")?.addEventListener("click", () => {
 	helpDialog.scrollTop = 0; // focus lands on Got it, at the bottom; start reading at the top
 });
 
+// What the site is for, next to Help (Dalton, 2026-10-28).
+const aboutDialog = document.getElementById("about-dialog") as HTMLDialogElement;
+document.getElementById("about")?.addEventListener("click", () => aboutDialog.showModal());
+
 // Ctrl-Enter (Cmd-Enter on a Mac) compiles, like the Arduino IDE's verify.
 window.addEventListener("keydown", (event) => {
 	if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {

@@ -25,7 +25,7 @@
     <!-- Blocking on purpose: sets data-theme before the first paint. -->
     <script src="/theme-boot.js"></script>
   <script src="/logo-alive.js" defer></script>
-  <script type="module" crossorigin src="/assets/index-DnbNePA0.js"></script>
+  <script type="module" crossorigin src="/assets/index-wgkwTJn8.js"></script>
   <link rel="stylesheet" crossorigin href="/assets/index-BugAVwND.css">
 </head>
 	<body>
@@ -73,6 +73,7 @@
 					⚙️ Settings
 				</button>
 				<button id="help" type="button" title="How to code, upload and use the serial monitor">ⓘ Help</button>
+				<button id="about" type="button" title="What uploadmycode is for">About</button>
 				<a class="toplink" href="/teacher.html" title="For teachers: the class phrase and settings">Teacher</a>
 
 				<!-- One group so a wrapping toolbar never splits the two buttons from
@@ -122,7 +123,7 @@
 				<div class="menu-row">
 					<span>Theme</span>
 					<!-- Cycles System, Light, Dark. src/theme.ts writes its label. -->
-					<button id="theme-toggle" type="button">🖥️ System</button>
+					<button id="theme-toggle" type="button">🌙 Dark</button>
 				</div>
 			</div>
 
@@ -164,6 +165,15 @@
 						<li>Upload is greyed out? Compile first. It only uploads what is on screen right now.</li>
 					</ul>
 					<p class="note">Your sketches stay in this browser. A sketch is sent to the server only to compile, then deleted. <a href="/legal" target="_blank" rel="noopener">Privacy &amp; legal</a></p>
+					<div class="dialog-actions"><button class="primary" value="close">Got it</button></div>
+				</form>
+			</dialog>
+
+			<dialog id="about-dialog" class="dialog">
+				<form method="dialog">
+					<h2>About uploadmycode</h2>
+					<p>uploadmycode lets you write code for an Arduino UNO, or an ESP32 when your teacher turns it on, and upload it right from Chrome. Nothing to install and no account: your code is compiled online, then sent to the board through a USB cable. It is built for classroom Chromebooks.</p>
+					<p class="note">Made by <a href="https://daltonjfowler.com" target="_blank" rel="noopener">Dalton Fowler</a>. <a href="/legal" target="_blank" rel="noopener">Privacy &amp; legal</a></p>
 					<div class="dialog-actions"><button class="primary" value="close">Got it</button></div>
 				</form>
 			</dialog>
