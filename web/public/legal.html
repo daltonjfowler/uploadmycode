@@ -7,11 +7,10 @@
   <meta name="description" content="What uploadmycode does with your code, safety, licences and trademarks.">
   <link rel="canonical" href="https://uploadmycode.com/legal">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <script src="/theme-boot.js"></script><!-- theme-boot.js: the site's saved theme (Dark when nothing is saved) as data-theme -->
   <style>
     :root { --bg: #ffffff; --ink: #14181d; --muted: #5b6570; --line: #d5dae0; --accent: #0f766e; color-scheme: light; }
-    @media (prefers-color-scheme: dark) {
-      :root { --bg: #121314; --ink: #ecedee; --muted: #a0a3a8; --line: #343639; --accent: #2dd4bf; color-scheme: dark; }
-    }
+    :root[data-theme="dark"] { --bg: #121314; --ink: #ecedee; --muted: #a0a3a8; --line: #343639; --accent: #2dd4bf; color-scheme: dark; }
     body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; padding-inline: 16px; padding-block: 24px 48px; }
     main { max-width: 68ch; margin: 0 auto; }
     h1 { font-size: 1.7rem; line-height: 1.2; margin: 0 0 4px; }

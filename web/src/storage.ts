@@ -184,10 +184,13 @@ export function saveMonitorView(view: MonitorView): void {
 /** The theme button's three settings. System follows the Chromebook. */
 export type ThemePreference = "system" | "light" | "dark";
 
-/** Default System: a student who never touches the button gets their device's theme. */
+/**
+ * Default Dark (Dalton, 2026-10-28): a student who never touches the button
+ * gets dark. Every choice is saved, System too.
+ */
 export function loadThemePreference(): ThemePreference {
 	const raw = readKey(THEME_KEY);
-	return raw === "light" || raw === "dark" ? raw : "system";
+	return raw === "light" || raw === "system" ? raw : "dark";
 }
 
 export function saveThemePreference(preference: ThemePreference): void {

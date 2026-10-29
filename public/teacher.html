@@ -18,21 +18,21 @@
 			Dalton types it once per machine; the phrase itself is not a secret and
 			is meant to be projected.
 		-->
+		<script src="/theme-boot.js"></script><!-- theme-boot.js: the site's saved theme (Dark when nothing is saved) as data-theme -->
 		<style>
 			:root {
-				color-scheme: light dark;
+				color-scheme: light;
 				--accent: #007b81;
 				--ok: #1a7f37;
 				--danger: #b3261e;
 				--line: #d5dae0;
 			}
-			@media (prefers-color-scheme: dark) {
-				:root {
-					--accent: #2f9ea4;
-					--ok: #3fb950;
-					--danger: #f85149;
-					--line: #30363d;
-				}
+			:root[data-theme="dark"] {
+				color-scheme: dark;
+				--accent: #2f9ea4;
+				--ok: #3fb950;
+				--danger: #f85149;
+				--line: #30363d;
 			}
 			body {
 				margin: 0 auto;

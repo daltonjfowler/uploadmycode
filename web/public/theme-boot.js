@@ -18,8 +18,9 @@
 	} catch (e) {
 		// Site data blocked: fall through to System.
 	}
+	// Nothing saved yet: Dark (Dalton, 2026-10-28). System is saved as "system" once picked.
 	var dark =
-		pref === "dark" ||
-		(pref !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+		pref !== "light" &&
+		(pref !== "system" || window.matchMedia("(prefers-color-scheme: dark)").matches);
 	document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
 })();

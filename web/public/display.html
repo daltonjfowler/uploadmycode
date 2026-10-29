@@ -21,9 +21,10 @@
 			teacher page alone. All it does is GET /api/teacher/phrase every five
 			seconds, which the Worker never rate limits for a correct key.
 		-->
+		<script src="/theme-boot.js"></script><!-- theme-boot.js: the site's saved theme (Dark when nothing is saved) as data-theme -->
 		<style>
 			:root {
-				color-scheme: light dark;
+				color-scheme: light;
 				--ok: #1a7f37;
 				--line: #d5dae0;
 				/*
@@ -34,11 +35,10 @@
 				*/
 				--chars: 12;
 			}
-			@media (prefers-color-scheme: dark) {
-				:root {
-					--ok: #3fb950;
-					--line: #30363d;
-				}
+			:root[data-theme="dark"] {
+				color-scheme: dark;
+				--ok: #3fb950;
+				--line: #30363d;
 			}
 			html,
 			body {
