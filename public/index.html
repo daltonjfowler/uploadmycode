@@ -25,8 +25,8 @@
     <!-- Blocking on purpose: sets data-theme before the first paint. -->
     <script src="/theme-boot.js"></script>
   <script src="/logo-alive.js" defer></script>
-  <script type="module" crossorigin src="/assets/index-wgkwTJn8.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-BugAVwND.css">
+  <script type="module" crossorigin src="/assets/index-C-6vYq3J.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-BfLA6PyP.css">
 </head>
 	<body>
 		<div class="app">
@@ -73,6 +73,7 @@
 					⚙️ Settings
 				</button>
 				<button id="help" type="button" title="How to code, upload and use the serial monitor">ⓘ Help</button>
+				<button id="reference" type="button" title="Where to read about the commands and libraries you can use">📖 Reference</button>
 				<button id="about" type="button" title="What uploadmycode is for">About</button>
 				<a class="toplink" href="/teacher.html" title="For teachers: the class phrase and settings">Teacher</a>
 
@@ -156,7 +157,7 @@
 						<tr><td>Find &amp; replace</td><td><kbd>Ctrl</kbd>+<kbd>F</kbd>, then <kbd>F3</kbd> for the next one</td></tr>
 						<tr><td>Undo / redo</td><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> · <kbd>Ctrl</kbd>+<kbd>Y</kbd></td></tr>
 						<tr><td>Tidy the spacing</td><td><em>Auto indent</em> (Undo puts it back)</td></tr>
-						<tr><td>Add a library</td><td>Pick it from the library list. It adds the <code>#include</code> line. Not in the list? <em>Add your own library</em> takes its <code>.zip</code>.</td></tr>
+						<tr><td>Add a library</td><td>Pick it from the library list. It adds the <code>#include</code> line. Not in the list? <em>Add your own library</em> takes its <code>.zip</code>. What a library does: <em>📖 Reference</em>.</td></tr>
 					</table>
 					<h3>Upload trouble</h3>
 					<ul class="steps">
@@ -165,6 +166,25 @@
 						<li>Upload is greyed out? Compile first. It only uploads what is on screen right now.</li>
 					</ul>
 					<p class="note">Your sketches stay in this browser. A sketch is sent to the server only to compile, then deleted. <a href="/legal" target="_blank" rel="noopener">Privacy &amp; legal</a></p>
+					<div class="dialog-actions"><button class="primary" value="close">Got it</button></div>
+				</form>
+			</dialog>
+
+			<!-- The lists are drawn by main.ts from src/reference.ts. The ESP32 part
+			     stays hidden unless a teacher has ESP32 switched on, like the board picker. -->
+			<dialog id="reference-dialog" class="dialog">
+				<form method="dialog">
+					<h2>Reference</h2>
+					<p>Where to read about the commands and libraries you can use here. Links open in a new tab.</p>
+					<ul id="reference-any" class="reference"></ul>
+					<h3>UNO libraries</h3>
+					<ul id="reference-uno" class="reference"></ul>
+					<div id="reference-esp32" hidden>
+						<h3>ESP32 libraries</h3>
+						<p class="note">For the ESP32 only. Use these when your board is set to ESP32.</p>
+						<ul id="reference-esp32-list" class="reference"></ul>
+					</div>
+					<p class="note">Libraries you upload yourself: look at where you downloaded them.</p>
 					<div class="dialog-actions"><button class="primary" value="close">Got it</button></div>
 				</form>
 			</dialog>

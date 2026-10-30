@@ -5,8 +5,9 @@
  * THIS LIST MUST STAY IN SYNC WITH `container/Dockerfile`. The first five are
  * installed by its `arduino-cli lib install` lines; the last four ship inside
  * the AVR core (`arduino:avr`) itself and so have no install line. Adding a
- * library is two edits and nothing else: an install line in the Dockerfile with
- * an exact version, and an entry here.
+ * library is three edits and nothing else: an install line in the Dockerfile with
+ * an exact version, an entry here, and its links in reference.ts (the 📖
+ * Reference dialog; `npm test` fails if that one is forgotten).
  *
  * The one mismatch is deliberate: the Dockerfile also installs Arduino SensorKit's
  * two dependencies (DHT20 and the LIS3DHTR accelerometer), which are NOT listed

@@ -22,6 +22,7 @@ import { errorLines, firstErrorSummary, parseCompileErrors, type CompileError } 
 import { formatEdit, requestFormat } from "./format.ts";
 import { HexParseError, parseIntelHex } from "./flash/intel-hex.ts";
 import { findIncludeLine, insertInclude, LIBRARIES } from "./libraries.ts";
+import { REFERENCE, type ReferenceEntry } from "./reference.ts";
 import { addLibrary, LibraryProblem, libraryBytes, parseStoredLibraries, readLibrary, type UserLibrary } from "./user-libraries.ts";
 import { initMenus } from "./menus.ts";
 import {
@@ -844,6 +845,7 @@ boardSelect.addEventListener("change", () => {
 void requestBoards().then((boards) => {
 	const esp32 = boards.includes("esp32");
 	boardSelect.hidden = !esp32;
+	el<HTMLDivElement>("reference-esp32").hidden = !esp32;
 	if (!esp32) {
 		if (currentBoard !== "uno") setBoard("uno");
 		return;
@@ -1319,6 +1321,7 @@ function renderLibraryList(): void {
 		placeholder,
 		...LIBRARIES.map((library) => new Option(`${library.label} - ${library.note}`, library.header)),
 		own,
+		new Option("📖 What do these do? Reference…", SHOW_REFERENCE),
 	);
 }
 
@@ -1326,6 +1329,7 @@ function renderLibraryList(): void {
 
 const ADD_LIBRARY = ":add"; // a colon is never in a header name
 const MANAGE_LIBRARIES = ":manage";
+const SHOW_REFERENCE = ":reference";
 let userLibraries: UserLibrary[] = parseStoredLibraries(loadUserLibrariesRaw());
 const userLibFile = el<HTMLInputElement>("userlib-file");
 const userLibsDialog = el<HTMLDialogElement>("userlibs-dialog");
@@ -1383,6 +1387,7 @@ librarySelect.addEventListener("change", () => {
 	librarySelect.selectedIndex = 0;
 	if (header === "") return;
 	if (header === ADD_LIBRARY) return userLibFile.click();
+	if (header === SHOW_REFERENCE) return openReference();
 	if (header === MANAGE_LIBRARIES) {
 		renderUserLibs();
 		userLibsDialog.showModal();
@@ -1459,6 +1464,35 @@ document.getElementById("help")?.addEventListener("click", () => {
 	helpDialog.showModal();
 	helpDialog.scrollTop = 0; // focus lands on Got it, at the bottom; start reading at the top
 });
+
+// Where to read about the language and each bundled library (Dalton,
+// 2026-10-29). Drawn once from src/reference.ts; the ESP32 list is unhidden
+// with the board picker, in the requestBoards() handler above.
+const referenceDialog = el<HTMLDialogElement>("reference-dialog");
+
+function referenceItem(entry: ReferenceEntry): HTMLLIElement {
+	const li = document.createElement("li");
+	li.append(Object.assign(document.createElement("strong"), { textContent: entry.name }));
+	if (entry.header) li.append(" ", Object.assign(document.createElement("code"), { textContent: `#include <${entry.header}>` }));
+	li.append(Object.assign(document.createElement("span"), { className: "reference-about", textContent: entry.about }));
+	const links = Object.assign(document.createElement("span"), { className: "reference-links" });
+	links.append(...entry.links.map((link) =>
+		Object.assign(document.createElement("a"), { href: link.url, textContent: link.label, target: "_blank", rel: "noopener" }),
+	));
+	li.append(links);
+	return li;
+}
+
+for (const board of ["any", "uno", "esp32"] as const) {
+	const list = el<HTMLUListElement>(board === "esp32" ? "reference-esp32-list" : `reference-${board}`);
+	list.replaceChildren(...REFERENCE.filter((entry) => entry.board === board).map(referenceItem));
+}
+
+function openReference(): void {
+	referenceDialog.showModal();
+	referenceDialog.scrollTop = 0;
+}
+el<HTMLButtonElement>("reference").addEventListener("click", openReference);
 
 // What the site is for, next to Help (Dalton, 2026-10-28).
 const aboutDialog = document.getElementById("about-dialog") as HTMLDialogElement;

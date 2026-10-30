@@ -463,6 +463,36 @@ select {
 .dialog .note a {
 	color: inherit;
 }
+/* 📖 Reference: one row per library, name and include on top, what it is
+   for under that, then its links. Long names and URLs-as-words wrap instead of
+   widening the dialog on a phone. */
+.reference {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+.reference li {
+	padding: 0.45rem 0;
+	border-bottom: 1px solid var(--border);
+	overflow-wrap: anywhere;
+}
+.reference code {
+	font-size: 0.8rem;
+	color: var(--muted);
+}
+.reference-about {
+	display: block;
+	font-size: 0.9rem;
+}
+.reference-links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.2rem 0.9rem;
+	font-size: 0.9rem;
+}
+.reference a {
+	color: var(--accent);
+}
 .userlibs {
 	list-style: none;
 	padding: 0;
@@ -988,6 +1018,11 @@ button.link {
 	}
 	button {
 		min-width: 2.5rem;
+	}
+	.reference-links a {
+		display: inline-flex;
+		align-items: center;
+		min-height: 2.5rem;
 	}
 	.phrase-form input[type="text"] {
 		height: 2.5rem;
