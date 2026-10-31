@@ -40,7 +40,10 @@
   // Rolling class phrase lives here (T5). Key "phrase", written with an expirationTtl by the
   // teacher endpoint; read on every compile.
   "kv_namespaces": [
-    { "binding": "CLASS_KV", "id": "1826452392d7425b96e48aa005f9be77" }
+    { "binding": "CLASS_KV", "id": "1826452392d7425b96e48aa005f9be77" },
+    // Teacher accounts (src/teachers.ts): ONE namespace shared by all four uploadmy sites on purpose,
+    // so a password works everywhere. Holds names and salted password hashes, never passwords.
+    { "binding": "TEACHERS_KV", "id": "6c37dd40d71545e989448c728031746e" }
   ],
 
   // The per-address brake on guessing the class phrase. Every compile or format
@@ -68,6 +71,9 @@
     // A var, not a secret: it is not sensitive and it belongs in version control.
     "ALLOWED_CIDRS": ""
   },
+
+  // Secrets: TEACHER_SESSION_KEY signs teacher sessions; TEACHER_KEY (+ _2) is the old shared key, still
+  // accepted until deleted. npx wrangler secret put <NAME>, value piped in, never typed on the command line.
 
   "observability": {
     "enabled": true,

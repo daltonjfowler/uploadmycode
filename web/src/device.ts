@@ -5,10 +5,11 @@
  * The Worker keys its wrong-guess lockout on it (src/lockout.ts), so a student
  * who types the phrase wrong five times locks only this Chromebook, never the
  * room: the whole school shares one public address. It is not a secret and not
- * a credential. teacher.js and display.js keep the same id under the same key.
+ * a credential. The teacher page (teacher.ts) uses this module; display.js keeps
+ * the same id under the same key.
  */
 
-/** Shared with web/public/teacher.js and web/public/display.js. */
+/** Shared with web/public/display.js. */
 const DEVICE_KEY = "umc.device";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 

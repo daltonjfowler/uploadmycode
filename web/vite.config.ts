@@ -19,6 +19,14 @@ export default defineConfig({
 		// Chrome. Default browser targets are fine; keep the sourcemap off so the
 		// deployed asset payload stays small.
 		sourcemap: false,
+		// Two pages: the editor and the teacher page (sign-in, phrase, boards).
+		// The other pages in web/public/ are plain files Vite copies as they are.
+		rollupOptions: {
+			input: {
+				main: "index.html",
+				teacher: "teacher.html",
+			},
+		},
 	},
 	server: {
 		// `npm run dev:web` serves the editor; the compile API comes from the

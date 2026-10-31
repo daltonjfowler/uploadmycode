@@ -1,0 +1,31 @@
+/* Teacher sign-in (teacher-account.ts), the same file on all four uploadmy sites. Buttons and inputs keep
+   each site's own look; this only lays them out. Colours follow the text colour, so light and dark work. */
+.ta-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px; margin: 6px 0; }
+.ta-form label { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1 1 200px; max-width: 320px; }
+.ta-form label > span { font-size: .85rem; opacity: .8; }
+.ta-form select, .ta-form input { width: 100%; box-sizing: border-box; }
+.ta-msg { min-height: 1.2em; margin: 6px 0; }
+.ta-msg[data-tone="error"] { color: #dc2626; font-weight: 600; }
+.ta-msg[data-tone="ok"] { color: #16a34a; }
+@media (prefers-color-scheme: dark) { .ta-msg[data-tone="error"] { color: #f87171; } .ta-msg[data-tone="ok"] { color: #4ade80; } }
+:root[data-theme="dark"] .ta-msg[data-tone="error"] { color: #f87171; }
+:root[data-theme="dark"] .ta-msg[data-tone="ok"] { color: #4ade80; }
+:root[data-theme="light"] .ta-msg[data-tone="error"] { color: #dc2626; }
+:root[data-theme="light"] .ta-msg[data-tone="ok"] { color: #16a34a; }
+.ta-note { font-size: .88rem; opacity: .8; margin: 6px 0; }
+.ta-hello { font-weight: 600; margin: 6px 0; }
+.ta-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.ta-who { margin: 0; margin-right: auto; }
+.ta-sub { margin: 8px 0; padding: 10px 12px; border: 1px solid color-mix(in srgb, currentColor 22%, transparent); border-radius: 8px; }
+.ta-details { margin: 10px 0; padding: 8px 12px; border: 1px solid color-mix(in srgb, currentColor 22%, transparent); border-radius: 8px; }
+.ta-details > summary { cursor: pointer; font-weight: 600; }
+.ta-people { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; }
+.ta-people li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.ta-pname { font-weight: 600; min-width: 7em; }
+.ta-pstate { font-size: .85rem; opacity: .75; margin-right: auto; }
+.ta-quiet { opacity: .8; }
+.ta-code { margin: 8px 0; padding: 10px 12px; border: 2px dashed color-mix(in srgb, currentColor 45%, transparent); border-radius: 8px; }
+.ta-code p { margin: 4px 0; }
+.ta-codetext { font-family: ui-monospace, Consolas, monospace; font-size: 1.25rem; letter-spacing: .06em; user-select: all; }
+.ta-changes { margin: 8px 0 2px; padding-left: 0; list-style: none; display: grid; gap: 4px; font-size: .92rem; }
+.ta-when { opacity: .7; font-size: .85rem; }

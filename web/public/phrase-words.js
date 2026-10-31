@@ -1,7 +1,7 @@
 /**
  * The words the teacher page's Generate button draws from, and the generator.
  *
- * A plain script, like teacher.js, loaded just before it by teacher.html. It is
+ * A plain script, loaded by teacher.html before the page's module. It is
  * a file of its own so web/test/phrase-words.test.mjs can load exactly this
  * list and check it, rather than a copy.
  *

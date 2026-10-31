@@ -41,8 +41,14 @@ import {
 	readActivePhrase,
 	type CompileCounters,
 } from "./compile-gate.ts";
-import { boardFromHeader, BOARDS_KEY, boardSettings, boardsRecordFor, type BoardSettings } from "./boards.ts";
-import { anyKeyEquals } from "./constant-time.ts";
+import {
+	boardFromHeader,
+	BOARDS_KEY,
+	boardSettings,
+	boardsRecordFor,
+	type BoardSettings,
+	type BoardsRecord,
+} from "./boards.ts";
 import { httpsRedirect, withSecurityHeaders } from "./headers.ts";
 import { json } from "./http.ts";
 import {
@@ -76,6 +82,17 @@ import {
 	type RateVerdict,
 } from "./ratelimit.ts";
 import { minutesPhrase, TeacherKeyGuard, type GuardVerdict } from "./teacher-guard.ts";
+import {
+	AccountError,
+	accountRoute,
+	checkCredential,
+	logChange,
+	readSignIn,
+	setupAllows,
+	signInOptions,
+	type PasswordCredential,
+	type Who,
+} from "./teachers.ts";
 
 /**
  * Fixed pause before every teacher-key rejection. It costs a guesser a third of
@@ -310,21 +327,21 @@ function countersStub(env: Env): DurableObjectStub<Counters> {
 
 // ---------------------------------------------------------------- teacher key
 
-async function teacherAuthorized(request: Request, env: Env): Promise<boolean> {
-	// TEACHER_KEY_2: an optional second teacher (a student teacher); delete that secret to remove them.
+/** Some way in is set up: the old shared key, or teacher accounts. Nothing set up = no teacher endpoint. */
+function teacherSignInSetUp(env: Env): boolean {
+	// TEACHER_KEY_2: the old second shared key (a student teacher); delete that secret to remove it.
 	const second = (env as { TEACHER_KEY_2?: string }).TEACHER_KEY_2;
-	const keys = [env.TEACHER_KEY, second].filter((k): k is string => !!k);
-	// No secret uploaded means no teacher endpoint at all. Never fall open.
-	if (!keys.length) {
-		console.error(JSON.stringify({ message: "TEACHER_KEY is not set; teacher endpoint refused" }));
-		return false;
-	}
-	return await anyKeyEquals(request.headers.get("x-teacher-key") ?? "", keys);
+	return !!(env.TEACHER_KEY || second || (env.TEACHERS_KV && env.TEACHER_SESSION_KEY));
 }
 
 /**
- * The door on every /api/teacher/* request. Returns the refusal to send, or
- * null when the key was right and the request may go on.
+ * The door on every /api/teacher/* request. Returns who it is, or the refusal
+ * to send.
+ *
+ * `cred` is what the teacher sent: on POST /api/teacher/signin the name and
+ * password from the body, otherwise the x-teacher-key header (a session, or the
+ * old shared key). src/teachers.ts says whether it is right; a wrong password,
+ * start code or session counts exactly like a wrong key.
  *
  * First the short per-device lockout (src/lockout.ts): five wrong keys in a
  * row from one device (its x-device-id; the address only when none is sent)
@@ -332,11 +349,10 @@ async function teacherAuthorized(request: Request, env: Env): Promise<boolean> {
  * refused before its key is compared. Dalton's call (2026-09-28). Per device,
  * so a student typing wrong keys locks only their own Chromebook, never the
  * teacher's.
- * Then the key, in constant time. Only a wrong key touches the coarse
- * site-wide guard, and only a wrong key can ever be refused by it. See
- * src/teacher-guard.ts.
+ * Then the credential. Only a wrong one touches the coarse site-wide guard,
+ * and only a wrong one can ever be refused by it. See src/teacher-guard.ts.
  */
-async function teacherGate(request: Request, env: Env): Promise<Response | null> {
+async function teacherGate(request: Request, env: Env, cred: string | PasswordCredential): Promise<Who | Response> {
 	const ip = request.headers.get("cf-connecting-ip") ?? "";
 	const lockout = cacheLockoutStore();
 	const now = Date.now();
@@ -344,9 +360,15 @@ async function teacherGate(request: Request, env: Env): Promise<Response | null>
 	const lock = await readLock(lockout, "teacher", subject, now);
 	if (lock.retryAfterSeconds > 0) return lockedResponse(lock.retryAfterSeconds);
 
-	if (await teacherAuthorized(request, env)) {
-		await clearLock(lockout, "teacher", subject, lock);
-		return null;
+	// Nothing set up means no teacher endpoint at all. Never fall open.
+	if (!teacherSignInSetUp(env)) {
+		console.error(JSON.stringify({ message: "no teacher key or accounts set up; teacher endpoint refused" }));
+	} else {
+		const who = await checkCredential(env, cred, now);
+		if (who !== null) {
+			await clearLock(lockout, "teacher", subject, lock);
+			return who;
+		}
 	}
 	await recordWrong(lockout, "teacher", subject, lock, now);
 
@@ -365,11 +387,15 @@ async function teacherGate(request: Request, env: Env): Promise<Response | null>
 			{ "retry-after": String(guard.retryAfterSeconds) },
 		);
 	}
-	return json(403, { ok: false, error: "Wrong teacher key." });
+	// 401: the teacher page (web/src/teacher-account.ts) reads it as "sign in again".
+	return json(401, { ok: false, error: "Wrong teacher key." });
 }
 
+/** Writes one line to the teacher page's "Recent changes" (src/teachers.ts). */
+type LogChange = (what: string) => Promise<void>;
+
 /** GET / POST / DELETE /api/teacher/phrase. The key is already checked. */
-async function teacherPhrase(request: Request, env: Env): Promise<Response> {
+async function teacherPhrase(request: Request, env: Env, changed: LogChange): Promise<Response> {
 	const method = request.method;
 	if (method !== "GET" && method !== "POST" && method !== "DELETE") {
 		return json(
@@ -381,6 +407,7 @@ async function teacherPhrase(request: Request, env: Env): Promise<Response> {
 
 	if (method === "DELETE") {
 		await env.CLASS_KV.delete(PHRASE_KEY);
+		await changed("Ended the class phrase");
 		return json(200, { ok: true, phrase: null });
 	}
 
@@ -422,6 +449,7 @@ async function teacherPhrase(request: Request, env: Env): Promise<Response> {
 	const record: PhraseRecord = { phrase, expiresAt };
 	// expirationTtl is KV's own cleanup. expiresAt is what the Worker enforces.
 	await env.CLASS_KV.put(PHRASE_KEY, JSON.stringify(record), { expirationTtl: ttlSeconds });
+	await changed("Set the class phrase");
 
 	return json(200, { ok: true, phrase, expiresAt });
 }
@@ -430,7 +458,7 @@ async function teacherPhrase(request: Request, env: Env): Promise<Response> {
  * GET / POST /api/teacher/boards. The key is already checked.
  * POST { esp32: boolean, wifiToolsSeconds?: number } — see src/boards.ts.
  */
-async function teacherBoards(request: Request, env: Env): Promise<Response> {
+async function teacherBoards(request: Request, env: Env, changed: LogChange): Promise<Response> {
 	if (request.method === "GET") return json(200, { ok: true, ...(await readBoards(env)) });
 	if (request.method !== "POST") {
 		return json(405, { ok: false, error: "Use GET or POST for /api/teacher/boards." }, { allow: "GET, POST" });
@@ -448,9 +476,22 @@ async function teacherBoards(request: Request, env: Env): Promise<Response> {
 	const now = Date.now();
 	const record = boardsRecordFor(body, now);
 	if (typeof record === "string") return json(400, { ok: false, error: record });
+	const before = await readBoards(env);
 	await env.CLASS_KV.put(BOARDS_KEY, JSON.stringify(record));
 	console.log(JSON.stringify({ event: "boards-set", esp32: record.esp32, wifiTools: record.wifiToolsUntil > 0 }));
+	await changed(boardsChange(before, record, now));
 	return json(200, { ok: true, ...boardSettings(record, now) });
+}
+
+/** The "Recent changes" line for one board switch. */
+function boardsChange(before: BoardSettings, after: BoardsRecord, now: number): string {
+	if (!after.esp32) return "Turned ESP32 off";
+	if (after.wifiToolsUntil > 0) {
+		const minutes = Math.round((after.wifiToolsUntil - now) / 60000);
+		return "Switched the ESP32 Wi-Fi safety failsafe off for " + minutes + " minutes";
+	}
+	if (before.esp32 && before.allowWifiTools) return "Switched the ESP32 Wi-Fi safety failsafe back on";
+	return "Turned ESP32 on";
 }
 
 /**
@@ -669,17 +710,38 @@ async function handle(request: Request, env: Env): Promise<Response> {
 		return await queuePosition(request, env);
 	}
 
-	// Everything under /api/teacher/ needs the key, including paths that do not
-	// exist: a stranger should not be able to map the endpoint by poking at it.
-	if (url.pathname.startsWith("/api/teacher/")) {
-		const refused = await teacherGate(request, env);
-		if (refused !== null) return refused;
-
-		if (url.pathname === "/api/teacher/phrase") {
-			return await teacherPhrase(request, env);
+	// The teacher sign-in list: names only, never anything secret.
+	if (url.pathname === "/api/teachers") {
+		if (request.method !== "GET") {
+			return json(405, { ok: false, error: "Use GET for /api/teachers." }, { allow: "GET" });
 		}
-		if (url.pathname === "/api/teacher/boards") {
-			return await teacherBoards(request, env);
+		return json(200, await signInOptions(env));
+	}
+
+	// Everything under /api/teacher/ needs a teacher, including paths that do not
+	// exist: a stranger should not be able to map the endpoint by poking at it.
+	// Signing in sends the name and password in the body; every other call sends
+	// the session (or the old shared key) in x-teacher-key.
+	if (url.pathname.startsWith("/api/teacher/")) {
+		const path = url.pathname;
+		const cred =
+			path === "/api/teacher/signin" && request.method === "POST"
+				? await readSignIn(request)
+				: (request.headers.get("x-teacher-key") ?? "");
+		const who = await teacherGate(request, env, cred);
+		if (who instanceof Response) return who;
+		if (who.setup && !setupAllows(path)) {
+			return json(403, { ok: false, error: "Choose your own password first." });
+		}
+		const account = await accountRoute(request, path, env, env.CLASS_KV, who, cred, Date.now());
+		if (account !== null) return account;
+		const changed: LogChange = (what) => logChange(env.CLASS_KV, who, what, Date.now());
+
+		if (path === "/api/teacher/phrase") {
+			return await teacherPhrase(request, env, changed);
+		}
+		if (path === "/api/teacher/boards") {
+			return await teacherBoards(request, env, changed);
 		}
 		return json(404, { ok: false, error: "Unknown API route." });
 	}
@@ -708,6 +770,10 @@ export default {
 		try {
 			return withSecurityHeaders(await handle(request, env), kind, path);
 		} catch (error) {
+			// A sign-in body that is too large or not JSON (readSignIn in src/teachers.ts).
+			if (error instanceof AccountError) {
+				return withSecurityHeaders(json(error.status, { ok: false, error: error.message }), "json");
+			}
 			console.error(
 				JSON.stringify({
 					message: "unhandled worker error",

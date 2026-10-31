@@ -79,7 +79,12 @@ npx wrangler kv namespace create CLASS_KV
 It prints a block containing a new `id`. Put **that** id in `wrangler.jsonc` in place of the one
 above, keeping `"binding": "CLASS_KV"` exactly as it is — the Worker looks the binding up by name.
 
-This namespace holds exactly one key, `phrase`, which is today's class phrase and its expiry.
+This namespace holds the class phrase and its expiry, the board switches and the teacher page's
+list of recent changes.
+
+The `TEACHERS_KV` line next to it in `wrangler.jsonc` is the author's too (teacher accounts,
+shared by the author's sites). Make your own the same way (`npx wrangler kv namespace create TEACHERS_KV`) and put its id
+there.
 
 ### The custom domain — remove it unless you own one
 
@@ -150,6 +155,9 @@ show, values never do.
 Deploying without this is safe but useless: the teacher endpoint refuses everyone until the secret
 exists, so no phrase can be set and nobody can compile.
 
+For teacher accounts (each teacher signs in with their own password), also set
+`TEACHER_SESSION_KEY` the same way, to another long random value. It signs the sign-in sessions.
+
 ## A6. Deploy
 
 ```sh
@@ -170,9 +178,10 @@ wrong.
 
 1. **Open the URL.** The editor loads: a toolbar, a code editor with a blank sketch template, an
    Output panel, a collapsed Serial Monitor strip. If you get a 404, the deploy did not finish.
-2. **Open `<your-url>/teacher.html`.** Paste the teacher key from A5 into the Teacher key field and
-   press **Remember on this machine**, then press **Refresh**. It should answer `no phrase set`
-   rather than an error. *An error here means the secret is missing or does not match — redo A5.*
+2. **Open `<your-url>/teacher.html`.** Pick **Shared key**, paste the teacher key from A5 and press
+   **Sign in**. The phrase box should show `no phrase set` rather than an error. *An error here
+   means the secret is missing or does not match — redo A5.* Then open **Teacher accounts**, add
+   yourself, and sign in with the start code to choose your own password.
 3. **Press Generate, pick a duration, press Set phrase.** The phrase appears in large type with a
    countdown. *A KV error here means the namespace id in A4 is still the author's — redo A4.*
 4. **Go back to the editor and press Compile.** It asks for the class phrase; type the one from

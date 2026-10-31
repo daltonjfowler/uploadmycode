@@ -2,7 +2,7 @@
 	"use strict";
 
 	var API = "/api/teacher/phrase";
-	/* The very same entry teacher.js writes. Same origin, so it is simply there. */
+	/* The very same entry the teacher page's sign-in writes. Same origin, so it is simply there. */
 	var KEY_STORAGE = "uploadmycode.teacherKey";
 	/* Five seconds. A GET with the right key is never rate limited: see the
 	   teacher gate in src/worker.ts, where a correct key is compared first and
@@ -35,10 +35,10 @@
 	var offline = false;
 	/* One request at a time, so a slow answer cannot stack up behind the timer. */
 	var polling = false;
-	/* A key the Worker refused. Not sent again: a projector re-sending a wrong
-	   key every five seconds would keep this device in the wrong-key
-	   lockout (src/lockout.ts) and hold the teacher page out with it. A new
-	   key saved on the teacher page is different, so polling resumes. */
+	/* A sign-in the Worker refused. Not sent again: a projector re-sending a
+	   wrong one every five seconds would keep this device in the wrong-key
+	   lockout (src/lockout.ts) and hold the teacher page out with it. Signing
+	   in again on the teacher page saves a new one, so polling resumes. */
 	var refusedKey = "";
 
 	function loadKey() {
@@ -69,7 +69,7 @@
 		}
 
 		if (state === "nokey") {
-			phraseEl.textContent = "Open the teacher page on this computer first.";
+			phraseEl.textContent = "Sign in on the teacher page on this computer first.";
 			subEl.textContent = "";
 			return;
 		}
@@ -180,7 +180,8 @@
 		}
 
 		/*
-		 * 403 is a key the Worker refused. 429 is the site-wide wrong-key guard,
+		 * 401 is a sign-in the Worker refused (403: a start-code sign-in that
+		 * has not chosen a password yet). 429 is the site-wide wrong-key guard,
 		 * which a correct key never meets, so it means the same thing here. Both
 		 * are fixed on the teacher page and nowhere else, so both say so.
 		 */
@@ -193,7 +194,7 @@
 			return;
 		}
 
-		if (result.status === 403 || result.status === 429) {
+		if (result.status === 401 || result.status === 403 || result.status === 429) {
 			offline = false;
 			state = "nokey";
 			expiresAt = 0;
@@ -222,7 +223,7 @@
 		polling = true;
 		fetchPhrase(key).then(function (result) {
 			polling = false;
-			if (result.status === 403) refusedKey = key;
+			if (result.status === 401 || result.status === 403) refusedKey = key;
 			apply(result);
 		});
 	}

@@ -37,6 +37,14 @@ row per DEVICE (`x-device-id`, `web/src/device.ts`; no id = per IP) lock 5 s, do
 checked before the compare, cleared by a right answer. Never key it per IP (Dalton 2026-09-28: a
 school shares one IP).
 
+Teacher accounts (Dalton 2026-10-30): `src/teachers.ts` (server) and `web/src/teacher-account.ts` + `.css`
+(teacher page) are the SAME files on all four uploadmy sites: change one, copy to all four. Each teacher picks
+their own password (start code first); accounts live in the shared `TEACHERS_KV` namespace, sessions are signed
+with this site's `TEACHER_SESSION_KEY` secret and sent as `x-teacher-key` (display.js reads the same
+`uploadmycode.teacherKey` entry). The old shared `TEACHER_KEY`(_2) still works until those secrets are deleted.
+A wrong key, password or session is a 401 and counts in the lockout above. Teacher changes are logged with the
+name (`logChange`, "Recent changes"). The teacher page is a Vite page now (`web/teacher.html` + `web/src/teacher.ts`).
+
 ## Code navigation: Serena (Dalton 2026-10-10)
 Use the Serena MCP tools by default in this repo. Start with `activate_project` on this repo's root folder
 (config in `.serena/project.yml`), then `get_symbols_overview` / `find_symbol` / `find_referencing_symbols`

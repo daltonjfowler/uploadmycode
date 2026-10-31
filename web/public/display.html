@@ -11,14 +11,14 @@
 			the teacher drags it onto the projector screen; it shows today's phrase
 			and nothing else, as large as the window allows.
 
-			Static, like teacher.html: no build step, no imports, no dependencies.
+			Static: no build step, no imports, no dependencies.
 			Its script is a plain file, display.js, and not an inline block, because
 			the site's Content-Security-Policy allows no inline script at all.
 
-			It reads the teacher key out of the same localStorage entry teacher.js
-			writes, which works because this page is served from the same origin.
-			It never asks for the key and never writes one: key entry lives on the
-			teacher page alone. All it does is GET /api/teacher/phrase every five
+			It reads the teacher's sign-in out of the same localStorage entry the
+			teacher page writes, which works because this page is served from the
+			same origin. It never asks for a password and never writes one: signing
+			in lives on the teacher page alone. All it does is GET /api/teacher/phrase every five
 			seconds, which the Worker never rate limits for a correct key.
 		-->
 		<script src="/theme-boot.js"></script><!-- theme-boot.js: the site's saved theme (Dark when nothing is saved) as data-theme -->

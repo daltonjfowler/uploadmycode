@@ -7,18 +7,21 @@
 		<meta name="color-scheme" content="light dark" />
 		<title>uploadmycode - teacher</title>
 		<!--
-			The teacher's page. Static: no build step, no imports, no dependencies,
-			so it keeps working even if the editor bundle ever breaks. Vite copies
-			web/public/ into public/ untouched. Its script is a plain file,
-			teacher.js, and not an inline block, because the site's
+			The teacher's page, a Vite page of its own (web/src/teacher.ts), so it
+			shares nothing with the editor bundle but the small sign-in module. Its
+			script is a file, not an inline block, because the site's
 			Content-Security-Policy allows no inline script at all.
 
-			It talks to /api/teacher/phrase with the TEACHER_KEY secret in an
-			x-teacher-key header. The key is kept in this browser's localStorage so
-			Dalton types it once per machine; the phrase itself is not a secret and
-			is meant to be projected.
+			Each teacher signs in with their own name and password
+			(web/src/teacher-account.ts, the same file on all four uploadmy sites).
+			The session is kept in this browser's localStorage and sent as
+			x-teacher-key to /api/teacher/*; the projector window (/display) reads
+			the same entry. The phrase itself is not a secret and is meant to be
+			projected.
 		-->
 		<script src="/theme-boot.js"></script><!-- theme-boot.js: the site's saved theme (Dark when nothing is saved) as data-theme -->
+		<!-- Blocking on purpose: teacher.ts reads its generator, and a module script runs after this one. -->
+		<script src="/phrase-words.js"></script>
 		<style>
 			:root {
 				color-scheme: light;
@@ -174,25 +177,12 @@
 			Set the class phrase. Students type it once per tab; nobody can compile without it.
 		</p>
 
-		<h2>Teacher key</h2>
-		<form id="key-form" class="row">
-			<!-- a fixed user name, so the browser's password manager can save and fill the key -->
-			<input type="text" name="username" autocomplete="username" value="teacher" hidden />
-			<div>
-				<label for="key">Kept in this browser only</label>
-				<input id="key" name="password" type="password" autocomplete="current-password" placeholder="teacher key" />
-			</div>
-			<div class="fixed">
-				<button type="submit">Open</button>
-			</div>
-			<div class="fixed">
-				<button id="remember" type="button">Remember on this machine</button>
-			</div>
-			<div class="fixed">
-				<button id="forget" type="button" class="link">Forget key on this device</button>
-			</div>
-		</form>
+		<h2>Teacher sign-in</h2>
+		<!-- src/teacher-account.ts: sign in, choose a password, teacher accounts, recent changes -->
+		<div id="account"></div>
 
+		<!-- Everything below is for a signed-in teacher only (teacher.ts shows it). -->
+		<div id="panel" hidden>
 		<h2>Today's phrase</h2>
 		<div class="row">
 			<div>
@@ -246,7 +236,7 @@
 			<div class="fixed"><button id="esp32-on" type="button">Switch ESP32 on</button></div>
 			<div class="fixed"><button id="esp32-off" type="button">Switch ESP32 off</button></div>
 		</div>
-		<p id="boards-now" class="note">Open with the teacher key to see the board settings.</p>
+		<p id="boards-now" class="note">Reading the board settings...</p>
 
 		<h3>ESP32 Wi-Fi safety failsafe</h3>
 		<p class="sub">
@@ -276,10 +266,10 @@
 			editor and click Compile once. That wakes the compiler so the first student does not
 			wait for a cold start.
 		</p>
+		</div>
 
 		<footer><a href="/">Back to the editor</a> &middot; <a href="/legal" target="_blank" rel="noopener">Privacy &amp; legal</a> &middot; <a href="https://github.com/daltonjfowler/uploadmycode" target="_blank" rel="noopener">Open source</a></footer>
 
-		<script src="/phrase-words.js" defer></script>
-		<script src="/teacher.js" defer></script>
+		<script type="module" src="/src/teacher.ts"></script>
 	</body>
 </html>

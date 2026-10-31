@@ -18,8 +18,8 @@ Teacher page: <https://uploadmycode.com/teacher.html>.
 
 Five things, about a minute, before the first student compiles.
 
-1. Open <https://uploadmycode.com/teacher.html>. The teacher key is remembered per browser, so on
-   your own laptop the page already knows it.
+1. Open <https://uploadmycode.com/teacher.html> and sign in with your name and password. The
+   sign-in is remembered per browser for 30 days, so on your own laptop you are already signed in.
 2. Press **Generate**, or type any phrase you like.
 3. Pick how long it lasts: 1 period (90 min), half day (4 h), or full day (8 h).
 4. Press **Set phrase**. The phrase appears in large type with a countdown. Project that, or write
@@ -28,7 +28,7 @@ Five things, about a minute, before the first student compiles.
    flips to "no phrase set" on its own when the phrase ends.
 
    **If a phrase is already live, Set phrase asks first.** There is one phrase for the whole site
-   and one teacher key, so two teachers setting a code in two rooms are setting the same one: the
+   for every teacher, so two teachers setting a code in two rooms are setting the same one: the
    second replaces the first, and the first room's students are refused with "Wrong class phrase"
    on their next compile until somebody tells them the new one. The confirmation names the live
    phrase and the time it was going to end so you can tell whose class it is. Re-setting the phrase
@@ -172,8 +172,15 @@ $key | Set-Clipboard
 npx wrangler secret put TEACHER_KEY
 ```
 
-Then open `/teacher.html`, paste the key, press **Remember on this machine**, and press
-**Refresh** — it should answer without an error.
+Then open `/teacher.html`, pick **Shared key** (or **Old shared key**), paste the key and press
+**Sign in**. It should sign you in without an error.
+
+**Teacher accounts (2026-10-30).** Each teacher now signs in with their own name and password. The
+accounts live in the `TEACHERS_KV` namespace, shared by all four uploadmy sites, and sessions are
+signed with the `TEACHER_SESSION_KEY` secret (a long random value, set like `TEACHER_KEY` above).
+Sign in once with the shared key, open **Teacher accounts**, add each teacher, and hand them their
+start code; they sign in with it and choose their own password. `TEACHER_KEY` keeps working until
+you delete that secret.
 
 Rotating is the same command; the new value replaces the old one the moment the upload finishes.
 Rotate if you ever type the key on a student machine, if it lands in a screenshot, or if it goes
@@ -326,7 +333,7 @@ and never be locked; the per-IP phrase brake above is what slows scripts.
 | Wrong class phrase | none of its own | 403, straight away | "Wrong class phrase. Ask your teacher for today's phrase." |
 | Wrong class phrases in a row, per device | 5 | 429 for 5 s, doubling each further wrong try to at most 300 s, before the phrase is compared | "Too many wrong tries. Wait N seconds and try again." |
 | Phrase-carrying requests, per public address | 120 per minute, right and wrong alike | 429 for up to a minute, before the phrase is compared | "That is a lot of tries from your network in one minute. Wait a minute and try again." |
-| Wrong teacher key | none of its own | 403 after a fixed 300 ms | "Wrong teacher key." |
+| Wrong teacher key, password, start code or session | none of its own | 401 after a fixed 300 ms | "Wrong teacher key." |
 | Wrong teacher keys in a row, per device | 5 | 429 for 5 s, doubling to at most 300 s, before the key is compared | "Too many wrong tries. Wait N seconds and try again." |
 | Wrong teacher keys, everywhere | more than 100 in 15 minutes | wrong keys get 429 for 15 minutes — **a correct key still gets in** | "Too many wrong keys from everywhere right now. Try again in N minutes. The right key still works." |
 | Compiles, per client id | 6 per minute | 429 until the window slides | "That is a lot of compiles in one minute. Wait N seconds…" |
@@ -491,7 +498,7 @@ Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'
 
 `script-src 'self'` is strict, with no `'unsafe-inline'` and no nonce, because the site has no
 inline script left at all. The teacher page and the Web Serial test page used to carry one each;
-they are now `public/teacher.js` and `public/serial-test.js`, loaded with `defer`. Keep it that
+they are now script files (`web/src/teacher.ts`, built by Vite, and `public/serial-test.js`). Keep it that
 way: an inline `<script>` added to any page under `web/` will simply not run in a browser.
 
 `style-src` is the exception, and it is deliberate. CodeMirror styles the editor by building a

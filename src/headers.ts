@@ -43,14 +43,13 @@ export const PERMISSIONS_POLICY =
  * The policy for HTML.
  *
  * `script-src 'self'` is strict on purpose: there is not one inline script left
- * in the site (teacher.js and serial-test.js were pulled out of their pages for
+ * in the site (the teacher page's script and serial-test.js were pulled out of their pages for
  * exactly this), so nothing needs 'unsafe-inline' and nothing needs a nonce.
  *
  * `style-src` keeps 'unsafe-inline' and that is the one loose thread. CodeMirror
  * styles itself by building a <style> element at runtime (style-mod, reached
  * through EditorView.theme in web/src/editor.ts), and teacher.html and
- * serial-test.html each carry their own <style> block so they keep working with
- * no build step. CodeMirror can take a nonce (the EditorView.cspNonce facet),
+ * serial-test.html each carry their own <style> block. CodeMirror can take a nonce (the EditorView.cspNonce facet),
  * but a nonce has to be minted per response and written into the HTML, which
  * means rewriting every HTML file on every request and giving up the asset
  * cache. Not worth it for style, which cannot fetch or execute anything. Scripts
