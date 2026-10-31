@@ -272,7 +272,7 @@ export function mountAccount(o: AccountOptions): Account {
     const add = h('button', { type: 'submit' }, 'Add teacher');
     const addForm = h('form', { class: 'ta-form ta-add' }, h('label', {}, h('span', {}, 'Add a teacher'), name), add);
     box.replaceChildren(summary, list, shown, addForm,
-      h('p', { class: 'ta-note' }, 'Every teacher can do everything here. A start code works once, for 7 days, and ends that teacher\'s old password.'));
+      h('p', { class: 'ta-note' }, 'Every teacher can do everything here. A start code works once, for 3 weeks, and ends that teacher\'s old password.'));
 
     const showCode = (who: string, code: string, days: number) => {
       shown.replaceChildren(

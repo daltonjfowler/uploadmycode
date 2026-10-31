@@ -4,7 +4,7 @@
 //
 // - Accounts live in TEACHERS_KV, ONE namespace bound to all four Workers, so a password set on one
 //   site works on every site. Only a salted PBKDF2 value is stored, never the password.
-// - A new teacher (or one who forgot) gets a one-time start code from any signed-in teacher, signs in
+// - A new teacher (or one who forgot) gets a one-time start code (21 days) from any signed-in teacher, signs in
 //   with it, and must choose a password before anything else (`setup` sessions reach only the
 //   account routes, `setupAllows`).
 // - Signing in gives a session token, signed with this site's TEACHER_SESSION_KEY secret. A token
@@ -45,7 +45,7 @@ export const MIN_PASSWORD = 10;
 export const MAX_PASSWORD = 200;
 export const SESSION_DAYS = 30;
 const SETUP_MINUTES = 30;
-const START_CODE_DAYS = 7;
+const START_CODE_DAYS = 21; // a week off must not use them up (Dalton 2026-10-30: 14+ days)
 const ITERATIONS = 100_000; // the most PBKDF2 rounds Workers allow
 const PERSON = 'person:';
 const FAILS = 'fails:';

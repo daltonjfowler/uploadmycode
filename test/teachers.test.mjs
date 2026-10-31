@@ -118,8 +118,8 @@ test('a new start code (forgot password) ends the old password and sessions', as
 test('sessions and start codes expire; a forged or tampered token is refused', async () => {
   const { env, site } = setup();
   const { code } = await addTeacher(env, site, 'Peter');
-  const eightDays = NOW + 8 * 86_400_000;
-  assert.equal(await checkCredential(env, { id: 'peter', password: code }, eightDays), null, 'start code lasts 7 days');
+  assert.equal((await checkCredential(env, { id: 'peter', password: code }, NOW + 20 * 86_400_000)).setup, true, 'a week off does not use it up');
+  assert.equal(await checkCredential(env, { id: 'peter', password: code }, NOW + 22 * 86_400_000), null, 'start code lasts 21 days');
   const tok = await mintToken(env, { id: 'peter', ver: 1 }, false, NOW);
   assert.ok(await checkCredential(env, tok, NOW + 29 * 86_400_000));
   assert.equal(await checkCredential(env, tok, NOW + 31 * 86_400_000), null, 'sessions last 30 days');
