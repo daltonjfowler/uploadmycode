@@ -1,7 +1,7 @@
 // Teacher sign-in on the teacher page, the same file on all four uploadmy sites (laser, model, code, cut;
 // the server half is src/teachers.ts). Pick your name, type your password. A new teacher types the start
-// code another teacher gave them, then chooses their own password. Signed in, it shows who you are, the
-// teacher accounts (start codes, add, remove) and the recent changes with who made them.
+// code Dalton gave them, then chooses their own password. Signed in, it shows who you are, the teacher
+// accounts (start codes, add, remove: only for Dalton, `manage`) and the recent changes with who made them.
 //
 // The session (or, during the switch, the old shared key) is kept in localStorage under `storageKey` and
 // sent as x-teacher-key, the header every teacher call already used.
@@ -25,7 +25,7 @@ export interface Account {
 }
 
 interface Person { id: string; name: string; ready: boolean }
-interface Me { id: string; name: string; via: 'account' | 'shared'; setup: boolean; token?: string | null }
+interface Me { id: string; name: string; via: 'account' | 'shared'; setup: boolean; manage?: boolean; token?: string | null }
 interface Change { at: number; who: string; what: string }
 
 const MIN_PASSWORD = 10;
@@ -117,7 +117,7 @@ export function mountAccount(o: AccountOptions): Account {
     }
     help.textContent = !opts.people.length
       ? 'No teacher accounts yet. Sign in with the shared key, then add each teacher under Teacher accounts.'
-      : 'New here, or forgot your password? Ask another teacher for a start code, then type it as your password.';
+      : 'New here, or forgot your password? Ask Dalton for a start code, then type it as your password.';
     try {
       const last = localStorage.getItem(`${o.storageKey}.who`);
       if (last && [...who.options].some((x) => x.value === last)) who.value = last;
@@ -271,8 +271,11 @@ export function mountAccount(o: AccountOptions): Account {
     const name = h('input', { type: 'text', placeholder: 'First name', autocomplete: 'off', maxLength: 30 });
     const add = h('button', { type: 'submit' }, 'Add teacher');
     const addForm = h('form', { class: 'ta-form ta-add' }, h('label', {}, h('span', {}, 'Add a teacher'), name), add);
-    box.replaceChildren(summary, list, shown, addForm,
-      h('p', { class: 'ta-note' }, 'Every teacher can do everything here. A start code works once, for 3 weeks, and ends that teacher\'s old password.'));
+    const manage = !!me?.manage; // the server checks too; this only hides buttons that would be refused
+    box.replaceChildren(summary, list, shown, ...(manage ? [addForm] : []),
+      h('p', { class: 'ta-note' }, manage
+        ? 'Only you can add or remove teachers and make start codes. A start code works once, for 3 weeks, and ends that teacher\'s old password.'
+        : 'Only Dalton can add or remove teachers or make start codes. Forgot your password? Ask Dalton for a start code.'));
 
     const showCode = (who: string, code: string, days: number) => {
       shown.replaceChildren(
@@ -337,7 +340,7 @@ export function mountAccount(o: AccountOptions): Account {
       return h('li', {},
         h('span', { class: 'ta-pname' }, p.name + (mine ? ' (you)' : '')),
         h('span', { class: 'ta-pstate' }, p.ready ? 'password set' : 'waiting for their start code'),
-        ...(mine ? [] : [code, remove]));
+        ...(mine || !manage ? [] : [code, remove]));
     }));
     if (!r.data.people.length) list.replaceChildren(h('li', { class: 'ta-note' }, 'No teacher accounts yet. Add yourself first.'));
   }

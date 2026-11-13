@@ -39,7 +39,7 @@ school shares one IP).
 
 Teacher accounts (Dalton 2026-10-30): `src/teachers.ts` (server) and `web/src/teacher-account.ts` + `.css`
 (teacher page) are the SAME files on all four uploadmy sites: change one, copy to all four. Each teacher picks
-their own password (start code first); accounts live in the shared `TEACHERS_KV` namespace, sessions are signed
+their own password (start code first); only Dalton's account (`ACCOUNT_MANAGERS` in `src/teachers.ts`, plus the emergency shared key) may add or remove teachers or make start codes (Dalton 2026-11-13); accounts live in the shared `TEACHERS_KV` namespace, sessions are signed
 with this site's `TEACHER_SESSION_KEY` secret and sent as `x-teacher-key` (display.js reads the same
 `uploadmycode.teacherKey` entry). The old shared `TEACHER_KEY`(_2) secrets were deleted on
 2026-11-12 (Dalton); sign-in is accounts only. With no working account, put a `TEACHER_KEY` secret back for a

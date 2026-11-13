@@ -1,10 +1,14 @@
 // Teacher accounts, the same file on all four uploadmy sites (laser, model, code, cut). Edit it in one
 // site and copy it to the other three, byte for byte (Dalton 2026-10-30: each teacher picks their own
-// password; teachers are equals).
+// password).
 //
 // - Accounts live in TEACHERS_KV, ONE namespace bound to all four Workers, so a password set on one
 //   site works on every site. Only a salted PBKDF2 value is stored, never the password.
-// - A new teacher (or one who forgot) gets a one-time start code (21 days) from any signed-in teacher, signs in
+// - Only ACCOUNT_MANAGERS (Dalton) may add or remove teachers or make start codes (Dalton 2026-11-13:
+//   "only Dalton can remove or add users or reset passwords"). Every teacher can still change their own
+//   password and use the rest of the teacher page. The old shared key counts as a manager: it only
+//   exists when Dalton puts the secret back to get in (CLAUDE.md, "emergency way back in").
+// - A new teacher (or one who forgot) gets a one-time start code (21 days) from Dalton, signs in
 //   with it, and must choose a password before anything else (`setup` sessions reach only the
 //   account routes, `setupAllows`).
 // - Signing in gives a session token, signed with this site's TEACHER_SESSION_KEY secret. A token
@@ -57,6 +61,15 @@ const LOG_KEY = 'teacher-log';
 const LOG_MAX = 25;
 const SHARED_NAME = 'Shared key';
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O or 1/I to misread
+/** Account ids (idFor(name)) that may add, remove and reset teachers. */
+export const ACCOUNT_MANAGERS: readonly string[] = ['dalton'];
+const NOT_MANAGER = 'Only Dalton can add or remove teachers or make start codes. Ask Dalton.';
+
+/** May add or remove teachers and make start codes: Dalton's own account, or the emergency shared key. */
+export function canManage(who: Who): boolean {
+  if (who.setup) return false;
+  return who.via === 'shared' || (who.via === 'account' && ACCOUNT_MANAGERS.includes(who.id));
+}
 
 interface Secret { salt: string; dk: string; it: number }
 interface Person { id: string; name: string; ver: number; pw?: Secret; start?: Secret & { exp: number }; setAt?: number }
@@ -339,7 +352,7 @@ export async function accountRoute(req: Request, path: string, env: TeacherEnv, 
 
 async function route(req: Request, path: string, env: TeacherEnv, siteKv: KvLike, who: Who, cred: string | PasswordCredential, now: number): Promise<Response | null> {
   const m = req.method;
-  const me = { id: who.id, name: who.name, via: who.via, setup: who.setup };
+  const me = { id: who.id, name: who.name, via: who.via, setup: who.setup, manage: canManage(who) };
   if (path === '/api/teacher/signin' && m === 'POST') {
     // A typed password becomes a session; a token or shared key just keeps working as it is.
     if (typeof cred !== 'string') {
@@ -366,7 +379,7 @@ async function route(req: Request, path: string, env: TeacherEnv, siteKv: KvLike
     const next: Person = { id: p.id, name: p.name, ver: p.ver + 1, pw: await makeSecret(b.next as string), setAt: now };
     await writePerson(store, next);
     await logChange(siteKv, who, who.setup ? 'Chose their password' : 'Changed their password', now);
-    return reply({ ...me, setup: false, token: await mintToken(env, next, false, now) });
+    return reply({ ...me, setup: false, manage: canManage({ ...who, setup: false }), token: await mintToken(env, next, false, now) });
   }
 
   if (path.startsWith('/api/teacher/people')) {
@@ -374,6 +387,7 @@ async function route(req: Request, path: string, env: TeacherEnv, siteKv: KvLike
     if (who.setup) throw new AccountError(403, 'Choose your own password first.');
     const b = m === 'GET' ? {} : await readSmallJson(req);
     if (path === '/api/teacher/people' && m === 'GET') return reply({ people: await listPeople(env) });
+    if (!canManage(who)) throw new AccountError(403, NOT_MANAGER);
     if (path === '/api/teacher/people' && m === 'POST') {
       const name = cleanName(b.name);
       const id = idFor(name);
@@ -395,7 +409,7 @@ async function route(req: Request, path: string, env: TeacherEnv, siteKv: KvLike
       return reply({ id: p.id, name: p.name, code, days: START_CODE_DAYS });
     }
     if (path === '/api/teacher/people' && m === 'DELETE') {
-      if (p.id === who.id) throw new AccountError(400, 'You cannot remove yourself. Ask another teacher.');
+      if (p.id === who.id) throw new AccountError(400, 'You cannot remove yourself.');
       await store.delete(PERSON + p.id);
       await store.delete(FAILS + p.id);
       listCache = null;

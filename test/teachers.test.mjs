@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  accountRoute, checkCredential, logChange, mintToken, newCode, passwordProblem, readChanges, readSignIn, setupAllows, signInOptions,
+  ACCOUNT_MANAGERS, accountRoute, canManage, checkCredential, logChange, mintToken, newCode, passwordProblem, readChanges, readSignIn, setupAllows, signInOptions,
 } from '../src/teachers.ts';
 
 /** An in-memory KV with metadata and list, like Cloudflare's. */
@@ -132,7 +132,7 @@ test('sessions and start codes expire; a forged or tampered token is refused', a
   assert.equal(await checkCredential(env, setupTok, NOW + 31 * 60_000), null, 'a start-code session lasts 30 minutes');
 });
 
-test('teachers can remove each other but not themselves; unknown names are refused', async () => {
+test('Dalton can remove others but not their own account; unknown names are refused', async () => {
   const { env, site } = setup();
   const { code } = await addTeacher(env, site, 'Dalton');
   await addTeacher(env, site, 'Axel');
@@ -181,6 +181,50 @@ test('a start-code session cannot manage accounts', async () => {
   const { code } = await addTeacher(env, site, 'Axel');
   const s = await call(env, site, '/api/teacher/signin', 'POST', null, { id: 'axel', password: code });
   assert.equal((await call(env, site, '/api/teacher/people', 'POST', { name: 'Eve' }, s.body.token)).status, 403);
+});
+
+/** A teacher with their own password chosen; returns their full session token. */
+async function readyTeacher(env, site, name) {
+  const { id, code } = await addTeacher(env, site, name);
+  const s = await call(env, site, '/api/teacher/signin', 'POST', null, { id, password: code });
+  return (await call(env, site, '/api/teacher/password', 'POST', { next: `${id} long password` }, s.body.token)).body.token;
+}
+
+test('only Dalton (or the emergency shared key) adds, removes and resets teachers', async () => {
+  const { env, site } = setup();
+  const dalton = await readyTeacher(env, site, 'Dalton');
+  const axel = await readyTeacher(env, site, 'Axel');
+  const peter = await readyTeacher(env, site, 'Peter');
+  assert.equal((await call(env, site, '/api/teacher/me', 'GET', null, dalton)).body.manage, true);
+  assert.equal((await call(env, site, '/api/teacher/me', 'GET', null, axel)).body.manage, false);
+  assert.equal((await call(env, site, '/api/teacher/me', 'GET', null, SHARED)).body.manage, true);
+  for (const t of [axel, peter]) {
+    const add = await call(env, site, '/api/teacher/people', 'POST', { name: 'Eve' }, t);
+    assert.equal(add.status, 403);
+    assert.match(add.body.error, /Only Dalton/);
+    assert.equal((await call(env, site, '/api/teacher/people/startcode', 'POST', { id: 'dalton' }, t)).status, 403);
+    assert.equal((await call(env, site, '/api/teacher/people/startcode', 'POST', { id: 'peter' }, t)).status, 403);
+    assert.equal((await call(env, site, '/api/teacher/people', 'DELETE', { id: 'dalton' }, t)).status, 403);
+    assert.equal((await call(env, site, '/api/teacher/people', 'GET', null, t)).status, 200, 'the list is still shown');
+  }
+  assert.deepEqual((await signInOptions(env, NOW + 60_000)).people.map((p) => p.id), ['axel', 'dalton', 'peter'], 'nothing changed');
+  assert.ok(await checkCredential(env, dalton, NOW), 'Dalton still signed in');
+  // everyone still changes their own password
+  const own = await call(env, site, '/api/teacher/password', 'POST', { current: 'axel long password', next: 'axel newer password' }, axel);
+  assert.equal(own.status, 200);
+  assert.equal(own.body.manage, false);
+  // Dalton can do it all
+  assert.equal((await call(env, site, '/api/teacher/people/startcode', 'POST', { id: 'peter' }, dalton)).status, 200);
+  assert.equal((await call(env, site, '/api/teacher/people', 'DELETE', { id: 'axel' }, dalton)).status, 200);
+  assert.equal((await call(env, site, '/api/teacher/people', 'POST', { name: 'Eve' }, dalton)).status, 200);
+});
+
+test('a teacher named like Dalton by a trick is not Dalton: the id must match exactly', async () => {
+  assert.equal(canManage({ id: 'dalton', name: 'Dalton', via: 'account', setup: false }), true);
+  assert.equal(canManage({ id: 'dalton', name: 'Dalton', via: 'account', setup: true }), false, 'not before choosing a password');
+  assert.equal(canManage({ id: 'dalton-2', name: 'Dalton 2', via: 'account', setup: false }), false);
+  assert.equal(canManage({ id: 'axel', name: 'Dalton', via: 'account', setup: false }), false);
+  assert.deepEqual(ACCOUNT_MANAGERS, ['dalton']);
 });
 
 test('the change list keeps the newest 25 with names', async () => {

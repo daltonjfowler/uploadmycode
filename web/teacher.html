@@ -47,6 +47,25 @@
 				font-size: 1.3rem;
 				margin: 0 0 0.15rem;
 			}
+			.pagehead {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 0.75rem;
+				flex-wrap: wrap;
+			}
+			.toplink {
+				color: inherit;
+				text-decoration: none;
+				white-space: nowrap;
+				padding: 0.35rem 0.75rem;
+				border: 1px solid var(--line);
+				border-radius: 6px;
+				font-size: 0.9rem;
+			}
+			.toplink:hover {
+				border-color: var(--accent);
+			}
 			p.sub {
 				margin: 0 0 1.5rem;
 				opacity: 0.75;
@@ -171,7 +190,7 @@
     <meta name="theme-color" content="#134E4A">
 </head>
 	<body>
-		<h1>uploadmycode - teacher</h1>
+		<header class="pagehead"><h1>uploadmycode - teacher</h1><a class="toplink" href="/">← Student page</a></header>
 		<p class="sub">Arduino UNO and ESP32 tool.</p>
 		<p class="sub">
 			Set the class phrase. Students type it once per tab; nobody can compile without it.
