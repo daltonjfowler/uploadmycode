@@ -41,7 +41,9 @@ Teacher accounts (Dalton 2026-10-30): `src/teachers.ts` (server) and `web/src/te
 (teacher page) are the SAME files on all four uploadmy sites: change one, copy to all four. Each teacher picks
 their own password (start code first); accounts live in the shared `TEACHERS_KV` namespace, sessions are signed
 with this site's `TEACHER_SESSION_KEY` secret and sent as `x-teacher-key` (display.js reads the same
-`uploadmycode.teacherKey` entry). The old shared `TEACHER_KEY`(_2) still works until those secrets are deleted.
+`uploadmycode.teacherKey` entry). The old shared `TEACHER_KEY`(_2) secrets were deleted on
+2026-11-12 (Dalton); sign-in is accounts only. With no working account, put a `TEACHER_KEY` secret back for a
+moment, sign in with it as "Shared key", fix the account, then delete it again.
 A wrong key, password or session is a 401 and counts in the lockout above. Teacher changes are logged with the
 name (`logChange`, "Recent changes"). The teacher page is a Vite page now (`web/teacher.html` + `web/src/teacher.ts`).
 
