@@ -33,9 +33,12 @@ test("every image starts node directly, so node is PID 1 and gets SIGTERM", () =
 	}
 });
 
-test("every Container class sets sleepAfter", () => {
+test("every Container class sets sleepAfter and has the idle cap", () => {
 	const worker = read("src/worker.ts");
-	const classes = [...worker.matchAll(/export class (\w+) extends Container \{([\s\S]*?)\n\}/g)];
+	// only the idle-capped base may extend Container directly (src/idle-cap.ts, Dalton 2026-11-16)
+	const direct = [...worker.matchAll(/class (\w+) extends Container \{/g)].map((c) => c[1]);
+	assert.deepEqual(direct, ["IdleCappedContainer"]);
+	const classes = [...worker.matchAll(/export class (\w+) extends IdleCappedContainer \{([\s\S]*?)\n\}/g)];
 	assert.deepEqual(classes.map((c) => c[1]).sort(), ["CompilerContainer", "Esp32Container"]);
 	for (const [, name, body] of classes) assert.match(body, /override sleepAfter = "\d+m"/, name);
 });

@@ -35,6 +35,8 @@
 import { Container, getContainer } from "@cloudflare/containers";
 import { DurableObject } from "cloudflare:workers";
 
+import { idleCapAction } from "./idle-cap.ts";
+
 import {
 	gateCompile,
 	gateFormat,
@@ -123,7 +125,51 @@ const MAX_TEACHER_BYTES = 4 * 1024;
  * whole time. They now live in `Counters` below, which has no container
  * attached and therefore no sleep clock to renew. Keep it that way.
  */
-export class CompilerContainer extends Container {
+/**
+ * The idle cap both compilers share (src/idle-cap.ts): stop a container nothing has reached or heard
+ * back from in 15 minutes, even if the library still thinks a request is in flight.
+ */
+abstract class IdleCappedContainer extends Container {
+	// Starts at "now", so a Durable Object restart never stops a container that is in use.
+	#lastActivityAt = Date.now();
+	#stopSentAt: number | null = null;
+
+	#touch(): void {
+		this.#lastActivityAt = Date.now();
+		this.#stopSentAt = null;
+	}
+
+	override async fetch(request: Request): Promise<Response> {
+		this.#touch();
+		try {
+			return await super.fetch(request);
+		} finally {
+			this.#touch(); // an answer counts too: a long line drains with no new arrivals
+		}
+	}
+
+	// The library's alarm loop runs at least every 3 minutes while the container is up.
+	override async alarm(alarmProps?: AlarmInvocationInfo): Promise<void> {
+		const now = Date.now();
+		const action = idleCapAction(now, this.#lastActivityAt, this.ctx.container?.running ?? false, this.#stopSentAt);
+		if (action !== "none") {
+			console.log(JSON.stringify({ message: `idle cap: ${action} container`, idleMs: now - this.#lastActivityAt }));
+			try {
+				if (action === "stop") {
+					this.#stopSentAt = now;
+					await this.stop();
+				} else {
+					await this.destroy();
+				}
+			} catch (e) {
+				console.error(JSON.stringify({ message: `idle cap: ${action} failed`, error: String(e) }));
+			}
+		}
+		return super.alarm(alarmProps);
+	}
+}
+
+export class CompilerContainer extends IdleCappedContainer {
 	/** Matches EXPOSE / PORT in the Dockerfile. */
 	override defaultPort = 8080;
 	/**
@@ -151,7 +197,7 @@ export class CompilerContainer extends Container {
  * it sleeps, and bills nothing, on every day ESP32 is not in use. Same rules as
  * CompilerContainer above: container concerns only.
  */
-export class Esp32Container extends Container {
+export class Esp32Container extends IdleCappedContainer {
 	override defaultPort = 8080;
 	override sleepAfter = "5m";
 
